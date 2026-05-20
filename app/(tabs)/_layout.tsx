@@ -1,8 +1,16 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Calendar, CheckSquare, Home, User } from 'lucide-react-native';
+import { useRouteTarget } from '@/lib/useRouteTarget';
+import { hrefForTarget } from '@/lib/routeTarget';
+import Splash from '../../components/auth/Splash';
 
-// AUTH GUARD BYPASSED FOR DEV — restore useAuth + Redirect when auth is fixed
+// Route guard: only render the tabs when the resolved target is 'tabs'. While
+// AUTH_ENABLED is false this is always 'tabs', so behavior is unchanged.
 export default function TabLayout() {
+  const target = useRouteTarget();
+  if (target === 'splash') return <Splash />;                       // loading — never redirect
+  if (target !== 'tabs') return <Redirect href={hrefForTarget(target) as any} />;
+
   return (
     <Tabs
       screenOptions={{
