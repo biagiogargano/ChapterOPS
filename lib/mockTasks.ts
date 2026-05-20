@@ -32,7 +32,7 @@
  *   • seed linkedEventId uses mock ids ('e1'..) requiring resolveEventId mapping.
  *   • dynamic RSVP-task generation is client-side and coupled to eventStore.
  */
-import { OFFICER_ROLES, type Role } from '@/lib/roles';
+import { OFFICER_ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -475,6 +475,89 @@ export function removeDynamicTaskById(id: string): void {
   if (idx >= 0) _dynamicTasks.splice(idx, 1);
 }
 
+// ─── User-created tasks (officer task creation — Phase 1) ──────────────────────
+// Officer-created structured tasks. Held locally for optimistic display; also
+// persisted to Supabase via taskService.insertTask by the create screen. Once a
+// reload re-hydrates them into the Supabase cache, getAllTasks() dedups the
+// local copy by id (same pattern as eventStore._userEvents).
+
+const _userTasks: MockTask[] = [];
+
+const BROAD_ROLES: Role[] = ['president', 'pro_consul'];
+
+/** Stable, collision-free id for a created task (distinct from seed 'tk3' ids). */
+function _taskUuid(): string {
+  return `tk_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Derive a human due label + urgency bucket from a real date (+ optional time). */
+function deriveDueMeta(dateString: string, time?: string): { dueLabel: string; urgency: TaskUrgency } {
+  const due   = new Date(dateString + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  const weekday  = due.toLocaleDateString('en-US', { weekday: 'short' });
+  const md       = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  if (diffDays < 0)   return { dueLabel: `Was due ${weekday}, ${md}`, urgency: 'overdue' };
+  if (diffDays === 0) return { dueLabel: time ? `Today by ${time}` : 'Today', urgency: 'today' };
+  return { dueLabel: time ? `${weekday}, ${md} · ${time}` : `${weekday}, ${md}`, urgency: 'week' };
+}
+
+/** Visibility = assignee + leadership + reviewer (so the approver always sees it). */
+function deriveVisibleTo(assignedRole: Role, reviewerRole?: Role): Role[] {
+  const set = new Set<Role>(BROAD_ROLES);
+  set.add(assignedRole);
+  if (reviewerRole) set.add(reviewerRole);
+  return Array.from(set);
+}
+
+/** Input for officer task creation (Phase 1 — structured tasks only). */
+export interface CreateTaskInput {
+  title:            string;
+  assignedRole:     Role;
+  dateString:       string;      // ISO "YYYY-MM-DD"
+  time?:            string;      // e.g. "8:00 PM" — optional
+  linkedEvent?:     string;      // event title
+  linkedEventId?:   string;      // event instance id
+  requiresProof:    boolean;
+  proofType?:       ProofType;
+  requiresApproval: boolean;
+  reviewerRole?:    Role;
+  description:      string;
+}
+
+/**
+ * Create a structured task: optimistic local add + fully-derived fields.
+ * The caller (create screen) is responsible for the Supabase insertTask call.
+ */
+export function addUserTask(input: CreateTaskInput): MockTask {
+  const { dueLabel, urgency } = deriveDueMeta(input.dateString, input.time);
+  const reviewerRole = input.requiresApproval ? input.reviewerRole : undefined;
+
+  const task: MockTask = {
+    id:               _taskUuid(),
+    title:            input.title,
+    type:             'structured',
+    state:            'assigned',
+    urgency,
+    dueLabel,
+    assignedRole:     input.assignedRole,
+    assignedTo:       ROLE_LABELS[input.assignedRole],
+    visibleTo:        deriveVisibleTo(input.assignedRole, reviewerRole),
+    description:      input.description,
+    linkedEvent:      input.linkedEvent,
+    linkedEventId:    input.linkedEventId,
+    requiresProof:    input.requiresProof,
+    proofType:        input.requiresProof ? input.proofType : undefined,
+    requiresApproval: input.requiresApproval,
+    reviewerRole,
+    supervisorRole:   reviewerRole,   // oversight defaults to the named reviewer
+  };
+
+  _userTasks.push(task);
+  return task;
+}
+
 // ─── Supabase task cache (structured tasks only) ───────────────────────────────
 //
 // When persistent tasks are loaded (root layout startup hydrate), the STRUCTURED
@@ -493,27 +576,35 @@ export function setSupabaseTaskCache(tasks: MockTask[]): void {
   _supabaseTasks = structured;
 }
 
-/** True if this id is a persisted (Supabase-backed) structured task. */
+/**
+ * True if this id is backed by Supabase: a hydrated structured task, OR an
+ * officer-created task this session (persisted via insertTask). Lets
+ * saveTaskState persist state changes for freshly-created tasks too.
+ */
 export function isPersistedTask(id: string): boolean {
+  if (_userTasks.some(t => t.id === id)) return true;
   return _supabaseTasks !== null && _supabaseTasks.some(t => t.id === id);
 }
 
-/** All tasks: seed/persisted data + any auto-generated tasks. */
+/** All tasks: seed/persisted data + user-created + any auto-generated tasks. */
 function getAllTasks(): MockTask[] {
   if (_supabaseTasks !== null) {
-    const byId = new Map(_supabaseTasks.map(t => [t.id, t]));
+    const byId      = new Map(_supabaseTasks.map(t => [t.id, t]));
+    const cacheIds  = new Set(_supabaseTasks.map(t => t.id));
     // Preserve MOCK_TASKS order (so role buckets render identically); swap each
     // structured task for its persisted version when present. Lightweight tasks
     // always remain the mock versions.
     const merged = MOCK_TASKS.map(t =>
       t.type === 'structured' ? (byId.get(t.id) ?? t) : t,
     );
-    // Any persisted structured tasks not in MOCK_TASKS (e.g. future created
-    // tasks) are appended, then runtime dynamic RSVP tasks.
-    const extra = _supabaseTasks.filter(t => !MOCK_TASKS.some(m => m.id === t.id));
-    return [...merged, ...extra, ..._dynamicTasks];
+    // Persisted structured tasks not in MOCK_TASKS (officer-created), then any
+    // local user-created tasks not yet re-hydrated into the cache (dedup by id),
+    // then runtime dynamic RSVP tasks.
+    const extra     = _supabaseTasks.filter(t => !MOCK_TASKS.some(m => m.id === t.id));
+    const localUser = _userTasks.filter(t => !cacheIds.has(t.id));
+    return [...merged, ...extra, ...localUser, ..._dynamicTasks];
   }
-  return [...MOCK_TASKS, ..._dynamicTasks];
+  return [...MOCK_TASKS, ..._userTasks, ..._dynamicTasks];
 }
 
 /** Find any task by ID — searches both seed and dynamic tasks. */
@@ -537,28 +628,45 @@ export type ResponsibilityBucket = 'mine' | 'review' | 'alert' | 'reviewed' | 's
  * Classify a visible task into a responsibility bucket for the given role.
  * Returns null if the role cannot see the task.
  *
- * NOTE: this reads task.state (the seed/persisted definition state). After a
- * reload, a reviewed task's persisted state is 'approved'/'rejected', so it
- * leaves 'review' — the 'reviewed' bucket keeps it visible to the reviewer
- * instead of vanishing into the (unrendered) 'supervising' bucket.
+ * `effectiveState` (optional) is the LIVE state (from devTaskStore) — pass it so
+ * in-session submit/approve/reject re-route immediately without a reload. When
+ * omitted, the task's definition state is used.
+ *
+ * REVIEW QUEUE RULE: "Needs my review" is driven by the NAMED reviewer only
+ * (task.reviewerRole === role), NOT by broad president/pro_consul oversight.
+ * Broad approval ability (canApproveTask) is a SEPARATE capability that still
+ * lets leadership act if they open the task — it must not populate the queue,
+ * or an approval task shows up for both leaders at once.
  */
-export function getTaskBucket(task: MockTask, role: Role): ResponsibilityBucket | null {
+export function getTaskBucket(
+  task: MockTask,
+  role: Role,
+  effectiveState?: TaskState,
+): ResponsibilityBucket | null {
   // Visibility gate
   if (task.visibleTo !== 'all' && !(task.visibleTo as Role[]).includes(role)) return null;
 
-  const isMine    = isTaskAssignee(task, role);
-  const canReview = canApproveTask(task, role) && !isMine;
-  const inReview  = canReview && task.state === 'submitted';
+  const state  = effectiveState ?? task.state;
+  const isMine = isTaskAssignee(task, role);
 
-  if (isMine)    return 'mine';
-  if (inReview)  return 'review';
+  // Named-reviewer gate (queue ownership). Defensive fallback: an approval task
+  // with no valid reviewerRole falls back to leadership so it is never stuck
+  // un-reviewable.
+  const isNamedReviewer =
+    !!task.requiresApproval && !isMine && (
+      task.reviewerRole === role ||
+      (!task.reviewerRole && (role === 'president' || role === 'pro_consul'))
+    );
 
-  // A task this role can review that has already been acted on — keep it in a
-  // visible "Recently Reviewed" surface rather than dropping it.
-  if (canReview && (task.state === 'approved' || task.state === 'rejected')) return 'reviewed';
+  if (isMine) return 'mine';
+
+  if (isNamedReviewer && state === 'submitted') return 'review';
+
+  // Already acted on by the named reviewer — keep it in "Recently Reviewed".
+  if (isNamedReviewer && (state === 'approved' || state === 'rejected')) return 'reviewed';
 
   // Non-mine overdue/escalated = chapter alert
-  if (task.state === 'overdue' || task.state === 'escalated') return 'alert';
+  if (state === 'overdue' || state === 'escalated') return 'alert';
 
   return 'supervising';
 }
@@ -569,8 +677,18 @@ export function sortByUrgency(tasks: MockTask[]): MockTask[] {
   return [...tasks].sort((a, b) => URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency]);
 }
 
-/** Get all tasks for a role, split into responsibility buckets. */
-export function getResponsibilityGroups(role: Role) {
+/**
+ * Get all tasks for a role, split into responsibility buckets.
+ *
+ * `getState` (optional) resolves the LIVE state for a task (e.g. from
+ * devTaskStore) so submit/approve/reject re-route the review queue immediately.
+ * Screens pass `(t) => getStoredState(t.id, t.state)`. When omitted, the
+ * definition state is used.
+ */
+export function getResponsibilityGroups(
+  role: Role,
+  getState?: (task: MockTask) => TaskState,
+) {
   const mine:        MockTask[] = [];
   const review:      MockTask[] = [];
   const alert:       MockTask[] = [];
@@ -581,7 +699,8 @@ export function getResponsibilityGroups(role: Role) {
     // Workflow parents are summary containers — their individual steps are shown instead
     if (task.isWorkflowParent) continue;
 
-    const bucket = getTaskBucket(task, role);
+    const state  = getState ? getState(task) : task.state;
+    const bucket = getTaskBucket(task, role, state);
     if (!bucket) continue;
     if (bucket === 'mine')          mine.push(task);
     else if (bucket === 'review')   review.push(task);

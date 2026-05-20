@@ -1,4 +1,4 @@
-import { loadTaskState, saveTaskState } from '@/lib/devTaskStore';
+import { getStoredState, loadTaskState, saveTaskState } from '@/lib/devTaskStore';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
@@ -589,7 +589,11 @@ export default function TodayScreen() {
   const isBrother  = roleGroup === 'brother';
   const isOfficerRole = isOfficer(role);
 
-  const { mine, review, alert } = getResponsibilityGroups(role);
+  // Live state (devTaskStore) so review routing reflects in-session changes.
+  const { mine, review, alert } = getResponsibilityGroups(
+    role,
+    t => getStoredState(t.id, t.state),
+  );
 
   const urgentMine = mine.filter(t => t.urgency === 'overdue' || t.urgency === 'today');
   const weekMine   = mine.filter(t => t.urgency === 'week');

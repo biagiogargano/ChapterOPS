@@ -12,8 +12,9 @@ import {
   type TaskState,
 } from '@/lib/mockTasks';
 import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
-import { ROLE_LABELS } from '@/lib/roles';
-import { useRouter } from 'expo-router';
+import { ROLE_LABELS, isOfficer } from '@/lib/roles';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // ─── Summary bar helpers ──────────────────────────────────────────────────────
@@ -295,11 +296,31 @@ function SectionHeader({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
-  const router    = useRouter();
-  const { role }  = useDevRole();
-  const roleLabel = ROLE_LABELS[role];
+  const router     = useRouter();
+  const navigation = useNavigation();
+  const { role }   = useDevRole();
+  const roleLabel  = ROLE_LABELS[role];
+  const officer    = isOfficer(role);
 
-  const { mine, review, alert, reviewed } = getResponsibilityGroups(role);
+  // Officer-only "+ Create" task button in the tab header.
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: officer
+        ? () => (
+            <Pressable style={s.createHdrBtn} onPress={() => router.push('/task/create' as any)}>
+              <Text style={s.createHdrText}>+ Create</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [officer, navigation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Use LIVE state (devTaskStore) so submit/approve/reject re-route the review
+  // queue to the correct reviewer immediately, without requiring a reload.
+  const { mine, review, alert, reviewed } = getResponsibilityGroups(
+    role,
+    t => getStoredState(t.id, t.state),
+  );
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
@@ -384,6 +405,10 @@ export default function TasksScreen() {
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: '#0f172a' },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+
+  // Header create button
+  createHdrBtn:  { paddingHorizontal: 12, paddingVertical: 4 },
+  createHdrText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
   // Role bar
   roleBar: {

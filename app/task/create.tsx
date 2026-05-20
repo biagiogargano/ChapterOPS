@@ -1,0 +1,557 @@
+import { useDevRole } from '@/lib/devRoleStore';
+import { getAllEvents } from '@/lib/eventStore';
+import { getEventDate } from '@/lib/mockEvents';
+import { addUserTask, type CreateTaskInput, type ProofType } from '@/lib/mockTasks';
+import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { insertTask } from '@/lib/taskService';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+// ─── Date utilities (mirrors event/create.tsx) ────────────────────────────────
+
+function isoDateFromParts(y: number, m0: number, d: number): string {
+  return `${y}-${String(m0 + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function todayIso(): string {
+  const t = new Date();
+  return isoDateFromParts(t.getFullYear(), t.getMonth(), t.getDate());
+}
+const _now     = new Date();
+const _maxDate = new Date(_now.getFullYear(), _now.getMonth() + 12, _now.getDate());
+const MAX_ISO  = isoDateFromParts(_maxDate.getFullYear(), _maxDate.getMonth(), _maxDate.getDate());
+
+const CAL_DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MONTH_NAMES    = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const MINUTE_CHIPS = ['00', '15', '30', '45'];
+
+const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
+  { value: 'text',       label: 'Text' },
+  { value: 'link',       label: 'Link' },
+  { value: 'document',   label: 'Document' },
+  { value: 'image',      label: 'Image' },
+  { value: 'screenshot', label: 'Screenshot' },
+];
+
+// ─── FieldLabel ───────────────────────────────────────────────────────────────
+
+function FieldLabel({ text, required }: { text: string; required?: boolean }) {
+  return (
+    <View style={s.fieldLabelRow}>
+      <Text style={s.fieldLabel}>{text}</Text>
+      {required && <Text style={s.fieldRequired}>required</Text>}
+    </View>
+  );
+}
+
+// ─── CalendarPicker (self-contained copy) ─────────────────────────────────────
+
+function CalendarPicker({
+  selected, onSelect, minIso, maxIso,
+}: {
+  selected: string;
+  onSelect: (iso: string) => void;
+  minIso?:  string;
+  maxIso?:  string;
+}) {
+  const today  = new Date();
+  const initY  = selected ? parseInt(selected.slice(0, 4))     : today.getFullYear();
+  const initM  = selected ? parseInt(selected.slice(5, 7)) - 1 : today.getMonth();
+  const [viewYear,  setViewYear ] = useState(initY);
+  const [viewMonth, setViewMonth] = useState(initM);
+
+  const effectiveMin = minIso ?? todayIso();
+  const effectiveMax = maxIso ?? MAX_ISO;
+
+  const prevY         = viewMonth === 0 ? viewYear - 1 : viewYear;
+  const prevM         = viewMonth === 0 ? 11           : viewMonth - 1;
+  const lastDayOfPrev = new Date(viewYear, viewMonth, 0).getDate();
+  const canGoPrev     = isoDateFromParts(prevY, prevM, lastDayOfPrev) >= effectiveMin;
+
+  const nextY     = viewMonth === 11 ? viewYear + 1 : viewYear;
+  const nextM     = viewMonth === 11 ? 0            : viewMonth + 1;
+  const canGoNext = isoDateFromParts(nextY, nextM, 1) <= effectiveMax;
+
+  function goPrev() {
+    if (!canGoPrev) return;
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else                 { setViewMonth(m => m - 1); }
+  }
+  function goNext() {
+    if (!canGoNext) return;
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else                  { setViewMonth(m => m + 1); }
+  }
+
+  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
+  const firstOffset  = (firstWeekday + 6) % 7;
+
+  const cells: (number | null)[] = Array(firstOffset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+
+  const todayStr = todayIso();
+
+  return (
+    <View style={s.cal}>
+      <View style={s.calHeader}>
+        <Pressable onPress={goPrev} disabled={!canGoPrev} style={[s.calNavBtn, !canGoPrev && s.calNavBtnOff]}>
+          <Text style={[s.calNavText, !canGoPrev && s.calNavTextOff]}>‹</Text>
+        </Pressable>
+        <Text style={s.calMonthLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
+        <Pressable onPress={goNext} disabled={!canGoNext} style={[s.calNavBtn, !canGoNext && s.calNavBtnOff]}>
+          <Text style={[s.calNavText, !canGoNext && s.calNavTextOff]}>›</Text>
+        </Pressable>
+      </View>
+
+      <View style={s.calRow}>
+        {CAL_DAY_LABELS.map(h => <Text key={h} style={s.calDayHead}>{h}</Text>)}
+      </View>
+
+      {rows.map((row, ri) => (
+        <View key={ri} style={s.calRow}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={ci} style={s.calCell} />;
+            const iso      = isoDateFromParts(viewYear, viewMonth, day);
+            const isSel    = iso === selected;
+            const isToday  = iso === todayStr;
+            const disabled = iso < effectiveMin || iso > effectiveMax;
+            return (
+              <Pressable
+                key={ci}
+                style={[s.calCell, isSel && s.calCellSel, isToday && !isSel && s.calCellToday, disabled && s.calCellOff]}
+                onPress={() => !disabled && onSelect(iso)}
+                disabled={disabled}
+              >
+                <Text style={[s.calCellText, isSel && s.calCellTextSel, isToday && !isSel && s.calCellTextToday, disabled && s.calCellTextOff]}>
+                  {day}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── TimePicker (self-contained copy) ─────────────────────────────────────────
+
+function TimePicker({
+  hour, minute, ampm, onHour, onMinute, onAmpm,
+}: {
+  hour: number; minute: string; ampm: 'AM' | 'PM';
+  onHour: (h: number) => void; onMinute: (m: string) => void; onAmpm: (a: 'AM' | 'PM') => void;
+}) {
+  return (
+    <View style={s.timePicker}>
+      <View style={s.timeRow1}>
+        <Pressable style={s.timeArrow} onPress={() => onHour(hour === 1 ? 12 : hour - 1)}>
+          <Text style={s.timeArrowText}>‹</Text>
+        </Pressable>
+        <Text style={s.timeHourNum}>{hour}</Text>
+        <Pressable style={s.timeArrow} onPress={() => onHour(hour === 12 ? 1 : hour + 1)}>
+          <Text style={s.timeArrowText}>›</Text>
+        </Pressable>
+        <Text style={s.timeColon}>h</Text>
+        <View style={{ flex: 1 }} />
+        {(['AM', 'PM'] as const).map(a => (
+          <Pressable key={a} style={[s.timeAmpmBtn, ampm === a && s.timeAmpmBtnOn]} onPress={() => onAmpm(a)}>
+            <Text style={[s.timeAmpmText, ampm === a && s.timeAmpmTextOn]}>{a}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={s.timeRow2}>
+        {MINUTE_CHIPS.map(m => (
+          <Pressable key={m} style={[s.timeMinChip, minute === m && s.timeMinChipOn]} onPress={() => onMinute(m)}>
+            <Text style={[s.timeMinText, minute === m && s.timeMinTextOn]}>:{m}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+export default function CreateTaskScreen() {
+  const router     = useRouter();
+  const navigation = useNavigation();
+  const { role }   = useDevRole();
+  const params     = useLocalSearchParams<{ eventId?: string; eventTitle?: string }>();
+
+  // BROAD officers can assign to any officer role; others only to themselves.
+  const isBroad         = role === 'president' || role === 'pro_consul';
+  const assignableRoles = useMemo<Role[]>(
+    () => (isBroad ? OFFICER_ROLES : [role]),
+    [isBroad, role],
+  );
+
+  // ── Form state ──────────────────────────────────────────────────────────────
+  const [title,        setTitle       ] = useState('');
+  const [assignedRole, setAssignedRole] = useState<Role>(() => assignableRoles[0] ?? role);
+  const [dateString,   setDateString  ] = useState('');
+  const [includeTime,  setIncludeTime ] = useState(false);
+  const [hour,         setHour        ] = useState(8);
+  const [minute,       setMinute      ] = useState('00');
+  const [ampm,         setAmpm        ] = useState<'AM' | 'PM'>('PM');
+  const [linkedEventId, setLinkedEventId] = useState<string | undefined>(params.eventId);
+  const [requiresProof, setRequiresProof] = useState(false);
+  const [proofType,    setProofType   ] = useState<ProofType>('text');
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [reviewerRole, setReviewerRole] = useState<Role | undefined>(undefined);
+  const [description,  setDescription ] = useState('');
+  const [errors,       setErrors      ] = useState<string[]>([]);
+
+  const events = useMemo(() => getAllEvents(), []);
+
+  // Reviewer options = leadership roles, excluding the assignee (a task can't
+  // review itself). Recompute + reset when assignee changes.
+  const reviewerOptions = useMemo<Role[]>(
+    () => (['president', 'pro_consul'] as Role[]).filter(r => r !== assignedRole),
+    [assignedRole],
+  );
+  useEffect(() => {
+    if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
+      setReviewerRole(reviewerOptions[0]);
+    }
+  }, [assignedRole, requiresApproval, reviewerRole, reviewerOptions]);
+
+  // Guard: non-officers should never reach this screen
+  useEffect(() => {
+    if (!isOfficer(role)) router.back();
+  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Create Task',
+      headerLeft: () => (
+        <Pressable onPress={() => router.back()} style={s.cancelBtn}>
+          <Text style={s.cancelBtnText}>Cancel</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const canSubmit =
+    title.trim().length > 0 &&
+    dateString !== '' &&
+    (!requiresProof    || !!proofType) &&
+    (!requiresApproval || (!!reviewerRole && reviewerRole !== assignedRole));
+
+  function handleCreate() {
+    const errs: string[] = [];
+    if (!title.trim())  errs.push('Task title is required.');
+    if (!dateString)    errs.push('Please pick a due date.');
+    if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
+      errs.push('Choose a reviewer different from the assignee.');
+    }
+    if (errs.length > 0) { setErrors(errs); return; }
+
+    const linkedEvent = linkedEventId
+      ? events.find(e => e.id === linkedEventId)?.title
+      : undefined;
+
+    const input: CreateTaskInput = {
+      title:            title.trim(),
+      assignedRole,
+      dateString,
+      time:             includeTime ? `${hour}:${minute} ${ampm}` : undefined,
+      linkedEvent,
+      linkedEventId:    linkedEventId,
+      requiresProof,
+      proofType:        requiresProof ? proofType : undefined,
+      requiresApproval,
+      reviewerRole:     requiresApproval ? reviewerRole : undefined,
+      description:      description.trim(),
+    };
+
+    // 1) optimistic local add (also derives label/urgency/visibleTo)
+    const task = addUserTask(input);
+    // 2) fire-and-forget Supabase insert (no-ops if unconfigured → mock fallback)
+    void insertTask(task);
+    // 3) go to the task detail
+    router.replace(`/task/${task.id}` as any);
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={s.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+        {/* Title */}
+        <View style={s.field}>
+          <FieldLabel text="TASK TITLE" required />
+          <TextInput
+            style={[s.textInput, errors.includes('Task title is required.') && s.inputError]}
+            placeholder="e.g. Draft budget report"
+            placeholderTextColor="#475569"
+            value={title}
+            onChangeText={v => { setTitle(v); setErrors([]); }}
+            autoCapitalize="sentences"
+            returnKeyType="next"
+          />
+        </View>
+
+        {/* Assignee role */}
+        <View style={s.field}>
+          <FieldLabel text="ASSIGN TO" required />
+          <View style={s.chipWrap}>
+            {assignableRoles.map(r => {
+              const on = assignedRole === r;
+              return (
+                <Pressable key={r} style={[s.chip, on && s.chipOn]} onPress={() => setAssignedRole(r)}>
+                  <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Linked event (optional) */}
+        <View style={s.field}>
+          <FieldLabel text="LINK TO EVENT" />
+          <View style={s.eventList}>
+            <Pressable
+              style={[s.eventRow, !linkedEventId && s.eventRowOn]}
+              onPress={() => setLinkedEventId(undefined)}
+            >
+              <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
+            </Pressable>
+            {events.map(e => {
+              const on   = linkedEventId === e.id;
+              const date = getEventDate(e.dayOffset);
+              const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
+              return (
+                <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => setLinkedEventId(e.id)}>
+                  <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
+                  <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Due date */}
+        <View style={s.field}>
+          <FieldLabel text="DUE DATE" required />
+          {errors.includes('Please pick a due date.') && (
+            <Text style={s.errorMsg}>Please pick a due date.</Text>
+          )}
+          <CalendarPicker
+            selected={dateString}
+            onSelect={d => { setDateString(d); setErrors([]); }}
+            maxIso={MAX_ISO}
+          />
+        </View>
+
+        {/* Optional time */}
+        <View style={s.field}>
+          <Pressable style={s.toggleRow} onPress={() => setIncludeTime(v => !v)}>
+            <View style={[s.toggleBox, includeTime && s.toggleBoxOn]}>
+              {includeTime && <Text style={s.toggleCheck}>✓</Text>}
+            </View>
+            <Text style={s.toggleLabel}>Add a specific due time</Text>
+          </Pressable>
+          {includeTime && (
+            <View style={{ marginTop: 12 }}>
+              <TimePicker hour={hour} minute={minute} ampm={ampm} onHour={setHour} onMinute={setMinute} onAmpm={setAmpm} />
+            </View>
+          )}
+        </View>
+
+        {/* Requires proof */}
+        <View style={s.field}>
+          <Pressable style={s.toggleRow} onPress={() => setRequiresProof(v => !v)}>
+            <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
+              {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
+            </View>
+            <Text style={s.toggleLabel}>Requires proof of completion</Text>
+          </Pressable>
+          {requiresProof && (
+            <View style={[s.chipWrap, { marginTop: 12 }]}>
+              {PROOF_OPTIONS.map(({ value, label }) => {
+                const on = proofType === value;
+                return (
+                  <Pressable key={value} style={[s.chip, on && s.chipOn]} onPress={() => setProofType(value)}>
+                    <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Requires approval */}
+        <View style={s.field}>
+          <Pressable style={s.toggleRow} onPress={() => setRequiresApproval(v => !v)}>
+            <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
+              {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
+            </View>
+            <Text style={s.toggleLabel}>Requires approval</Text>
+          </Pressable>
+          {requiresApproval && (
+            <>
+              <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
+              {errors.includes('Choose a reviewer different from the assignee.') && (
+                <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
+              )}
+              <View style={s.chipWrap}>
+                {reviewerOptions.map(r => {
+                  const on = reviewerRole === r;
+                  return (
+                    <Pressable key={r} style={[s.chip, on && s.chipOn]} onPress={() => setReviewerRole(r)}>
+                      <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Description */}
+        <View style={s.field}>
+          <FieldLabel text="DESCRIPTION" />
+          <TextInput
+            style={[s.textInput, s.textArea]}
+            placeholder="Details, expectations, links to templates…"
+            placeholderTextColor="#475569"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Submit */}
+        <Pressable style={[s.createBtn, !canSubmit && s.createBtnDisabled]} onPress={handleCreate} disabled={!canSubmit}>
+          <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>Create Task</Text>
+        </Pressable>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root:    { flex: 1, backgroundColor: '#0f172a' },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+
+  cancelBtn:     { paddingHorizontal: 4 },
+  cancelBtnText: { color: '#94a3b8', fontSize: 15 },
+
+  field:         { marginBottom: 28 },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
+  fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
+  errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
+
+  textInput: {
+    backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155',
+    color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  textArea:   { minHeight: 96, paddingTop: 12 },
+  inputError: { borderColor: '#f87171' },
+
+  // Chips (assignee / proof / reviewer)
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
+    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10,
+  },
+  chipOn:     { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  chipText:   { fontSize: 13, fontWeight: '600', color: '#64748b' },
+  chipTextOn: { color: '#a5b4fc' },
+
+  // Event picker
+  eventList: { gap: 8 },
+  eventRow: {
+    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, gap: 2,
+  },
+  eventRowOn:      { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  eventRowTitle:   { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
+  eventRowTitleOn: { color: '#a5b4fc' },
+  eventRowSub:     { fontSize: 12, color: '#64748b' },
+
+  // Toggle
+  toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toggleBox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#475569',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  toggleBoxOn:  { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  toggleCheck:  { fontSize: 13, color: '#a5b4fc', fontWeight: '700', lineHeight: 16 },
+  toggleLabel:  { fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+
+  // Calendar
+  cal: { backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
+  calHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#334155',
+  },
+  calNavBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  calNavBtnOff: { opacity: 0.3 },
+  calNavText:   { fontSize: 22, color: '#94a3b8', lineHeight: 26 },
+  calNavTextOff:{ color: '#475569' },
+  calMonthLabel:{ fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
+  calRow:       { flexDirection: 'row', paddingHorizontal: 4, paddingVertical: 1 },
+  calDayHead:   { flex: 1, textAlign: 'center', fontSize: 10, fontWeight: '700', color: '#475569', letterSpacing: 0.2, paddingVertical: 6 },
+  calCell:      { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', margin: 1, borderRadius: 6 },
+  calCellSel:       { backgroundColor: '#4f46e5' },
+  calCellToday:     { backgroundColor: '#1e1b4b' },
+  calCellOff:       { opacity: 0.25 },
+  calCellText:      { fontSize: 13, fontWeight: '500', color: '#94a3b8' },
+  calCellTextSel:   { color: '#fff', fontWeight: '700' },
+  calCellTextToday: { color: '#a5b4fc', fontWeight: '700' },
+  calCellTextOff:   { color: '#334155' },
+
+  // Time picker
+  timePicker: {
+    backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155',
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12, gap: 10,
+  },
+  timeRow1:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeArrow:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  timeArrowText: { fontSize: 18, color: '#94a3b8', lineHeight: 22 },
+  timeHourNum: { width: 32, textAlign: 'center', fontSize: 22, fontWeight: '700', color: '#f1f5f9' },
+  timeColon:   { fontSize: 12, fontWeight: '600', color: '#475569', marginLeft: 2 },
+  timeAmpmBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
+  timeAmpmBtnOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  timeAmpmText:   { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  timeAmpmTextOn: { color: '#a5b4fc' },
+  timeRow2:    { flexDirection: 'row', gap: 6 },
+  timeMinChip: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  timeMinChipOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  timeMinText:    { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  timeMinTextOn:  { color: '#a5b4fc' },
+
+  // Submit
+  createBtn:             { backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
+  createBtnDisabled:     { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155' },
+  createBtnText:         { fontSize: 16, fontWeight: '700', color: '#fff' },
+  createBtnTextDisabled: { color: '#475569' },
+});

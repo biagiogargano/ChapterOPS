@@ -799,6 +799,12 @@ export default function TaskDetailScreen() {
   const showEscalation  = !!(task.escalationChain && task.escalationChain.length > 1);
   const showWorkflow    = !!task.isWorkflowParent;
 
+  // Post-review wording: only say "You" if the current role IS the named
+  // reviewer. Otherwise attribute it to the reviewer role. (No reviewedBy is
+  // tracked yet, so reviewerRole is the fallback label.)
+  const reviewerIsYou = !!task.reviewerRole && task.reviewerRole === role;
+  const reviewerLabel = task.reviewerRole ? ROLE_LABELS[task.reviewerRole] : 'The reviewer';
+
   const parentTask = getParentTask(task);
 
   function handleReject(note: string) {
@@ -936,16 +942,26 @@ export default function TaskDetailScreen() {
         {isReviewerOnly && taskState === 'approved' && (
           <>
             <Divider />
-            <StatusChip icon="✓" text="You approved this task" color="#4ade80" bg="#052e16" />
+            <StatusChip
+              icon="✓"
+              text={reviewerIsYou ? 'You approved this task' : `${reviewerLabel} approved this task`}
+              color="#4ade80"
+              bg="#052e16"
+            />
           </>
         )}
         {isReviewerOnly && taskState === 'rejected' && (
           <>
             <Divider />
-            <StatusChip icon="✗" text="You rejected this task" color="#fca5a5" bg="#1a0505" />
+            <StatusChip
+              icon="✗"
+              text={reviewerIsYou ? 'You rejected this task' : `${reviewerLabel} rejected this task`}
+              color="#fca5a5"
+              bg="#1a0505"
+            />
             {rejNote !== '' && (
               <View style={[s.rejectionNote, { marginTop: 10 }]}>
-                <Text style={s.rejectionNoteLabel}>Your feedback:</Text>
+                <Text style={s.rejectionNoteLabel}>{reviewerIsYou ? 'Your feedback:' : `${reviewerLabel} feedback:`}</Text>
                 <Text style={s.rejectionNoteText}>{rejNote}</Text>
               </View>
             )}

@@ -16,7 +16,7 @@ import {
   useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { ROLE_LABELS } from '@/lib/roles';
+import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import {
   STATE_COLOR,
   filterTasksForRole,
@@ -449,6 +449,7 @@ export default function EventDetailScreen() {
   const isMandatory = event.audience === 'all';
 
   // Role-gated officer sections
+  const officer     = isOfficer(role);
   const isBROAD     = role === 'president' || role === 'pro_consul';
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';
@@ -583,17 +584,30 @@ export default function EventDetailScreen() {
       )}
 
       {/* ── Related tasks (RSVP tasks already filtered out) ── */}
-      {relatedTasks.length > 0 && (
+      {(officer || relatedTasks.length > 0) && (
         <>
           <View style={s.divider} />
-          <SectionLabel text="RELATED TASKS" />
-          {relatedTasks.map(task => (
-            <RelatedTaskCard
-              key={task.id}
-              task={task}
-              onPress={() => router.push(`/task/${task.id}` as any)}
-            />
-          ))}
+          <View style={s.relatedHeader}>
+            <SectionLabel text="RELATED TASKS" />
+            {officer && (
+              <Pressable
+                onPress={() => router.push(`/task/create?eventId=${event.id}` as any)}
+              >
+                <Text style={s.addTaskText}>+ Add Task</Text>
+              </Pressable>
+            )}
+          </View>
+          {relatedTasks.length === 0 ? (
+            <Text style={s.noRelatedText}>No related tasks yet.</Text>
+          ) : (
+            relatedTasks.map(task => (
+              <RelatedTaskCard
+                key={task.id}
+                task={task}
+                onPress={() => router.push(`/task/${task.id}` as any)}
+              />
+            ))
+          )}
         </>
       )}
 
@@ -727,6 +741,11 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 12,
   },
+
+  // Related tasks header row (+ Add Task)
+  relatedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addTaskText:   { fontSize: 13, fontWeight: '600', color: '#818cf8', marginBottom: 12 },
+  noRelatedText: { fontSize: 13, color: '#475569', marginBottom: 4 },
 
   description: {
     fontSize: 15,
