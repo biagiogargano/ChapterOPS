@@ -1,4 +1,4 @@
-import { getStoredState, loadTaskState, saveTaskState } from '@/lib/devTaskStore';
+import { getStoredState, loadTaskState, saveTaskState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
@@ -29,12 +29,19 @@ import {
   hydrateRsvpsFromSupabase,
   setRsvpEntry,
   useRsvpEntry,
+  useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
+import {
+  deriveReminders,
+  type Reminder,
+  type ReminderKind,
+  type ReminderSeverity,
+} from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -89,6 +96,39 @@ function getRoleGroup(role: Role) {
   if (role === 'pro_consul') return 'leadership';
   if (role === 'annotator')  return 'annotator';
   return 'officer'; // risk_manager, social_chair, recruitment_chair
+}
+
+// ─── Reminders (derived signals on existing cards — Phase C) ──────────────────
+// A reminder is looked up by entity id and shown as a small badge on the card
+// that already renders that entity (no separate feed). Provided via context so
+// the many card call-sites don't need new props.
+
+const ReminderCtx = createContext<Map<string, Reminder>>(new Map());
+
+const REMINDER_LABEL: Record<ReminderKind, string> = {
+  rsvp_needed:     'RSVP needed',
+  event_today:     'Today',
+  task_due_today:  'Due today',
+  task_overdue:    'Overdue',
+  review_pending:  'Review',
+  resubmit_needed: 'Resubmit',
+  escalation_alert:'Overdue',
+};
+
+const REMINDER_BADGE: Record<ReminderSeverity, { color: string; bg: string }> = {
+  critical: { color: '#fca5a5', bg: '#450a0a' },
+  moderate: { color: '#fbbf24', bg: '#1c1407' },
+  low:      { color: '#94a3b8', bg: '#1e293b' },
+};
+
+function ReminderBadge({ reminder }: { reminder?: Reminder }) {
+  if (!reminder) return null;
+  const cfg = REMINDER_BADGE[reminder.severity];
+  return (
+    <View style={[s.remBadge, { backgroundColor: cfg.bg }]}>
+      <Text style={[s.remBadgeText, { color: cfg.color }]}>{REMINDER_LABEL[reminder.kind]}</Text>
+    </View>
+  );
 }
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
@@ -425,6 +465,7 @@ function TodayTaskCard({
   const stateBg    = STATE_BG[state];
   // Overdue is date-driven (computed from dueAt) and never true once done.
   const isUrgent   = isOverdue(task.dueAt, state) || state === 'escalated';
+  const reminder   = useContext(ReminderCtx).get(task.id);
 
   return (
     <Pressable style={[s.taskCard, isUrgent && s.taskCardUrgent]} onPress={onPress}>
@@ -440,6 +481,7 @@ function TodayTaskCard({
           </View>
         </View>
         <View style={s.taskMetaRow}>
+          <ReminderBadge reminder={reminder} />
           {showAssignee && (
             <>
               <Text style={s.taskAssignee}>{task.assignedTo}</Text>
@@ -464,12 +506,16 @@ function TodayTaskCard({
 
 function AlertCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
   const isEscalated = task.state === 'escalated';
+  const reminder    = useContext(ReminderCtx).get(task.id);
   return (
     <Pressable style={s.alertCard} onPress={onPress}>
       <Text style={s.alertIcon}>{isEscalated ? '⚡' : '⚠️'}</Text>
       <View style={s.alertBody}>
-        <Text style={s.alertTitle} numberOfLines={1}>{task.title}</Text>
-        <Text style={s.alertMeta}>{task.assignedTo} · {task.dueLabel}</Text>
+        <View style={s.alertTitleRow}>
+          <Text style={s.alertTitle} numberOfLines={1}>{task.title}</Text>
+          <ReminderBadge reminder={reminder} />
+        </View>
+        <Text style={s.alertMeta}>{task.assignedTo} · {dueLabelOf(task)}</Text>
       </View>
       <Text style={s.alertChevron}>›</Text>
     </Pressable>
@@ -629,6 +675,15 @@ export default function TodayScreen() {
   useUpdateNoticesVersion();
   const notices = getNoticesForRole(role);
 
+  // Derived reminders (compute-on-read). Subscribe to BOTH stores so the count
+  // and card badges recompute immediately on an RSVP response or a task
+  // submit/approve/reject/resubmit — same live sources the badges read.
+  useRsvpVersion();
+  useTaskStateVersion();
+  const reminders    = deriveReminders(role);
+  const reminderById = new Map(reminders.map(r => [r.entityId, r]));
+  const topSeverity  = reminders[0]?.severity ?? 'low';
+
   function handleNoticePress(n: UpdateNotice) {
     acknowledgeNotice(n.id, role);   // dismiss for this role
     if (n.entityType === 'task' && findTaskById(n.entityId)) {
@@ -703,6 +758,7 @@ export default function TodayScreen() {
   const hasUrgentContent = urgentMine.length > 0 || review.length > 0 || alert.length > 0;
 
   return (
+    <ReminderCtx.Provider value={reminderById}>
     <KeyboardAvoidingView
       style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -723,6 +779,17 @@ export default function TodayScreen() {
         <Text style={s.chapter}>
           {DEMO_CHAPTER.name} · {ROLE_LABELS[role].toUpperCase()}
         </Text>
+
+        {/* ── Needs Attention summary — informational caption (NOT a button).
+            Count only; the items themselves are in the sections below. ── */}
+        {reminders.length > 0 && (
+          <View style={s.needsAttn}>
+            <View style={[s.needsAttnDot, { backgroundColor: REMINDER_BADGE[topSeverity].color }]} />
+            <Text style={s.needsAttnText}>
+              {reminders.length} {reminders.length === 1 ? 'item needs' : 'items need'} your attention
+            </Text>
+          </View>
+        )}
 
         {/* ── UPDATES (change notices for this role) ── */}
         {notices.length > 0 && (
@@ -910,6 +977,7 @@ export default function TodayScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
     </KeyboardAvoidingView>
+    </ReminderCtx.Provider>
   );
 }
 
@@ -1014,7 +1082,7 @@ const s = StyleSheet.create({
   alertCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a0505', borderRadius: 12, borderWidth: 1, borderColor: '#7f1d1d', padding: 14, gap: 12, marginBottom: 8 },
   alertIcon:    { fontSize: 18 },
   alertBody:    { flex: 1, gap: 2 },
-  alertTitle:   { fontSize: 14, fontWeight: '700', color: '#fca5a5' },
+  alertTitle:   { fontSize: 14, fontWeight: '700', color: '#fca5a5', flexShrink: 1 },
   alertMeta:    { fontSize: 12, color: '#f87171', opacity: 0.7 },
   alertChevron: { fontSize: 20, color: '#7f1d1d' },
 
@@ -1037,6 +1105,14 @@ const s = StyleSheet.create({
   excuseStatusBadge:{ borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   excuseStatusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   jboardNote:       { fontSize: 12, color: '#fb923c', fontStyle: 'italic', lineHeight: 17 },
+
+  // ── Reminders: needs-attention caption (informational, not a button) ────────
+  needsAttn:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 16, paddingHorizontal: 2 },
+  needsAttnDot:  { width: 7, height: 7, borderRadius: 4 },
+  needsAttnText: { fontSize: 13, fontWeight: '500', color: '#94a3b8' },
+  remBadge:      { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  remBadgeText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  alertTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // ── Update notice card ──────────────────────────────────────────────────────
   noticeCard:   { flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, marginBottom: 8, overflow: 'hidden' },

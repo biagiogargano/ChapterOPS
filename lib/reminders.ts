@@ -16,7 +16,7 @@
  */
 
 import { getStoredState } from './devTaskStore';
-import { getAllEvents } from './eventStore';
+import { getAllEvents, resolveEventId } from './eventStore';
 import {
   dueLabelOf,
   getResponsibilityGroups,
@@ -70,7 +70,46 @@ export function deriveReminders(role: Role, now: Date = new Date()): Reminder[] 
     t => getStoredState(t.id, t.state),
   );
 
+  // Events already covered by an RSVP/name task (so we don't also emit event_today).
+  const coveredEventIds = new Set<string>();
+
   for (const t of mine) {
+    // RSVP / name-submission completion lives in rsvpStore — NOT devTaskStore —
+    // so derive these from the RSVP entry (keyed by the resolved event id).
+    if (t.lightweightKind === 'rsvp' || t.lightweightKind === 'name_submission') {
+      const evId  = resolveEventId(t.linkedEventId ?? t.linkedEvent ?? '');
+      coveredEventIds.add(evId);
+      const entry = getRsvpEntry(evId, role);
+
+      if (t.lightweightKind === 'rsvp') {
+        const mandatory     = t.linkedEventMandatory ?? false;
+        const needsCovering = t.requiresCovering ?? false;
+        const responded =
+          entry.status === 'attending' ||
+          (entry.status === 'not_attending' &&
+            (!mandatory     || entry.excuse.trim().length   > 0) &&
+            (!needsCovering || entry.covering.trim().length > 0));
+        if (!responded) {
+          out.push({
+            kind: 'rsvp_needed', severity: 'moderate',
+            entityType: 'task', entityId: t.id, role,
+            message: `RSVP for "${t.linkedEvent ?? t.title}"`, reason: 'Response needed',
+          });
+        }
+      } else {
+        // name_submission
+        if (entry.dateName.trim().length === 0) {
+          out.push({
+            kind: 'rsvp_needed', severity: 'moderate',
+            entityType: 'task', entityId: t.id, role,
+            message: `Submit a date name for "${t.linkedEvent ?? t.title}"`, reason: 'Submission needed',
+          });
+        }
+      }
+      continue;
+    }
+
+    // Structured + other lightweight (acknowledgment / yes_no): devTaskStore state.
     const state = getStoredState(t.id, t.state);
     if (state === 'submitted' || state === 'approved') continue; // done / awaiting reviewer
 
@@ -115,32 +154,25 @@ export function deriveReminders(role: Role, now: Date = new Date()): Reminder[] 
     });
   }
 
-  // ── Events + RSVP (this week, today onward) ────────────────────────────────
+  // ── Events happening TODAY (informational) ─────────────────────────────────
+  // RSVP "needed" is owned by the RSVP/name tasks above (rsvpStore-driven), so
+  // here we only surface today's events that AREN'T already covered by such a
+  // task — avoiding double-counting / entityId mismatch.
   const todayOffset = (now.getDay() + 6) % 7;   // 0=Mon … 6=Sun
   for (const ev of getAllEvents()) {
-    if (ev.dayOffset < todayOffset || ev.dayOffset > 6) continue;   // only the rest of this week
-    const isToday      = ev.dayOffset === todayOffset;
-    const rsvpRequired = ev.audience === 'all' || (ev.audience === 'officers' && isOfficer(role));
-    const relevant     = rsvpRequired || ev.audience === 'optional';
+    if (ev.dayOffset !== todayOffset) continue;          // only "today"
+    if (coveredEventIds.has(ev.id)) continue;            // an RSVP/name task already covers it
+    const relevant =
+      ev.audience === 'all' ||
+      ev.audience === 'optional' ||
+      (ev.audience === 'officers' && isOfficer(role));
+    if (!relevant) continue;
 
-    // RSVP needed wins over a plain "today" notice for the same event.
-    if (rsvpRequired && getRsvpEntry(ev.id, role).status === 'no_response') {
-      out.push({
-        kind: 'rsvp_needed', severity: isToday ? 'critical' : 'moderate',
-        entityType: 'event', entityId: ev.id, role,
-        message: `RSVP for "${ev.title}"`,
-        reason: isToday ? 'Today — response needed' : 'This week — response needed',
-      });
-      continue;
-    }
-
-    if (isToday && relevant) {
-      out.push({
-        kind: 'event_today', severity: ev.audience === 'all' ? 'moderate' : 'low',
-        entityType: 'event', entityId: ev.id, role,
-        message: `"${ev.title}" is today`, reason: `${ev.time} · ${ev.location}`,
-      });
-    }
+    out.push({
+      kind: 'event_today', severity: ev.audience === 'all' ? 'moderate' : 'low',
+      entityType: 'event', entityId: ev.id, role,
+      message: `"${ev.title}" is today`, reason: `${ev.time} · ${ev.location}`,
+    });
   }
 
   return sortReminders(out);
