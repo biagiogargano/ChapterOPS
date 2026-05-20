@@ -11,7 +11,9 @@
  *  - Every function is guarded by isSupabaseConfigured() and wrapped in
  *    try/catch, returning a safe default (null / []) on error or when Supabase
  *    is unconfigured — the app must keep working with no identity backend.
- *  - No auth, no RLS, no writes. Not yet imported by any provider/screen.
+ *  - Phase 1, commit C5 adds the ONLY mutation: a guarded conditional claim
+ *    (linkAuthUserToMember) plus resolveIdentity orchestration. Still not wired
+ *    into any provider/screen — IdentityProvider consumes this in C6.
  */
 
 import { supabase } from './supabase';
@@ -232,5 +234,199 @@ export async function fetchMembershipsByEmail(email: string): Promise<Membership
   } catch (err) {
     console.warn('[memberService] fetchMembershipsByEmail threw:', err);
     return [];
+  }
+}
+
+// ─── Claim-by-login: types ────────────────────────────────────────────────────
+
+/**
+ * Why a resolution failed. 'transient' is the only auto-retryable reason; the
+ * rest are deterministic data states that require human (officer) action.
+ */
+export type ResolutionErrorReason =
+  | 'unconfigured'    // Supabase not configured (provider uses fallback instead)
+  | 'missing_email'   // auth user has no email — config/backend anomaly
+  | 'transient'       // network/db failure — safe to retry
+  | 'ambiguous_email' // 2+ unclaimed roster rows share the email in one org
+  | 'claim_conflict'  // candidate got claimed by a different user mid-flow
+  | 'email_taken';    // email already bound to a different auth user
+
+/** Result of resolving a logged-in auth user to their chapter membership(s). */
+export type MemberResolution =
+  | { kind: 'resolved'; memberships: Membership[] }   // ≥1 membership, across orgs
+  | { kind: 'not_on_roster' }                          // valid session, no roster row
+  | { kind: 'error'; reason: ResolutionErrorReason };
+
+// ─── Claim-by-login: helpers ──────────────────────────────────────────────────
+
+/** True if any organization has 2+ unclaimed candidate rows (per-org ambiguity). */
+function hasDuplicatePerOrg(rows: MemberRow[]): boolean {
+  const byOrg = new Map<string, number>();
+  for (const r of rows) {
+    const n = (byOrg.get(r.org_id) ?? 0) + 1;
+    byOrg.set(r.org_id, n);
+    if (n > 1) return true;
+  }
+  return false;
+}
+
+/**
+ * True if a member row with this (normalized) email is already bound to a
+ * DIFFERENT auth user — i.e. the email is taken. Read-only.
+ */
+async function emailClaimedByOther(email: string, authUserId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('members')
+    .select('auth_user_id')
+    .ilike('email', email)
+    .not('auth_user_id', 'is', null);
+
+  if (error) {
+    console.warn('[memberService] emailClaimedByOther error:', error.message);
+    return false; // treat as "not taken" → caller falls through to not_on_roster
+  }
+  return ((data ?? []) as { auth_user_id: string | null }[])
+    .some(r => r.auth_user_id !== null && r.auth_user_id !== authUserId);
+}
+
+// ─── Claim-by-login: the only mutation ────────────────────────────────────────
+
+/**
+ * Atomically bind an auth user to ONE pre-provisioned member row.
+ *
+ * The race/idempotency guarantee lives in the UPDATE predicate: the write only
+ * matches when `auth_user_id IS NULL` (and the email still matches). Concurrent
+ * or double-fired logins therefore can't double-link — exactly one writer wins;
+ * the loser's update affects 0 rows.
+ *
+ * Status handling: a freshly-claimed 'invited' member is activated. Any other
+ * status (active/inactive/alumni/removed) is preserved — claiming must never
+ * resurrect an inactive/removed member; the IdentityProvider status gate (C6)
+ * decides access.
+ *
+ * Returns the linked Member on success, or null if the guard didn't match
+ * (already claimed / lost race / unconfigured / error).
+ */
+export async function linkAuthUserToMember(
+  memberId:   string,
+  authUserId: string,
+  email:      string,
+): Promise<Member | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const normalized = normalizeEmail(email);
+    const { data, error } = await supabase
+      .from('members')
+      .update({ auth_user_id: authUserId })
+      .eq('id', memberId)
+      .is('auth_user_id', null)        // ← atomic guard: only an unclaimed row
+      .ilike('email', normalized)      // ← defense-in-depth: email must still match
+      .select();
+
+    if (error) {
+      console.warn('[memberService] linkAuthUserToMember error:', error.message);
+      return null;
+    }
+
+    const rows = (data ?? []) as MemberRow[];
+    if (rows.length !== 1) return null;  // 0 rows = already claimed / lost race
+
+    let row = rows[0];
+
+    // Activate only an 'invited' member; preserve every other status.
+    if (row.status === 'invited') {
+      const { data: act } = await supabase
+        .from('members')
+        .update({ status: 'active' })
+        .eq('id', memberId)
+        .eq('auth_user_id', authUserId)  // now ours — safe follow-up
+        .select();
+      const actRows = (act ?? []) as MemberRow[];
+      if (actRows.length === 1) row = actRows[0];
+    }
+
+    return rowToMember(row);
+  } catch (err) {
+    console.warn('[memberService] linkAuthUserToMember threw:', err);
+    return null;
+  }
+}
+
+// ─── Claim-by-login: orchestration ────────────────────────────────────────────
+
+/**
+ * Resolve a logged-in Supabase auth user to their membership(s), claiming a
+ * pre-provisioned roster row by verified email on first login.
+ *
+ * Flow (org-aware — an email may match unclaimed rows in several orgs):
+ *   1. Fast path: already linked by auth_user_id → resolved (no write).
+ *   2. Candidate lookup: unclaimed rows matching email. 2+ in one org → ambiguous.
+ *   3. Claim each unclaimed candidate via the guarded conditional write.
+ *   4. Reconcile by re-reading via auth_user_id (idempotent landing point).
+ *   5. No unclaimed candidate: email taken by another → email_taken, else
+ *      not_on_roster.
+ *
+ * `transient` is the only retryable error; the rest are deterministic.
+ */
+export async function resolveIdentity(
+  authUserId: string,
+  authEmail:  string,
+): Promise<MemberResolution> {
+  if (!isSupabaseConfigured()) return { kind: 'error', reason: 'unconfigured' };
+
+  const email = normalizeEmail(authEmail);
+  if (!email) return { kind: 'error', reason: 'missing_email' };
+
+  try {
+    // Step 1 — fast path: already linked (steady state on every later login).
+    const existing = await fetchMembershipsByAuthUserId(authUserId);
+    if (existing.length > 0) return { kind: 'resolved', memberships: existing };
+
+    // Step 2 — unclaimed candidates matching this email.
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .ilike('email', email)
+      .is('auth_user_id', null);
+
+    if (error) {
+      console.warn('[memberService] resolveIdentity candidate lookup error:', error.message);
+      return { kind: 'error', reason: 'transient' };
+    }
+
+    const candidates = (data ?? []) as MemberRow[];
+
+    if (hasDuplicatePerOrg(candidates)) {
+      console.warn(`[memberService] resolveIdentity ambiguous_email: ${candidates.length} unclaimed rows`);
+      return { kind: 'error', reason: 'ambiguous_email' };
+    }
+
+    // Step 5 — no unclaimed candidate.
+    if (candidates.length === 0) {
+      const taken = await emailClaimedByOther(email, authUserId);
+      if (taken) {
+        console.warn('[memberService] resolveIdentity email_taken');
+        return { kind: 'error', reason: 'email_taken' };
+      }
+      return { kind: 'not_on_roster' };
+    }
+
+    // Step 3 — claim each unclaimed candidate (one per org).
+    let anyGuardMiss = false;
+    for (const cand of candidates) {
+      const linked = await linkAuthUserToMember(cand.id, authUserId, email);
+      if (!linked) anyGuardMiss = true; // lost a race or guard failed
+    }
+
+    // Step 4 — reconcile via fast path (idempotent landing point).
+    const after = await fetchMembershipsByAuthUserId(authUserId);
+    if (after.length > 0) return { kind: 'resolved', memberships: after };
+
+    // Nothing linked to us despite candidates existing → a different user won.
+    console.warn('[memberService] resolveIdentity claim_conflict');
+    return { kind: 'error', reason: anyGuardMiss ? 'claim_conflict' : 'transient' };
+  } catch (err) {
+    console.warn('[memberService] resolveIdentity threw:', err);
+    return { kind: 'error', reason: 'transient' };
   }
 }
