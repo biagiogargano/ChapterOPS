@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,7 +16,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { devSignIn } = useAuth();
 
   async function handleSignIn() {
     if (!email || !password) {
@@ -31,8 +29,9 @@ export default function LoginScreen() {
   }
 
   function handleDevLogin() {
-    devSignIn();
-    // _layout.tsx AuthGate effect handles navigation to /(tabs)/today
+    // Dev bypass is now handled by the AUTH_ENABLED fallback architecture, not
+    // a per-screen sign-in. This dormant screen isn't routed yet (wired in C9+).
+    Alert.alert('Dev login is disabled while authentication is gated by AUTH_ENABLED.');
   }
 
   return (
