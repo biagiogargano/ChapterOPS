@@ -140,6 +140,9 @@ function rowToMockTask(row: TaskRow): MockTask {
 
     escalationChain: row.escalation_chain.length ? (row.escalation_chain as Role[]) : undefined,
     escalatedTo:     (row.escalated_to as Role | null) ?? undefined,
+
+    createdByRole:   (row.created_by_role as Role | null) ?? undefined,
+    dueAt:           row.due_at ?? undefined,
   };
 }
 
@@ -177,6 +180,8 @@ function mockTaskToRow(task: MockTask): Record<string, unknown> {
     supervisor_role:        task.supervisorRole ?? null,
     escalation_chain:       task.escalationChain ?? [],
     escalated_to:           task.escalatedTo ?? null,
+    created_by_role:        task.createdByRole ?? null,
+    due_at:                 task.dueAt ?? null,
   };
 }
 
@@ -273,6 +278,37 @@ export async function insertTask(task: MockTask): Promise<MockTask | undefined> 
   } catch (err) {
     console.warn('[taskService] insertTask threw:', err);
     return undefined;
+  }
+}
+
+/**
+ * Update an existing task's DEFINITION fields (title, due, assignee, proof,
+ * approval, reviewer, linked event, etc.). Does NOT touch interaction state
+ * (state/proof_content/rejection_note) — those are owned by updateTaskState.
+ * Returns true on success.
+ */
+export async function updateTask(task: MockTask): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    // Build the row payload but never reassign the primary key.
+    const { id: _omitId, ...payload } = mockTaskToRow(task) as Record<string, unknown> & { id: string };
+    // Don't overwrite interaction-state columns from a definition edit.
+    delete (payload as any).state;
+
+    const { error } = await supabase
+      .from('tasks')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', task.id)
+      .eq('chapter_id', DEMO_CHAPTER_ID);
+
+    if (error) {
+      console.warn('[taskService] updateTask error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[taskService] updateTask threw:', err);
+    return false;
   }
 }
 

@@ -9,6 +9,8 @@ import {
   STATE_LABEL,
   STATE_STRIPE,
   canApproveTask,
+  canManageTask,
+  deleteUserTask,
   findTaskById,
   getParentTask,
   getWorkflowChildren,
@@ -17,6 +19,7 @@ import {
   type ProofType,
   type TaskState,
 } from '@/lib/mockTasks';
+import { removeTask } from '@/lib/taskService';
 import {
   getRsvpEntry,
   setRsvpEntry,
@@ -28,6 +31,7 @@ import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -742,6 +746,9 @@ export default function TaskDetailScreen() {
 
   const task = findTaskById(id ?? '');
 
+  // Edit/delete allowed only for officer-created structured tasks the role manages.
+  const canManage = !!task && canManageTask(task, role);
+
   const _init = task ? loadTaskState(task.id, { state: task.state }) : null;
 
   const [taskState,    _setTaskState   ] = useState<TaskState>(_init?.state       ?? 'assigned');
@@ -763,8 +770,37 @@ export default function TaskDetailScreen() {
   }
 
   useEffect(() => {
-    if (task) navigation.setOptions({ title: task.title });
-  }, [task, navigation]);
+    if (!task) return;
+    navigation.setOptions({
+      title: task.title,
+      headerRight: canManage
+        ? () => (
+            <Pressable
+              style={s.editHdrBtn}
+              onPress={() => router.push(`/task/create?taskId=${task.id}` as any)}
+            >
+              <Text style={s.editHdrText}>Edit</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [task, navigation, canManage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleDelete() {
+    if (!task) return;
+    Alert.alert('Delete Task', `Delete "${task.title}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteUserTask(task.id);   // local + cache (optimistic) + tombstone
+          void removeTask(task.id);  // Supabase row (no-op in mock fallback)
+          router.back();
+        },
+      },
+    ]);
+  }
 
   if (!task) {
     return (
@@ -981,6 +1017,16 @@ export default function TaskDetailScreen() {
         <SLabel text="DETAILS" />
         <Text style={s.description}>{task.description}</Text>
 
+        {/* ── Delete (creator/leadership only, user-created tasks) ── */}
+        {canManage && (
+          <>
+            <Divider />
+            <Pressable style={s.deleteBtn} onPress={handleDelete}>
+              <Text style={s.deleteBtnText}>Delete Task</Text>
+            </Pressable>
+          </>
+        )}
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -998,6 +1044,12 @@ const s = StyleSheet.create({
 
   sLabel:  { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
   divider: { height: 1, backgroundColor: '#1e293b', marginVertical: 22 },
+
+  // Header edit + destructive delete
+  editHdrBtn:    { paddingHorizontal: 12, paddingVertical: 4 },
+  editHdrText:   { color: '#818cf8', fontSize: 15, fontWeight: '600' },
+  deleteBtn:     { alignItems: 'center', paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#7f1d1d', backgroundColor: '#1a0505' },
+  deleteBtnText: { fontSize: 14, fontWeight: '600', color: '#f87171' },
 
   statusChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 14 },
   statusChipIcon: { fontSize: 15 },

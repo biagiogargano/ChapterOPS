@@ -1,9 +1,17 @@
+import { getStoredState } from '@/lib/devTaskStore';
 import { useDevRole } from '@/lib/devRoleStore';
 import { getAllEvents } from '@/lib/eventStore';
 import { getEventDate } from '@/lib/mockEvents';
-import { addUserTask, type CreateTaskInput, type ProofType } from '@/lib/mockTasks';
+import {
+  addUserTask,
+  canManageTask,
+  findTaskById,
+  updateUserTask,
+  type CreateTaskInput,
+  type ProofType,
+} from '@/lib/mockTasks';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
-import { insertTask } from '@/lib/taskService';
+import { insertTask, updateTask } from '@/lib/taskService';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -36,6 +44,32 @@ const MONTH_NAMES    = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const MINUTE_CHIPS = ['00', '15', '30', '45'];
+
+// ─── dueAt round-trip (date+time ↔ ISO timestamp) ─────────────────────────────
+
+/** Build an ISO timestamp from the form fields (midnight when no time set). */
+function buildDueAt(dateString: string, includeTime: boolean, hour: number, minute: string, ampm: 'AM' | 'PM'): string {
+  if (!dateString) return '';
+  if (!includeTime) return `${dateString}T00:00:00`;
+  let h = hour % 12;
+  if (ampm === 'PM') h += 12;
+  return `${dateString}T${String(h).padStart(2, '0')}:${minute}:00`;
+}
+
+/** Parse a stored dueAt back into form fields for edit prefill (string-sliced — tz-safe). */
+function parseDueAt(dueAt?: string): { dateString: string; includeTime: boolean; hour: number; minute: string; ampm: 'AM' | 'PM' } {
+  const fallback = { dateString: '', includeTime: false, hour: 8, minute: '00', ampm: 'PM' as const };
+  if (!dueAt) return fallback;
+  const dateString = dueAt.slice(0, 10);
+  const hhmm = dueAt.slice(11, 16);                 // 'HH:MM'
+  if (!hhmm || hhmm === '00:00') return { ...fallback, dateString };
+  let h = parseInt(hhmm.slice(0, 2), 10);
+  const rawMin = hhmm.slice(3, 5);
+  const ampm: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  const minute = MINUTE_CHIPS.includes(rawMin) ? rawMin : '00';
+  return { dateString, includeTime: true, hour: h, minute, ampm };
+}
 
 const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
   { value: 'text',       label: 'Text' },
@@ -193,7 +227,20 @@ export default function CreateTaskScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
   const { role }   = useDevRole();
-  const params     = useLocalSearchParams<{ eventId?: string; eventTitle?: string }>();
+  const params     = useLocalSearchParams<{ eventId?: string; eventTitle?: string; taskId?: string }>();
+
+  // Edit mode when a taskId is supplied.
+  const editing  = !!params.taskId;
+  const existing = useMemo(
+    () => (params.taskId ? findTaskById(params.taskId) : undefined),
+    [params.taskId],
+  );
+  const prefillDue = useMemo(() => parseDueAt(existing?.dueAt), [existing]);
+
+  // Once submitted/reviewed, workflow-critical fields are locked to preserve the
+  // review routing/history. Title/description/due/event stay editable.
+  const effState     = existing ? getStoredState(existing.id, existing.state) : 'assigned';
+  const reviewLocked = editing && (effState === 'submitted' || effState === 'approved' || effState === 'rejected');
 
   // BROAD officers can assign to any officer role; others only to themselves.
   const isBroad         = role === 'president' || role === 'pro_consul';
@@ -202,51 +249,54 @@ export default function CreateTaskScreen() {
     [isBroad, role],
   );
 
-  // ── Form state ──────────────────────────────────────────────────────────────
-  const [title,        setTitle       ] = useState('');
-  const [assignedRole, setAssignedRole] = useState<Role>(() => assignableRoles[0] ?? role);
-  const [dateString,   setDateString  ] = useState('');
-  const [includeTime,  setIncludeTime ] = useState(false);
-  const [hour,         setHour        ] = useState(8);
-  const [minute,       setMinute      ] = useState('00');
-  const [ampm,         setAmpm        ] = useState<'AM' | 'PM'>('PM');
-  const [linkedEventId, setLinkedEventId] = useState<string | undefined>(params.eventId);
-  const [requiresProof, setRequiresProof] = useState(false);
-  const [proofType,    setProofType   ] = useState<ProofType>('text');
-  const [requiresApproval, setRequiresApproval] = useState(false);
-  const [reviewerRole, setReviewerRole] = useState<Role | undefined>(undefined);
-  const [description,  setDescription ] = useState('');
+  // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
+  const [title,        setTitle       ] = useState(existing?.title ?? '');
+  const [assignedRole, setAssignedRole] = useState<Role>(
+    () => (existing?.assignedRole as Role) ?? assignableRoles[0] ?? role,
+  );
+  const [dateString,   setDateString  ] = useState(prefillDue.dateString);
+  const [includeTime,  setIncludeTime ] = useState(prefillDue.includeTime);
+  const [hour,         setHour        ] = useState(prefillDue.hour);
+  const [minute,       setMinute      ] = useState(prefillDue.minute);
+  const [ampm,         setAmpm        ] = useState<'AM' | 'PM'>(prefillDue.ampm);
+  const [linkedEventId, setLinkedEventId] = useState<string | undefined>(existing?.linkedEventId ?? params.eventId);
+  const [requiresProof, setRequiresProof] = useState(existing?.requiresProof ?? false);
+  const [proofType,    setProofType   ] = useState<ProofType>(existing?.proofType ?? 'text');
+  const [requiresApproval, setRequiresApproval] = useState(existing?.requiresApproval ?? false);
+  const [reviewerRole, setReviewerRole] = useState<Role | undefined>(existing?.reviewerRole);
+  const [description,  setDescription ] = useState(existing?.description ?? '');
   const [errors,       setErrors      ] = useState<string[]>([]);
 
   const events = useMemo(() => getAllEvents(), []);
 
   // Reviewer options = leadership roles, excluding the assignee (a task can't
-  // review itself). Recompute + reset when assignee changes.
+  // review itself). Recompute + reset when assignee changes (skip while locked).
   const reviewerOptions = useMemo<Role[]>(
     () => (['president', 'pro_consul'] as Role[]).filter(r => r !== assignedRole),
     [assignedRole],
   );
   useEffect(() => {
-    if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
+    if (!reviewLocked && requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
       setReviewerRole(reviewerOptions[0]);
     }
-  }, [assignedRole, requiresApproval, reviewerRole, reviewerOptions]);
+  }, [assignedRole, requiresApproval, reviewerRole, reviewerOptions, reviewLocked]);
 
-  // Guard: non-officers should never reach this screen
+  // Guard: non-officers (or non-managers of this task) should never be here.
   useEffect(() => {
-    if (!isOfficer(role)) router.back();
-  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isOfficer(role)) { router.back(); return; }
+    if (editing && (!existing || !canManageTask(existing, role))) router.back();
+  }, [role, editing, existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     navigation.setOptions({
-      title: 'Create Task',
+      title: editing ? 'Edit Task' : 'Create Task',
       headerLeft: () => (
         <Pressable onPress={() => router.back()} style={s.cancelBtn}>
           <Text style={s.cancelBtnText}>Cancel</Text>
         </Pressable>
       ),
     });
-  }, [navigation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit =
     title.trim().length > 0 &&
@@ -254,7 +304,7 @@ export default function CreateTaskScreen() {
     (!requiresProof    || !!proofType) &&
     (!requiresApproval || (!!reviewerRole && reviewerRole !== assignedRole));
 
-  function handleCreate() {
+  function handleSubmit() {
     const errs: string[] = [];
     if (!title.trim())  errs.push('Task title is required.');
     if (!dateString)    errs.push('Please pick a due date.');
@@ -272,6 +322,7 @@ export default function CreateTaskScreen() {
       assignedRole,
       dateString,
       time:             includeTime ? `${hour}:${minute} ${ampm}` : undefined,
+      dueAt:            buildDueAt(dateString, includeTime, hour, minute, ampm),
       linkedEvent,
       linkedEventId:    linkedEventId,
       requiresProof,
@@ -279,14 +330,28 @@ export default function CreateTaskScreen() {
       requiresApproval,
       reviewerRole:     requiresApproval ? reviewerRole : undefined,
       description:      description.trim(),
+      createdByRole:    role,   // used on create; preserved (ignored) on edit
     };
 
-    // 1) optimistic local add (also derives label/urgency/visibleTo)
-    const task = addUserTask(input);
-    // 2) fire-and-forget Supabase insert (no-ops if unconfigured → mock fallback)
-    void insertTask(task);
-    // 3) go to the task detail
-    router.replace(`/task/${task.id}` as any);
+    // Safety: if review has started, force workflow-critical fields back to the
+    // existing values so they can never be altered (UI also locks them).
+    if (reviewLocked && existing) {
+      input.assignedRole     = existing.assignedRole as Role;
+      input.requiresProof    = existing.requiresProof ?? false;
+      input.proofType        = existing.proofType;
+      input.requiresApproval = existing.requiresApproval ?? false;
+      input.reviewerRole     = existing.reviewerRole;
+    }
+
+    if (editing && existing) {
+      const updated = updateUserTask(existing.id, input);
+      if (updated) void updateTask(updated);   // persist (no-op in mock fallback)
+      router.replace(`/task/${existing.id}` as any);
+    } else {
+      const task = addUserTask(input);
+      void insertTask(task);
+      router.replace(`/task/${task.id}` as any);
+    }
   }
 
   return (
@@ -311,14 +376,29 @@ export default function CreateTaskScreen() {
           />
         </View>
 
+        {/* Locked notice — workflow fields are read-only once review has begun */}
+        {reviewLocked && (
+          <View style={s.lockedNote}>
+            <Text style={s.lockedNoteText}>
+              This task is already in review. Assignee, proof, and approval are locked to preserve
+              the review workflow. You can still edit the title, due date, linked event, and description.
+            </Text>
+          </View>
+        )}
+
         {/* Assignee role */}
-        <View style={s.field}>
+        <View style={[s.field, reviewLocked && s.lockedField]}>
           <FieldLabel text="ASSIGN TO" required />
           <View style={s.chipWrap}>
             {assignableRoles.map(r => {
               const on = assignedRole === r;
               return (
-                <Pressable key={r} style={[s.chip, on && s.chipOn]} onPress={() => setAssignedRole(r)}>
+                <Pressable
+                  key={r}
+                  style={[s.chip, on && s.chipOn]}
+                  disabled={reviewLocked}
+                  onPress={() => setAssignedRole(r)}
+                >
                   <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
                 </Pressable>
               );
@@ -379,8 +459,8 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Requires proof */}
-        <View style={s.field}>
-          <Pressable style={s.toggleRow} onPress={() => setRequiresProof(v => !v)}>
+        <View style={[s.field, reviewLocked && s.lockedField]}>
+          <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
             <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
               {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
             </View>
@@ -391,7 +471,7 @@ export default function CreateTaskScreen() {
               {PROOF_OPTIONS.map(({ value, label }) => {
                 const on = proofType === value;
                 return (
-                  <Pressable key={value} style={[s.chip, on && s.chipOn]} onPress={() => setProofType(value)}>
+                  <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
                     <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
                   </Pressable>
                 );
@@ -401,8 +481,8 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Requires approval */}
-        <View style={s.field}>
-          <Pressable style={s.toggleRow} onPress={() => setRequiresApproval(v => !v)}>
+        <View style={[s.field, reviewLocked && s.lockedField]}>
+          <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresApproval(v => !v)}>
             <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
               {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
             </View>
@@ -418,7 +498,7 @@ export default function CreateTaskScreen() {
                 {reviewerOptions.map(r => {
                   const on = reviewerRole === r;
                   return (
-                    <Pressable key={r} style={[s.chip, on && s.chipOn]} onPress={() => setReviewerRole(r)}>
+                    <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
                       <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
                     </Pressable>
                   );
@@ -444,8 +524,10 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Submit */}
-        <Pressable style={[s.createBtn, !canSubmit && s.createBtnDisabled]} onPress={handleCreate} disabled={!canSubmit}>
-          <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>Create Task</Text>
+        <Pressable style={[s.createBtn, !canSubmit && s.createBtnDisabled]} onPress={handleSubmit} disabled={!canSubmit}>
+          <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>
+            {editing ? 'Save Changes' : 'Create Task'}
+          </Text>
         </Pressable>
 
         <View style={{ height: 40 }} />
@@ -462,6 +544,10 @@ const s = StyleSheet.create({
 
   cancelBtn:     { paddingHorizontal: 4 },
   cancelBtnText: { color: '#94a3b8', fontSize: 15 },
+
+  lockedNote:     { backgroundColor: '#1c1407', borderRadius: 10, borderWidth: 1, borderColor: '#854d0e', padding: 12, marginBottom: 24 },
+  lockedNoteText: { fontSize: 12, color: '#fbbf24', lineHeight: 18 },
+  lockedField:    { opacity: 0.5 },
 
   field:         { marginBottom: 28 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },

@@ -22,8 +22,9 @@ import {
   filterTasksForRole,
   type MockTask,
 } from '@/lib/mockTasks';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 // ─── UUID detection ───────────────────────────────────────────────────────────
 // Supabase event ids are UUIDs; mock/session ids are 'e1'/'uce_…' — never match.
@@ -404,6 +405,11 @@ export default function EventDetailScreen() {
 
     return () => { cancelled = true; };
   }, [id]);
+
+  // Recompute related tasks on focus so a task deleted/unlinked elsewhere (e.g.
+  // from Task Detail) disappears from this list immediately when we return.
+  const [, _bumpFocus] = useState(0);
+  useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
   // All related tasks visible to this role
   const allRelatedTasks = filterTasksForRole(role).filter(

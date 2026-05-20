@@ -86,6 +86,10 @@ export interface MockTask {
   // Escalation
   escalationChain?: Role[];
   escalatedTo?:     Role;
+
+  // Created-task metadata (officer-created structured tasks — Phase: edit/delete)
+  createdByRole?: Role;     // who created it (for edit/delete permission)
+  dueAt?:         string;   // ISO date(+time) the due label was derived from
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -511,12 +515,13 @@ function deriveVisibleTo(assignedRole: Role, reviewerRole?: Role): Role[] {
   return Array.from(set);
 }
 
-/** Input for officer task creation (Phase 1 — structured tasks only). */
+/** Input for officer task creation / editing (structured tasks only). */
 export interface CreateTaskInput {
   title:            string;
   assignedRole:     Role;
   dateString:       string;      // ISO "YYYY-MM-DD"
   time?:            string;      // e.g. "8:00 PM" — optional
+  dueAt?:           string;      // ISO date(+time), for round-trip / persistence
   linkedEvent?:     string;      // event title
   linkedEventId?:   string;      // event instance id
   requiresProof:    boolean;
@@ -524,6 +529,7 @@ export interface CreateTaskInput {
   requiresApproval: boolean;
   reviewerRole?:    Role;
   description:      string;
+  createdByRole?:   Role;        // creator (set on create; preserved on edit)
 }
 
 /**
@@ -541,6 +547,7 @@ export function addUserTask(input: CreateTaskInput): MockTask {
     state:            'assigned',
     urgency,
     dueLabel,
+    dueAt:            input.dueAt,
     assignedRole:     input.assignedRole,
     assignedTo:       ROLE_LABELS[input.assignedRole],
     visibleTo:        deriveVisibleTo(input.assignedRole, reviewerRole),
@@ -552,10 +559,103 @@ export function addUserTask(input: CreateTaskInput): MockTask {
     requiresApproval: input.requiresApproval,
     reviewerRole,
     supervisorRole:   reviewerRole,   // oversight defaults to the named reviewer
+    createdByRole:    input.createdByRole,
   };
 
   _userTasks.push(task);
   return task;
+}
+
+// ─── Edit / delete (user-created structured tasks only) ───────────────────────
+
+const _seedTaskIds       = new Set(MOCK_TASKS.map(t => t.id));
+const _deletedTaskIds    = new Set<string>();
+
+/**
+ * A task is editable/deletable only if it is an officer-CREATED structured task
+ * (not seed, not lightweight RSVP/name, not a workflow parent/child).
+ */
+export function isEditableTask(task: MockTask): boolean {
+  return (
+    task.type === 'structured' &&
+    !task.isWorkflowParent &&
+    !task.parentTaskId &&
+    !_seedTaskIds.has(task.id)
+  );
+}
+
+/**
+ * Edit/delete permission (DISTINCT from review/approval and from being assigned
+ * the work). Being the assignee does NOT grant management rights.
+ *
+ *   • the creator can always manage their task; OR
+ *   • BROAD leadership (president/pro_consul) has oversight — but NOT when they
+ *     are the task's assignee (being assigned a task ≠ owning its definition).
+ */
+export function canManageTask(task: MockTask, role: Role): boolean {
+  if (!isEditableTask(task)) return false;
+  if (task.createdByRole === role) return true;            // creator
+  const isBroad = role === 'president' || role === 'pro_consul';
+  return isBroad && task.assignedRole !== role;            // oversight, not as assignee
+}
+
+/** Find a user-created task in either the local list or the Supabase cache. */
+function _findUserTask(id: string): MockTask | undefined {
+  return _userTasks.find(t => t.id === id) ?? _supabaseTasks?.find(t => t.id === id);
+}
+
+/**
+ * Update an existing user-created task's definition fields. Preserves id, type,
+ * state, createdByRole, and workflow/escalation metadata (those are never edited
+ * here), so review state / reviewer history are untouched. Re-derives label,
+ * urgency, assignee display, and visibility. Updates both the local list and the
+ * Supabase cache; the caller persists via taskService.updateTask.
+ */
+export function updateUserTask(id: string, input: CreateTaskInput): MockTask | undefined {
+  const existing = _findUserTask(id);
+  if (!existing) return undefined;
+
+  const { dueLabel, urgency } = deriveDueMeta(input.dateString, input.time);
+  const reviewerRole = input.requiresApproval ? input.reviewerRole : undefined;
+
+  const updated: MockTask = {
+    ...existing,                       // preserves id, type, state, createdByRole, etc.
+    title:            input.title,
+    urgency,
+    dueLabel,
+    dueAt:            input.dueAt,
+    assignedRole:     input.assignedRole,
+    assignedTo:       ROLE_LABELS[input.assignedRole],
+    visibleTo:        deriveVisibleTo(input.assignedRole, reviewerRole),
+    description:      input.description,
+    linkedEvent:      input.linkedEvent,
+    linkedEventId:    input.linkedEventId,
+    requiresProof:    input.requiresProof,
+    proofType:        input.requiresProof ? input.proofType : undefined,
+    requiresApproval: input.requiresApproval,
+    reviewerRole,
+    supervisorRole:   reviewerRole,
+  };
+
+  const ui = _userTasks.findIndex(t => t.id === id);
+  if (ui >= 0) _userTasks[ui] = updated;
+  if (_supabaseTasks) {
+    const ci = _supabaseTasks.findIndex(t => t.id === id);
+    if (ci >= 0) _supabaseTasks[ci] = updated;
+  }
+  return updated;
+}
+
+/**
+ * Delete a user-created task from the local list AND the Supabase cache
+ * (optimistic), and tombstone the id so a racing refetch can't resurrect it.
+ * The caller fires taskService.removeTask for the Supabase row.
+ */
+export function deleteUserTask(id: string): void {
+  _deletedTaskIds.add(id);
+  const ui = _userTasks.findIndex(t => t.id === id);
+  if (ui >= 0) _userTasks.splice(ui, 1);
+  if (_supabaseTasks) _supabaseTasks = _supabaseTasks.filter(t => t.id !== id);
 }
 
 // ─── Supabase task cache (structured tasks only) ───────────────────────────────
@@ -569,11 +669,13 @@ export function addUserTask(input: CreateTaskInput): MockTask {
 
 let _supabaseTasks: MockTask[] | null = null;   // null = not yet loaded
 
-/** Set the persisted task cache. Defensively keeps only structured tasks. */
+/** Set the persisted task cache. Defensively keeps only structured tasks, and
+ *  drops any task tombstoned by an in-session delete (guards the delete→refetch
+ *  race). */
 export function setSupabaseTaskCache(tasks: MockTask[]): void {
   const structured = tasks.filter(t => t.type === 'structured');
   if (structured.length === 0) return;          // keep mock fallback
-  _supabaseTasks = structured;
+  _supabaseTasks = structured.filter(t => !_deletedTaskIds.has(t.id));
 }
 
 /**
