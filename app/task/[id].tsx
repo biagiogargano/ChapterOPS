@@ -11,6 +11,7 @@ import {
   canApproveTask,
   canManageTask,
   deleteUserTask,
+  dueLabelOf,
   findTaskById,
   getParentTask,
   getWorkflowChildren,
@@ -155,7 +156,7 @@ function InfoBlock({
 }) {
   return (
     <View style={s.infoBlock}>
-      <InfoRow icon="📅" label="Due" value={task.dueLabel} />
+      <InfoRow icon="📅" label="Due" value={dueLabelOf(task)} />
       <InfoRow
         icon="👤"
         label="Assigned To"

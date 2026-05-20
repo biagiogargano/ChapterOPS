@@ -9,8 +9,11 @@ import {
   STATE_COLOR,
   STATE_LABEL,
   STATE_STRIPE,
+  dueLabelOf,
   findTaskById,
   getResponsibilityGroups,
+  isOverdue,
+  urgencyOf,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
@@ -420,7 +423,8 @@ function TodayTaskCard({
   const stripe     = STATE_STRIPE[state];
   const stateColor = STATE_COLOR[state];
   const stateBg    = STATE_BG[state];
-  const isUrgent   = state === 'overdue' || state === 'escalated';
+  // Overdue is date-driven (computed from dueAt) and never true once done.
+  const isUrgent   = isOverdue(task.dueAt, state) || state === 'escalated';
 
   return (
     <Pressable style={[s.taskCard, isUrgent && s.taskCardUrgent]} onPress={onPress}>
@@ -442,7 +446,7 @@ function TodayTaskCard({
               <Text style={s.dot}>·</Text>
             </>
           )}
-          <Text style={[s.taskDue, isUrgent && s.taskDueUrgent]}>{task.dueLabel}</Text>
+          <Text style={[s.taskDue, isUrgent && s.taskDueUrgent]}>{dueLabelOf(task)}</Text>
           {task.linkedEvent && (
             <>
               <Text style={s.dot}>·</Text>
@@ -641,8 +645,10 @@ export default function TodayScreen() {
     t => getStoredState(t.id, t.state),
   );
 
-  const urgentMine = mine.filter(t => t.urgency === 'overdue' || t.urgency === 'today');
-  const weekMine   = mine.filter(t => t.urgency === 'week');
+  // Urgency is computed from real due dates at read time (falls back to the
+  // stored urgency when a task has no dueAt).
+  const urgentMine = mine.filter(t => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; });
+  const weekMine   = mine.filter(t => urgencyOf(t) === 'week');
 
   const pendingExcuses = MOCK_EXCUSES.filter(e => getExcuseStatus(e.id) === 'pending');
 

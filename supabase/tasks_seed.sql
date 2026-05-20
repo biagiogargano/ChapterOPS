@@ -181,8 +181,29 @@ INSERT INTO tasks (
    ARRAY[]::text[], NULL,
    '', '', NULL);
 
+-- ─── Backfill due_at (current-week-relative) ──────────────────────────────────
+-- Real due timestamps so urgency/overdue can be computed at read time. Chosen to
+-- MATCH each task's static urgency today (overdue / today / week), so re-running
+-- the seed changes nothing immediately but becomes truthful as days pass.
+DO $$
+DECLARE chap uuid := 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0';
+BEGIN
+  -- intentionally overdue (last week)
+  UPDATE tasks SET due_at = (DATE_TRUNC('week', CURRENT_DATE::timestamp)::date - 7)::timestamptz
+    WHERE chapter_id = chap AND id = 'tk3';
+  -- due today, 8:00 PM
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '20 hours'
+    WHERE chapter_id = chap AND id = 'tk4';
+  -- week (future) — spread across the next several days
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '2 days' WHERE chapter_id = chap AND id IN ('tk5a','tk7a');
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '3 days' WHERE chapter_id = chap AND id IN ('tk5b','tk7b');
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '4 days' WHERE chapter_id = chap AND id IN ('tk5','tk5c','tk5d');
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '5 days' WHERE chapter_id = chap AND id = 'tk6';
+  UPDATE tasks SET due_at = CURRENT_DATE::timestamp + interval '6 days' WHERE chapter_id = chap AND id IN ('tk7','tk7c','tk7d');
+END $$;
+
 -- Verify
-SELECT id, title, state, urgency, assigned_role, parent_task_id
+SELECT id, title, state, urgency, due_at, assigned_role, parent_task_id
 FROM tasks
 WHERE chapter_id = 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0'
 ORDER BY id;

@@ -7,7 +7,9 @@ import {
   STATE_COLOR,
   STATE_LABEL,
   STATE_STRIPE,
+  dueLabelOf,
   getResponsibilityGroups,
+  isOverdue,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
@@ -126,7 +128,7 @@ function StructuredCard({
   reviewerLabel?: string;    // truthy for mine — shows who will review my work
   onPress:        () => void;
 }) {
-  const isUrgent   = effectiveState === 'overdue' || effectiveState === 'escalated';
+  const isUrgent   = isOverdue(task.dueAt, effectiveState) || effectiveState === 'escalated';
   const stripe     = STATE_STRIPE[effectiveState];
   const stateColor = STATE_COLOR[effectiveState];
   const stateBg    = STATE_BG[effectiveState];
@@ -167,7 +169,7 @@ function StructuredCard({
 
         {/* Due + proof icon + event */}
         <View style={s.metaRow}>
-          <Text style={[s.cardDue, isUrgent && s.cardDueUrgent]}>{task.dueLabel}</Text>
+          <Text style={[s.cardDue, isUrgent && s.cardDueUrgent]}>{dueLabelOf(task)}</Text>
           {task.requiresProof && task.proofType && (
             <>
               <Text style={s.dot}>·</Text>

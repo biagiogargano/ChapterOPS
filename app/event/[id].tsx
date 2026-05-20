@@ -20,7 +20,9 @@ import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
+  dueLabelOf,
   filterTasksForRole,
+  isOverdue,
   type MockTask,
 } from '@/lib/mockTasks';
 import { useFocusEffect } from '@react-navigation/native';
@@ -255,15 +257,15 @@ function RsvpSection({
 }
 
 function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
-  const isOverdue   = task.urgency === 'overdue';
+  const overdue     = isOverdue(task.dueAt, task.state);   // date-driven (fallback to state)
   const statusColor = STATE_COLOR[task.state];
 
   return (
-    <Pressable style={[s.taskCard, isOverdue && s.taskCardOverdue]} onPress={onPress}>
-      <View style={[s.taskStripe, { backgroundColor: isOverdue ? '#ef4444' : '#334155' }]} />
+    <Pressable style={[s.taskCard, overdue && s.taskCardOverdue]} onPress={onPress}>
+      <View style={[s.taskStripe, { backgroundColor: overdue ? '#ef4444' : '#334155' }]} />
       <View style={s.taskBody}>
         <Text style={s.taskTitle} numberOfLines={1}>{task.title}</Text>
-        <Text style={[s.taskDue, isOverdue && s.taskDueRed]}>{task.dueLabel}</Text>
+        <Text style={[s.taskDue, overdue && s.taskDueRed]}>{dueLabelOf(task)}</Text>
       </View>
       <View style={[s.taskStatusDot, { backgroundColor: statusColor }]} />
       <Text style={s.taskChevron}>›</Text>

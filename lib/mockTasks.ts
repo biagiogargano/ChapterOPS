@@ -775,8 +775,66 @@ export function getTaskBucket(
 
 const URGENCY_ORDER: Record<TaskUrgency, number> = { overdue: 0, today: 1, week: 2 };
 
+// ─── Date-driven urgency (read-time, from dueAt) ───────────────────────────────
+
+function _dayStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function _to12h(hhmm: string): string {
+  const [hStr, m] = hhmm.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+/** Urgency derived from a real due timestamp (compared by calendar day). */
+export function deriveUrgency(dueAt: string, now: Date = new Date()): TaskUrgency {
+  const dueDay = dueAt.slice(0, 10);   // 'YYYY-MM-DD'
+  const today  = _dayStr(now);
+  if (dueDay < today)   return 'overdue';
+  if (dueDay === today) return 'today';
+  return 'week';
+}
+
+/**
+ * Overdue = past its due date AND not yet done. Completed work (submitted/
+ * approved) is never overdue. Falls back to the task's state when no dueAt.
+ */
+export function isOverdue(dueAt: string | undefined, effectiveState: TaskState, now: Date = new Date()): boolean {
+  if (effectiveState === 'submitted' || effectiveState === 'approved') return false;
+  if (!dueAt) return effectiveState === 'overdue' || effectiveState === 'escalated';
+  return dueAt.slice(0, 10) < _dayStr(now);
+}
+
+/** Human due label derived from a real due timestamp. */
+export function formatDueLabel(dueAt: string, now: Date = new Date()): string {
+  const dueDay  = dueAt.slice(0, 10);
+  const today   = _dayStr(now);
+  const hhmm    = dueAt.slice(11, 16);
+  const hasTime = hhmm.length === 5 && hhmm !== '00:00';
+  const d       = new Date(dueDay + 'T00:00:00');
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+  const md      = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const time    = hasTime ? _to12h(hhmm) : '';
+  if (dueDay < today)   return `Was due ${weekday}, ${md}`;
+  if (dueDay === today) return hasTime ? `Today by ${time}` : 'Today';
+  return hasTime ? `${weekday}, ${md} · ${time}` : `${weekday}, ${md}`;
+}
+
+/** Read-time urgency: computed from dueAt when present, else the stored value. */
+export function urgencyOf(task: MockTask, now: Date = new Date()): TaskUrgency {
+  return task.dueAt ? deriveUrgency(task.dueAt, now) : task.urgency;
+}
+
+/** Read-time due label: computed from dueAt when present, else the stored label. */
+export function dueLabelOf(task: MockTask, now: Date = new Date()): string {
+  return task.dueAt ? formatDueLabel(task.dueAt, now) : task.dueLabel;
+}
+
 export function sortByUrgency(tasks: MockTask[]): MockTask[] {
-  return [...tasks].sort((a, b) => URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency]);
+  const now = new Date();
+  return [...tasks].sort((a, b) => URGENCY_ORDER[urgencyOf(a, now)] - URGENCY_ORDER[urgencyOf(b, now)]);
 }
 
 /**
