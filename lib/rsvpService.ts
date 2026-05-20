@@ -88,7 +88,6 @@ export async function fetchRsvpsForEvent(eventId: string): Promise<RsvpEntry[]> 
       console.warn('[rsvpService] fetchRsvpsForEvent error:', error.message);
       return [];
     }
-    console.log('[rsvpService] hydrate fetch for', eventId, '→ rows:', data?.length ?? 0);
     return (data as RsvpRow[]).map(rowToEntry);
   } catch (err) {
     console.warn('[rsvpService] fetchRsvpsForEvent threw:', err);
@@ -106,12 +105,11 @@ export async function upsertRsvp(
   role:    string,
   entry:   Pick<RsvpEntry, 'status' | 'excuse' | 'covering' | 'dateName'>,
 ): Promise<void> {
-  console.log('[rsvpService] upsert called:', { eventId, role, status: entry.status });
-  if (!isUUID(eventId))         { console.log('[rsvpService] upsert skipped — not a UUID'); return; }
-  if (!isSupabaseConfigured())  { console.log('[rsvpService] upsert skipped — not configured'); return; }
+  if (!isUUID(eventId))        return;
+  if (!isSupabaseConfigured()) return;
   try {
-    // .select() returns the written row so we can confirm the write actually
-    // landed (an empty array here means a silent reject, e.g. RLS).
+    // .select() returns the written row so a silent reject (empty array, e.g. RLS)
+    // can be surfaced as a warning.
     const { data, error } = await supabase
       .from('rsvps')
       .upsert(
@@ -129,11 +127,9 @@ export async function upsertRsvp(
       .select();
 
     if (error) {
-      console.warn('[rsvpService] upsert ERROR:', error.message, error);
+      console.warn('[rsvpService] upsert error:', error.message);
     } else if (!data || data.length === 0) {
-      console.warn('[rsvpService] upsert returned NO ROWS — silent reject (check RLS on rsvps)');
-    } else {
-      console.log('[rsvpService] upsert SUCCESS — wrote row id:', data[0]?.id);
+      console.warn('[rsvpService] upsert wrote no rows — possible RLS reject on rsvps');
     }
   } catch (err) {
     console.warn('[rsvpService] upsert threw:', err);
