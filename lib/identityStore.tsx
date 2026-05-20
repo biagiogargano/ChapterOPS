@@ -124,8 +124,13 @@ export function IdentityProvider({
     devBypass:   false,
   });
 
+  const configured = configuredOverride ?? isSupabaseConfigured();
+
   useEffect(() => {
-    if (authProp) return; // injected auth wins; skip live subscription
+    // Skip the live auth subscription when auth is injected (tests) or when
+    // Supabase is treated as unconfigured (no-env / flag-off forced fallback).
+    // The fallback identity needs no session, so we avoid all auth side effects.
+    if (authProp || !configured) return;
     let mounted = true;
 
     supabase.auth.getSession().then(({ data }) => {
@@ -138,14 +143,19 @@ export function IdentityProvider({
     });
 
     return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [authProp]);
+  }, [authProp, configured]);
 
   const auth = authProp ?? internalAuth;
-  const configured = configuredOverride ?? isSupabaseConfigured();
 
-  const [phase, setPhase]             = useState<IdentityPhase>('initializing');
-  const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  // Synchronous fallback seed: when unconfigured, initialize directly to the
+  // fallback identity so the very first render is already resolved (President),
+  // with no 'brother' floor flash before the resolution effect runs.
+  const [initialFallback] = useState<Membership | null>(
+    () => (!configured ? buildFallbackMembership() : null),
+  );
+  const [phase, setPhase]             = useState<IdentityPhase>(() => (initialFallback ? 'fallback' : 'initializing'));
+  const [memberships, setMemberships] = useState<Membership[]>(() => (initialFallback ? [initialFallback] : []));
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(() => (initialFallback ? initialFallback.organization.id : null));
   const [errorReason, setErrorReason] = useState<ResolutionErrorReason | null>(null);
   const [devRoleOverride, setDevRoleOverride] = useState<Role | null>(null);
   const [preferredOrgId, setPreferredOrgId]   = useState<string | null>(null);
