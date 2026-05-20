@@ -17,9 +17,9 @@ import { useAuth } from '@/lib/auth';
 import { useIdentity } from '@/lib/identityStore';
 import { decideRoute } from '@/lib/initRoute';
 import { AUTH_ENABLED } from '@/lib/flags';
-import Splash from '@/components/auth/Splash';
-import ErrorRetry from '@/components/auth/ErrorRetry';
-import OnboardingHub from '@/components/onboarding/OnboardingHub';
+import Splash from './auth/Splash';
+import ErrorRetry from './auth/ErrorRetry';
+import OnboardingHub from './onboarding/OnboardingHub';
 
 export interface InitGateProps {
   children: ReactNode;
