@@ -30,6 +30,7 @@ export interface AuthContextType {
   user:               User | null;
   signInWithOtp:      (email: string) => Promise<AuthActionResult>;
   signInWithPassword: (email: string, password: string) => Promise<AuthActionResult>;
+  signUp:             (email: string, password: string) => Promise<AuthActionResult>;
   signOut:            () => Promise<void>;
 }
 
@@ -47,6 +48,7 @@ const fallbackAuthSurface: AuthContextType = {
   user:               null,
   signInWithOtp:      async () => ({ error: AUTH_DISABLED }),
   signInWithPassword: async () => ({ error: AUTH_DISABLED }),
+  signUp:             async () => ({ error: AUTH_DISABLED }),
   signOut:            async () => {},
 };
 
@@ -87,6 +89,11 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }, []);
 
+  const signUp = useCallback(async (email: string, password: string): Promise<AuthActionResult> => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error: error?.message ?? null };
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
@@ -97,8 +104,9 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     signInWithOtp,
     signInWithPassword,
+    signUp,
     signOut,
-  }), [initialized, session, signInWithOtp, signInWithPassword, signOut]);
+  }), [initialized, session, signInWithOtp, signInWithPassword, signUp, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
