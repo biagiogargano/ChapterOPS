@@ -1,4 +1,5 @@
 import { useDevRole } from '@/lib/devRoleStore';
+import { insertEvent } from '@/lib/eventService';
 import {
   RECURRENCE_LABELS,
   ROLE_ALLOWED_KINDS,
@@ -407,7 +408,9 @@ export default function CreateEventScreen() {
     if (errs.length > 0) { setErrors(errs); return; }
 
     const timeStr  = `${hour}:${minute} ${ampm}`;
-    const newEvent = addUserEvent({
+    // Local optimistic write (also generates RSVP tasks). Returns all instances
+    // (recurring series → one per date), each with a client-generated UUID id.
+    const created = addUserEvent({
       title:        title.trim(),
       kind,
       audience:     audience as EventAudience,
@@ -420,7 +423,11 @@ export default function CreateEventScreen() {
       repeatUntil:  recurrence !== 'none' ? repeatUntil : undefined,
     });
 
-    router.replace(`/event/${newEvent.id}` as any);
+    // Persist each instance to Supabase (fire-and-forget; no-ops if unconfigured,
+    // preserving the local-only fallback). Same UUIDs are used in both places.
+    created.forEach(e => { void insertEvent(e); });
+
+    router.replace(`/event/${created[0].id}` as any);
   }
 
   // Repeat-until lower bound is the chosen event date (or today if none yet)

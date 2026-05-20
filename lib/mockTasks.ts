@@ -1,4 +1,38 @@
-import type { Role } from '@/lib/roles';
+/**
+ * mockTasks.ts — task DEFINITIONS + read/permission helpers.
+ *
+ * ── ARCHITECTURE (read before persisting tasks) ───────────────────────────────
+ * Tasks are split across THREE runtime layers today; all are session-only:
+ *
+ *   1. MOCK_TASKS (this file)        — static seed task DEFINITIONS.
+ *   2. _dynamicTasks (this file)     — RSVP task DEFINITIONS auto-generated at
+ *                                      runtime by eventStore.maybeGenerateRsvpTask
+ *                                      when an officer creates a mandatory/officer
+ *                                      event. Added via addDynamicTask().
+ *   3. devTaskStore._store           — mutable INTERACTION STATE keyed by task id
+ *                                      ({ state, proofContent, rejectionNote }).
+ *                                      Read via getStoredState(task.id, task.state).
+ *
+ * This file owns the DEFINITION + the read API (findTaskById, filterTasksForRole,
+ * getResponsibilityGroups, getWorkflowChildren/getParentTask) and pure permission
+ * helpers (isTaskAssignee, canApproveTask, getTaskBucket). It holds NO mutable
+ * lifecycle state — that lives in devTaskStore.
+ *
+ * ── STATE OWNERSHIP / RSVP DUALITY (critical for persistence) ─────────────────
+ * For lightweight tasks of kind 'rsvp' and 'name_submission', completion is owned
+ * by rsvpStore (the rsvps table), NOT by devTaskStore or task.state. See
+ * app/(tabs)/tasks.tsx computeSummary, which reads those from rsvpStore. A future
+ * persistence layer (lib/taskService.ts + supabase/tasks_schema.sql) must keep
+ * RSVP completion in rsvps and treat the task row as definition-only for those.
+ *
+ * ── KNOWN TECH DEBT (flagged, not addressed here) ─────────────────────────────
+ *   • dueLabel/urgency/state are static strings — overdue is NOT computed from a
+ *     real date. Adding a machine-readable due_at would change behavior → deferred.
+ *   • assignedTo is a denormalized display string (derivable from assignedRole).
+ *   • seed linkedEventId uses mock ids ('e1'..) requiring resolveEventId mapping.
+ *   • dynamic RSVP-task generation is client-side and coupled to eventStore.
+ */
+import { OFFICER_ROLES, type Role } from '@/lib/roles';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -12,10 +46,9 @@ export type LightweightKind = 'rsvp' | 'name_submission' | 'acknowledgment' | 'y
 
 const BROAD:    Role[] = ['president', 'pro_consul'];
 const DOCS:     Role[] = [...BROAD, 'annotator'];
-const OFFICERS: Role[] = [
-  'president', 'pro_consul', 'annotator',
-  'risk_manager', 'social_chair', 'recruitment_chair',
-];
+// Dedup: same membership as the canonical OFFICER_ROLES in roles.ts. Used only
+// with .includes() (visibleTo checks), so element order is irrelevant.
+const OFFICERS: Role[] = OFFICER_ROLES;
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 

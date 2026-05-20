@@ -1,6 +1,6 @@
 import { useDevRole } from '@/lib/devRoleStore';
-import { fetchEventById } from '@/lib/eventService';
-import { findEventById, deleteEvent, deleteEventSeries } from '@/lib/eventStore';
+import { fetchEventById, removeEvent, removeEventSeries } from '@/lib/eventService';
+import { findEventById, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
 import {
   AUDIENCE_LABEL,
   KIND_BG,
@@ -465,8 +465,8 @@ export default function EventDetailScreen() {
     t => t.lightweightKind === 'rsvp' && !!t.requiresCovering,
   );
 
-  // User-created events can be deleted (id starts with 'uce_')
-  const isUserCreated = (event.id).startsWith('uce_');
+  // Only officer-created events are deletable (the 4 seed events are not).
+  const isUserCreated = isUserCreatedEvent(event.id);
 
   function handleDelete() {
     if (!event) return;
@@ -478,12 +478,22 @@ export default function EventDetailScreen() {
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'This Event Only',
-            onPress: () => { deleteEvent(event.id); router.back(); },
+            onPress: () => {
+              const eid = event.id;
+              deleteEvent(eid);             // local + cache (optimistic)
+              void removeEvent(eid);        // Supabase row (no-ops if unconfigured)
+              router.back();
+            },
           },
           {
             text: 'Entire Series',
             style: 'destructive',
-            onPress: () => { deleteEventSeries(event.seriesId!); router.back(); },
+            onPress: () => {
+              const sid = event.seriesId!;
+              deleteEventSeries(sid);        // local + cache (optimistic)
+              void removeEventSeries(sid);   // Supabase rows (cascade rsvps)
+              router.back();
+            },
           },
         ],
       );
@@ -493,7 +503,12 @@ export default function EventDetailScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => { deleteEvent(event.id); router.back(); },
+          onPress: () => {
+            const eid = event.id;
+            deleteEvent(eid);              // local + cache (optimistic)
+            void removeEvent(eid);         // Supabase row (no-ops if unconfigured)
+            router.back();
+          },
         },
       ]);
     }

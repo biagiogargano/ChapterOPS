@@ -162,20 +162,20 @@ export async function fetchEventById(id: string): Promise<MockEvent | undefined>
 }
 
 /**
- * Insert a single event row into Supabase.
- * Note: recurrence expansion (multiple rows for a series) is handled by
+ * Insert a single event row into Supabase, using the caller-provided id so the
+ * same UUID is used locally (optimistic) and in Supabase.
+ * Recurrence expansion (multiple rows per series) is handled by
  * eventStore.addUserEvent — this function inserts exactly one row.
  *
- * Returns the inserted event as MockEvent, or undefined on failure.
+ * Returns the inserted event as MockEvent, or undefined on failure / fallback.
  */
-export async function insertEvent(
-  event: Omit<UserCreatedEvent, 'id' | 'seriesId'> & { seriesId?: string },
-): Promise<MockEvent | undefined> {
+export async function insertEvent(event: UserCreatedEvent): Promise<MockEvent | undefined> {
   if (!isSupabaseConfigured()) return undefined;
   try {
     const { data, error } = await supabase
       .from('events')
       .insert({
+        id:              event.id,            // client-generated UUID (shared with local copy)
         chapter_id:      DEMO_CHAPTER_ID,
         title:           event.title,
         kind:            event.kind,

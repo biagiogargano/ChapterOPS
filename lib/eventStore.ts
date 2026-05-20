@@ -73,8 +73,17 @@ export const ROLE_ALLOWED_KINDS: Record<Role, EventKind[]> = {
 
 const _userEvents: UserCreatedEvent[] = [];
 
-function _uid(): string {
-  return `uce_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+/**
+ * RFC4122-v4-format UUID. Used as the id for created events so the SAME id is
+ * used locally (optimistic) and in Supabase — enabling dedup + delete-by-id.
+ * Math.random is fine here: these are demo record ids, not security tokens.
+ */
+function _uuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 // ─── Date utilities ────────────────────────────────────────────────────────────
@@ -202,31 +211,34 @@ function maybeGenerateRsvpTask(event: UserCreatedEvent, dayOffset: number): void
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Save a new officer-created event (and any recurring instances).
- * Automatically generates RSVP tasks for mandatory/officer events this week.
- * Returns the first (or only) event created.
+ * Save a new officer-created event (and any recurring instances) into the local
+ * session store, generating RSVP tasks for mandatory/officer events this week.
+ *
+ * Ids (and the series id) are client-generated UUIDs so the screen can persist
+ * the SAME ids to Supabase via insertEvent(). Returns ALL created instances
+ * (first element is the primary event) so the caller can persist each one.
  */
 export function addUserEvent(
   event: Omit<UserCreatedEvent, 'id' | 'seriesId'>,
-): UserCreatedEvent {
+): UserCreatedEvent[] {
   const dates = event.recurrence !== 'none' && event.repeatUntil
     ? generateRecurrenceDates(event.dateString, event.recurrence, event.repeatUntil)
     : [event.dateString];
 
-  const seriesId = dates.length > 1 ? _uid() : undefined;
-  let first: UserCreatedEvent | undefined;
+  const seriesId = dates.length > 1 ? _uuid() : undefined;
+  const created: UserCreatedEvent[] = [];
 
   for (const dateString of dates) {
-    const id  = _uid();
+    const id  = _uuid();
     const e: UserCreatedEvent = { ...event, id, dateString, seriesId };
     _userEvents.push(e);
-    if (!first) first = e;
+    created.push(e);
 
     const offset = dateStringToDayOffset(dateString);
     maybeGenerateRsvpTask(e, offset);
   }
 
-  return first!;
+  return created;
 }
 
 /** Raw user-created events (no mock seed). Used for store introspection only. */
@@ -236,18 +248,25 @@ export function getUserEvents(): UserCreatedEvent[] {
 
 /**
  * Delete a single event instance by id.
- * Also removes any auto-generated RSVP task tied to this event id.
+ * Removes it from the local session store AND the Supabase cache (optimistic),
+ * plus any auto-generated RSVP task tied to this event id. The Supabase row
+ * removal itself is fired by the caller (event detail screen) via removeEvent().
  */
 export function deleteEvent(id: string): void {
+  _deletedIds.add(id);   // tombstone — survives a racing refetch this session
   const idx = _userEvents.findIndex(e => e.id === id);
   if (idx >= 0) _userEvents.splice(idx, 1);
+  if (_supabaseEvents) _supabaseEvents = _supabaseEvents.filter(e => e.id !== id);
   removeDynamicTaskById(`task_rsvp_${id}`);
 }
 
 /**
  * Delete all events in a recurring series, plus their generated RSVP tasks.
+ * Clears both the local store and the Supabase cache (optimistic). The Supabase
+ * row removal is fired by the caller via removeEventSeries().
  */
 export function deleteEventSeries(seriesId: string): void {
+  _deletedSeriesIds.add(seriesId);   // tombstone — guards against a racing refetch
   // Collect titles for task removal (titles may repeat)
   const toDelete = _userEvents.filter(e => e.seriesId === seriesId);
   for (const e of toDelete) {
@@ -256,6 +275,7 @@ export function deleteEventSeries(seriesId: string): void {
   for (let i = _userEvents.length - 1; i >= 0; i--) {
     if (_userEvents[i].seriesId === seriesId) _userEvents.splice(i, 1);
   }
+  if (_supabaseEvents) _supabaseEvents = _supabaseEvents.filter(e => e.seriesId !== seriesId);
 }
 
 // ─── Supabase event cache + id resolution ──────────────────────────────────────
@@ -272,15 +292,26 @@ export function deleteEventSeries(seriesId: string): void {
 let _supabaseEvents: MockEvent[] | null = null;        // null = not yet loaded
 const _mockIdToSupabaseId: Record<string, string> = {};
 
+// Session tombstones: ids/series the user optimistically deleted. A focus
+// refetch can race ahead of the async Supabase delete and return a row we just
+// removed; filtering against these keeps the cache from "un-deleting" it.
+const _deletedIds       = new Set<string>();
+const _deletedSeriesIds = new Set<string>();
+
 /** Called by screens after fetching events from Supabase. No-op on empty input. */
 export function setSupabaseEventCache(events: MockEvent[]): void {
   if (!events || events.length === 0) return;          // keep mock fallback
-  _supabaseEvents = events;
+
+  // Drop anything the user deleted this session (guards the delete→refetch race).
+  const filtered = events.filter(
+    e => !_deletedIds.has(e.id) && !(e.seriesId && _deletedSeriesIds.has(e.seriesId)),
+  );
+  _supabaseEvents = filtered;
 
   // Rebuild the mock-id → supabase-id map by matching titles against MOCK_EVENTS.
   for (const key of Object.keys(_mockIdToSupabaseId)) delete _mockIdToSupabaseId[key];
   for (const mock of MOCK_EVENTS) {
-    const match = events.find(e => e.title === mock.title);
+    const match = filtered.find(e => e.title === mock.title);
     if (match) _mockIdToSupabaseId[mock.id] = match.id;
   }
 }
@@ -298,6 +329,21 @@ export function hasSupabaseEvents(): boolean {
  */
 export function resolveEventId(id: string): string {
   return _mockIdToSupabaseId[id] ?? id;
+}
+
+// Seed events are never user-deletable. They are the 4 MOCK_EVENTS, identified
+// either by their mock id ('e1'..'e4') or by their mapped Supabase UUID.
+const _seedMockIds = new Set(MOCK_EVENTS.map(e => e.id));
+
+/**
+ * True if `id` belongs to an officer-created event (i.e. NOT one of the 4 seed
+ * events). Used to decide whether to show the Delete button. Works after reload
+ * because _mockIdToSupabaseId is rebuilt from the cache on load.
+ */
+export function isUserCreatedEvent(id: string): boolean {
+  if (_seedMockIds.has(id)) return false;                          // 'e1'..'e4'
+  if (Object.values(_mockIdToSupabaseId).includes(id)) return false; // seed Supabase UUIDs
+  return true;
 }
 
 // ─── Read functions ───────────────────────────────────────────────────────────
@@ -327,9 +373,15 @@ export function toMockEvent(e: UserCreatedEvent): MockEvent {
  * This is the single source of truth every screen should read.
  */
 export function getAllEvents(): MockEvent[] {
-  const userMapped = _userEvents.map(toMockEvent);
   // Prefer the Supabase cache when loaded; otherwise fall back to MOCK_EVENTS.
   const base = _supabaseEvents ?? MOCK_EVENTS;
+  // Dedup: a freshly-created event lives in _userEvents (optimistic) AND, once
+  // persisted + re-fetched, in the Supabase cache under the same UUID. Drop the
+  // local copy when the cache already has that id.
+  const baseIds = new Set(base.map(e => e.id));
+  const userMapped = _userEvents
+    .map(toMockEvent)
+    .filter(e => !baseIds.has(e.id));
   return [...base, ...userMapped].sort((a, b) =>
     a.dayOffset !== b.dayOffset
       ? a.dayOffset - b.dayOffset
