@@ -1,6 +1,6 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchEventById, removeEvent, removeEventSeries } from '@/lib/eventService';
-import { findEventById, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
+import { canManageEvent, findEventById, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
 import {
   AUDIENCE_LABEL,
   KIND_BG,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/mockEvents';
 import {
   getAllRsvpsForEvent,
+  getRsvpEntry,
   hydrateRsvpsFromSupabase,
   setRsvpEntry,
   useRsvpEntry,
@@ -273,6 +274,77 @@ function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => voi
   );
 }
 
+// ─── Member date-name submission — reads/writes live rsvpStore ────────────────
+//
+// Shown to every role when the event collects date names (requiresDateNames).
+// Uses the same rsvpStore key (eventId::role) as the Today/Tasks quick-action
+// cards, so a name entered on any surface stays in sync here. Draft/Save model:
+// typing buffers locally; only Save commits.
+
+function DateNameSubmitSection({ eventId, role }: { eventId: string; role: string }) {
+  const entry = useRsvpEntry(eventId, role);          // reactive saved state
+  const [draft,   setDraft  ] = useState(() => getRsvpEntry(eventId, role).dateName);
+  const [editing, setEditing] = useState(false);
+  const isSaved = entry.dateName.trim().length > 0 && !editing;
+
+  function save() {
+    const name = draft.trim();
+    if (!name) return;
+    setRsvpEntry(eventId, role, { dateName: name });  // merges — leaves status intact
+    setEditing(false);
+  }
+  function clear() {
+    setDraft('');
+    setEditing(false);
+    setRsvpEntry(eventId, role, { dateName: '' });
+  }
+
+  // ── Saved: show committed name + Edit / Clear ──────────────────────────────
+  if (isSaved) {
+    return (
+      <View style={s.rsvpBlock}>
+        <SectionLabel text="YOUR DATE" />
+        <View style={[s.rsvpSavedBanner, s.rsvpSavedBannerYes]}>
+          <Text style={[s.rsvpSavedYesText, { flex: 1 }]} numberOfLines={1}>✓ {entry.dateName}</Text>
+          <View style={{ flexDirection: 'row', gap: 6, flexShrink: 0 }}>
+            <Pressable style={s.rsvpEditBtn} onPress={() => setEditing(true)}>
+              <Text style={s.rsvpEditBtnText}>Edit</Text>
+            </Pressable>
+            <Pressable style={[s.rsvpEditBtn, { backgroundColor: '#1a0505' }]} onPress={clear}>
+              <Text style={[s.rsvpEditBtnText, { color: '#f87171' }]}>Clear</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Draft: input + Save ────────────────────────────────────────────────────
+  return (
+    <View style={s.rsvpBlock}>
+      <SectionLabel text="YOUR DATE" />
+      <Text style={s.dateSubmitHint}>Enter your date's full name for this event.</Text>
+      <TextInput
+        style={s.dateNameInput}
+        placeholder="Date's full name…"
+        placeholderTextColor="#475569"
+        value={draft}
+        onChangeText={setDraft}
+        autoCapitalize="words"
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+      <Pressable
+        style={[s.rsvpSaveBtn, { marginTop: 10 }, !draft.trim() && s.rsvpSaveBtnDisabled]}
+        onPress={save}
+        disabled={!draft.trim()}
+      >
+        <Text style={s.rsvpSaveBtnText}>Save Date Name</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ─── Date Party submissions — reads live rsvpStore ───────────────────────────
 
 function DateSubmissionsSection({ eventId }: { eventId: string }) {
@@ -414,18 +486,32 @@ export default function EventDetailScreen() {
   const [, _bumpFocus] = useState(0);
   useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
-  // All related tasks visible to this role
-  const allRelatedTasks = filterTasksForRole(role).filter(
-    t => t.linkedEvent === event?.title && !t.isWorkflowParent,
-  );
+  // All related tasks visible to this role. Match by linkedEventId when present
+  // (robust to a title edit), else by title (legacy/seed tasks).
+  const allRelatedTasks = filterTasksForRole(role).filter(t => {
+    if (t.isWorkflowParent) return false;
+    return t.linkedEventId ? t.linkedEventId === event?.id : t.linkedEvent === event?.title;
+  });
   // Hide RSVP tasks from the list — RSVP is already surfaced by RsvpSection above
   const relatedTasks = allRelatedTasks.filter(t => t.lightweightKind !== 'rsvp');
 
   useEffect(() => {
-    if (event) {
-      navigation.setOptions({ title: event.title });
-    }
-  }, [event, navigation]);
+    if (!event) return;
+    const canEdit = canManageEvent(event, role);
+    navigation.setOptions({
+      title: event.title,
+      headerRight: canEdit
+        ? () => (
+            <Pressable
+              style={s.editHdrBtn}
+              onPress={() => router.push(`/event/create?eventId=${event.id}` as any)}
+            >
+              <Text style={s.editHdrText}>Edit</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [event, navigation, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once we have a Supabase-backed event, pull its rsvps into the local store.
   // hydrateRsvpsFromSupabase short-circuits on non-UUID ids (mock/session
@@ -467,8 +553,9 @@ export default function EventDetailScreen() {
   const showRsvpResponses  = (isMandatory || event.audience === 'officers') && canSeeRsvps;
   const rsvpResponseLabel  = event.audience === 'officers' ? 'OFFICER RSVPS' : 'MEMBER RSVPS';
 
-  // Show date-party submissions for social events
-  const showDateSubmissions = event.kind === 'social' && canSeeDates;
+  // Show date submissions only for date-style social events (requiresDateNames),
+  // not every social event.
+  const showDateSubmissions = !!event.requiresDateNames && canSeeDates;
 
   // If any RSVP task requires covering, bubble that up into the RSVP panel
   const rsvpNeedsCovering = allRelatedTasks.some(
@@ -590,7 +677,15 @@ export default function EventDetailScreen() {
         requiresCovering={rsvpNeedsCovering}
       />
 
-      {/* ── Date Submissions (social events — Risk Mgr, Social Chair, BROAD) ── */}
+      {/* ── Your Date (member submission — any role, when event collects names) ── */}
+      {event.requiresDateNames && (
+        <>
+          <View style={s.divider} />
+          <DateNameSubmitSection eventId={event.id} role={role} />
+        </>
+      )}
+
+      {/* ── Date Submissions roster (Risk Mgr, Social Chair, BROAD) ── */}
       {showDateSubmissions && (
         <>
           <View style={s.divider} />
@@ -770,6 +865,10 @@ const s = StyleSheet.create({
   addTaskText:   { fontSize: 13, fontWeight: '600', color: '#818cf8', marginBottom: 12 },
   noRelatedText: { fontSize: 13, color: '#475569', marginBottom: 4 },
 
+  // Header edit button
+  editHdrBtn:    { paddingHorizontal: 12, paddingVertical: 4 },
+  editHdrText:   { color: '#818cf8', fontSize: 15, fontWeight: '600' },
+
   description: {
     fontSize: 15,
     color: '#94a3b8',
@@ -821,6 +920,19 @@ const s = StyleSheet.create({
   rsvpSaveBtnDisabled: { backgroundColor: '#1e293b', opacity: 0.5 },
   rsvpSaveBtnText:     { fontSize: 14, fontWeight: '700', color: '#fff' },
   rsvpHint:            { fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 18 },
+
+  // Member date-name submission
+  dateSubmitHint: { fontSize: 13, color: '#64748b', marginBottom: 10, lineHeight: 18 },
+  dateNameInput: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    color: '#f1f5f9',
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
 
   // RSVP
   rsvpBlock: {

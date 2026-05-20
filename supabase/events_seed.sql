@@ -80,7 +80,12 @@ INSERT INTO events (
     'annotator'
   );
 
+-- Only the Date Party collects date names (date-style social event). Other
+-- social events do NOT show the Date Submissions section.
+UPDATE events SET requires_date_names = true
+WHERE chapter_id = 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0' AND id = 'e3e3e3e3-e3e3-e3e3-e3e3-e3e3e3e3e3e3';
+
 -- Verify
-SELECT id, title, event_date, kind, audience FROM events
+SELECT id, title, event_date, kind, audience, requires_date_names FROM events
 WHERE chapter_id = 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0'
 ORDER BY event_date;

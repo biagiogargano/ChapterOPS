@@ -21,6 +21,11 @@ export interface MockEvent {
   isRecurring?:  boolean;
   seriesId?:     string;
   recurrence?:   string; // 'weekly' | 'biweekly' | etc.
+  // Officer who created it (for edit permission); absent on seed events.
+  createdByRole?: string;
+  // True only for date-style social events (date party / formal) that collect
+  // date names — gates the Date Submissions section. Not every social event.
+  requiresDateNames?: boolean;
 }
 
 export const MOCK_EVENTS: MockEvent[] = [

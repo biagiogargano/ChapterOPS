@@ -54,6 +54,7 @@ interface EventRow {
   recurrence:      string | null;
   repeat_until:    string | null;
   created_by_role: string | null;
+  requires_date_names: boolean | null;
   created_at:      string;
 }
 
@@ -77,6 +78,8 @@ function rowToMockEvent(row: EventRow): MockEvent {
     isRecurring: row.is_recurring,
     seriesId:    row.series_id ?? undefined,
     recurrence:  row.recurrence ?? undefined,
+    createdByRole: row.created_by_role ?? undefined,
+    requiresDateNames: row.requires_date_names ?? false,
   };
 }
 
@@ -98,6 +101,7 @@ function rowToUserCreatedEvent(row: EventRow): UserCreatedEvent {
     recurrence:    (row.recurrence as RecurrenceType) ?? 'none',
     seriesId:      row.series_id ?? undefined,
     repeatUntil:   row.repeat_until ?? undefined,
+    requiresDateNames: row.requires_date_names ?? false,
   };
 }
 
@@ -189,6 +193,7 @@ export async function insertEvent(event: UserCreatedEvent): Promise<MockEvent | 
         recurrence:      event.recurrence !== 'none' ? event.recurrence : null,
         repeat_until:    event.repeatUntil ?? null,
         created_by_role: event.createdByRole,
+        requires_date_names: event.requiresDateNames ?? false,
       })
       .select()
       .single();
@@ -201,6 +206,75 @@ export async function insertEvent(event: UserCreatedEvent): Promise<MockEvent | 
   } catch (err) {
     console.warn('[eventService] insertEvent threw:', err);
     return undefined;
+  }
+}
+
+/**
+ * Update a created event's editable fields. Intentionally does NOT touch the
+ * recurrence columns (recurrence / series_id / repeat_until / is_recurring) so
+ * recurring metadata is preserved when editing a single occurrence.
+ * Returns true on success; no-op in mock fallback.
+ */
+export async function updateEvent(event: UserCreatedEvent): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { error } = await supabase
+      .from('events')
+      .update({
+        title:       event.title,
+        kind:        event.kind,
+        audience:    event.audience,
+        event_date:  event.dateString,
+        time:        event.time,
+        location:    event.location,
+        description: event.description,
+      })
+      .eq('id', event.id)
+      .eq('chapter_id', DEMO_CHAPTER_ID);
+
+    if (error) {
+      console.warn('[eventService] updateEvent error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[eventService] updateEvent threw:', err);
+    return false;
+  }
+}
+
+/**
+ * Update SHARED editable fields for every event in a recurring series. Does NOT
+ * touch event_date (each occurrence keeps its date) or recurrence columns.
+ * Returns true on success; no-op in mock fallback.
+ */
+export async function updateEventSeries(
+  seriesId: string,
+  fields: { title: string; kind: EventKind; audience: EventAudience; time: string; location: string; description: string },
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const { error } = await supabase
+      .from('events')
+      .update({
+        title:       fields.title,
+        kind:        fields.kind,
+        audience:    fields.audience,
+        time:        fields.time,
+        location:    fields.location,
+        description: fields.description,
+      })
+      .eq('series_id', seriesId)
+      .eq('chapter_id', DEMO_CHAPTER_ID);
+
+    if (error) {
+      console.warn('[eventService] updateEventSeries error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[eventService] updateEventSeries threw:', err);
+    return false;
   }
 }
 

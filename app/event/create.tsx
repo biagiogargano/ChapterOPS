@@ -1,22 +1,31 @@
 import { useDevRole } from '@/lib/devRoleStore';
-import { insertEvent } from '@/lib/eventService';
+import { insertEvent, updateEvent, updateEventSeries } from '@/lib/eventService';
 import {
   RECURRENCE_LABELS,
   ROLE_ALLOWED_KINDS,
   addUserEvent,
+  canManageEvent,
+  findEventById,
+  updateUserEvent,
+  updateUserEventSeries,
   type RecurrenceType,
+  type UpdateEventInput,
 } from '@/lib/eventStore';
 import {
   KIND_BG,
   KIND_COLORS,
   KIND_LABELS,
+  getEventDate,
   type EventAudience,
   type EventKind,
+  type MockEvent,
 } from '@/lib/mockEvents';
-import { isOfficer } from '@/lib/roles';
-import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
+import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -43,6 +52,55 @@ function todayIso(): string {
 const _now      = new Date();
 const _maxDate  = new Date(_now.getFullYear(), _now.getMonth() + 12, _now.getDate());
 const MAX_ISO   = isoDateFromParts(_maxDate.getFullYear(), _maxDate.getMonth(), _maxDate.getDate());
+
+// ─── Edit-mode helpers ─────────────────────────────────────────────────────────
+
+/** Parse a stored time string ("8:00 PM") back into the picker fields. */
+function parseTime(t: string): { hour: number; minute: string; ampm: 'AM' | 'PM' } {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(t.trim());
+  if (!m) return { hour: 8, minute: '00', ampm: 'PM' };
+  const minute = ['00', '15', '30', '45'].includes(m[2]) ? m[2] : '00';
+  return { hour: parseInt(m[1], 10), minute, ampm: m[3].toUpperCase() as 'AM' | 'PM' };
+}
+
+/** A MockEvent stores dayOffset; reconstruct its ISO date for edit prefill. */
+function isoFromDayOffset(dayOffset: number): string {
+  const d = getEventDate(dayOffset);
+  return isoDateFromParts(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** Natural-language join: ['time','location'] → "time and location". */
+function joinNatural(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/**
+ * Build a coalesced update notice from an event edit diff (null if no
+ * notify-worthy change). Reassures recipients their RSVP is preserved.
+ * `includeDate` is false for series edits (date isn't applied to the series).
+ */
+function buildEventEditNotice(
+  before: MockEvent,
+  input: UpdateEventInput,
+  includeDate: boolean,
+): { summary: string; severity: UpdateSeverity; audience: Role[] } | null {
+  const changes: { label: string; sev: UpdateSeverity }[] = [];
+  if (before.title !== input.title)                                        changes.push({ label: 'title',      sev: 'moderate' });
+  if (includeDate && isoFromDayOffset(before.dayOffset) !== input.dateString) changes.push({ label: 'date',       sev: 'critical' });
+  if (before.time !== input.time)                                          changes.push({ label: 'time',       sev: 'critical' });
+  if (before.location !== input.location)                                  changes.push({ label: 'location',   sev: 'critical' });
+  if (before.audience !== input.audience)                                  changes.push({ label: 'attendance', sev: 'critical' });
+  if (changes.length === 0) return null;
+
+  const severity: UpdateSeverity = changes.some(c => c.sev === 'critical') ? 'critical' : 'moderate';
+  const summary  =
+    `${input.title} was updated: ${joinNatural(changes.map(c => c.label))} changed. ` +
+    `Your RSVP is still saved, but please review the update and change your response if needed.`;
+  const audience = input.audience === 'officers' ? [...OFFICER_ROLES] : [...OFFICER_ROLES, 'brother' as Role];
+  return { summary, severity, audience };
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -353,61 +411,138 @@ export default function CreateEventScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
   const { role }   = useDevRole();
+  const params     = useLocalSearchParams<{ eventId?: string }>();
+
+  // Edit mode when an eventId is supplied.
+  const editing     = !!params.eventId;
+  const existing    = useMemo(() => (params.eventId ? findEventById(params.eventId) : undefined), [params.eventId]);
+  const prefillTime = useMemo(() => (existing ? parseTime(existing.time) : { hour: 8, minute: '00', ampm: 'PM' as const }), [existing]);
 
   const allowedKinds = ROLE_ALLOWED_KINDS[role] ?? [];
 
-  // ── Form state ──────────────────────────────────────────────────────────────
-  const [title,       setTitle      ] = useState('');
-  const [kind,        setKind       ] = useState<EventKind>(() => allowedKinds[0] ?? 'chapter');
-  const [dateString,  setDateString ] = useState('');
-  const [hour,        setHour       ] = useState(8);
-  const [minute,      setMinute     ] = useState('00');
-  const [ampm,        setAmpm       ] = useState<'AM' | 'PM'>('PM');
-  const [location,    setLocation   ] = useState('');
-  const [audience,    setAudience   ] = useState<EventAudience | ''>('');
-  const [description, setDescription] = useState('');
+  // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
+  const [title,       setTitle      ] = useState(existing?.title ?? '');
+  const [kind,        setKind       ] = useState<EventKind>(() => (existing?.kind as EventKind) ?? allowedKinds[0] ?? 'chapter');
+  const [dateString,  setDateString ] = useState(existing ? isoFromDayOffset(existing.dayOffset) : '');
+  const [hour,        setHour       ] = useState(prefillTime.hour);
+  const [minute,      setMinute     ] = useState(prefillTime.minute);
+  const [ampm,        setAmpm       ] = useState<'AM' | 'PM'>(prefillTime.ampm);
+  const [location,    setLocation   ] = useState(existing?.location ?? '');
+  const [audience,    setAudience   ] = useState<EventAudience | ''>(existing?.audience ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
   const [recurrence,  setRecurrence ] = useState<RecurrenceType>('none');
   const [repeatUntil, setRepeatUntil] = useState('');
+  const [requiresDateNames, setRequiresDateNames] = useState(existing?.requiresDateNames ?? false);
   const [errors,      setErrors     ] = useState<string[]>([]);
 
-  // Reset kind when role changes to one that disallows it
+  // Reset kind when role changes to one that disallows it (create mode only —
+  // never mutate the kind of an event being edited).
   useEffect(() => {
+    if (editing) return;
     const allowed = ROLE_ALLOWED_KINDS[role] ?? [];
     if (!allowed.includes(kind)) setKind(allowed[0] ?? 'chapter');
   }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Guard: non-officers should never land here
+  // Guard: non-officers, or non-managers of this event in edit mode.
   useEffect(() => {
-    if (!isOfficer(role)) router.back();
-  }, [role]);
+    if (!isOfficer(role)) { router.back(); return; }
+    if (editing && (!existing || !canManageEvent(existing, role))) router.back();
+  }, [role, editing, existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Header cancel button
+  // Header cancel button + title
   useEffect(() => {
     navigation.setOptions({
-      title: 'Create Event',
+      title: editing ? 'Edit Event' : 'Create Event',
       headerLeft: () => (
         <Pressable onPress={() => router.back()} style={s.cancelBtn}>
           <Text style={s.cancelBtnText}>Cancel</Text>
         </Pressable>
       ),
     });
-  }, [navigation]);
+  }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit =
     title.trim().length > 0 &&
     dateString !== '' &&
     audience !== '' &&
-    (recurrence === 'none' || repeatUntil !== '');
+    (editing || recurrence === 'none' || repeatUntil !== '');
 
-  function handleCreate() {
+  function handleSubmit() {
     const errs: string[] = [];
-    if (!title.trim())                          errs.push('Event name is required.');
-    if (!dateString)                            errs.push('Please pick a date.');
-    if (!audience)                              errs.push('Please select attendance type.');
-    if (recurrence !== 'none' && !repeatUntil) errs.push('Please set a repeat-until date.');
+    if (!title.trim())                                     errs.push('Event name is required.');
+    if (!dateString)                                       errs.push('Please pick a date.');
+    if (!audience)                                         errs.push('Please select attendance type.');
+    if (!editing && recurrence !== 'none' && !repeatUntil) errs.push('Please set a repeat-until date.');
     if (errs.length > 0) { setErrors(errs); return; }
 
-    const timeStr  = `${hour}:${minute} ${ampm}`;
+    const timeStr = `${hour}:${minute} ${ampm}`;
+
+    // ── Edit existing event (recurrence rule preserved, not edited) ────────────
+    if (editing && existing) {
+      const input: UpdateEventInput = {
+        title:       title.trim(),
+        kind,
+        audience:    audience as EventAudience,
+        dateString,
+        time:        timeStr,
+        location:    location.trim() || 'TBD',
+        description: description.trim(),
+      };
+
+      // Emit one update notice (RSVP is preserved; never reset).
+      function emitEditNotice(includeDate: boolean) {
+        const notice = buildEventEditNotice(existing!, input, includeDate);
+        if (notice) {
+          emitUpdateNotice({
+            entityType:    'event',
+            entityId:      existing!.id,
+            summary:       notice.summary,
+            severity:      notice.severity,
+            audienceRoles: notice.audience,
+            changedByRole: role,
+          });
+        }
+      }
+
+      function applySingle() {
+        const updated = updateUserEvent(existing!.id, input);
+        if (updated) {
+          void updateEvent(updated);   // persist editable fields (incl. date)
+          emitEditNotice(true);
+        }
+        router.replace(`/event/${existing!.id}` as any);
+      }
+
+      function applySeries() {
+        const sid = existing!.seriesId!;
+        updateUserEventSeries(sid, input);           // local + cache (date NOT applied)
+        void updateEventSeries(sid, {                // persist shared fields across the series
+          title: input.title, kind: input.kind, audience: input.audience,
+          time: input.time, location: input.location, description: input.description,
+        });
+        emitEditNotice(false);                       // date excluded for series
+        router.replace(`/event/${existing!.id}` as any);
+      }
+
+      // Recurring → ask the edit scope; otherwise edit the single event.
+      // seriesId is the authoritative "part of a series" marker.
+      if (existing.seriesId) {
+        Alert.alert(
+          'Edit Recurring Event',
+          `"${existing.title}" is part of a recurring series.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'This Event Only', onPress: applySingle },
+            { text: 'Entire Series',   onPress: applySeries },
+          ],
+        );
+      } else {
+        applySingle();
+      }
+      return;
+    }
+
+    // ── Create new event ───────────────────────────────────────────────────────
     // Local optimistic write (also generates RSVP tasks). Returns all instances
     // (recurring series → one per date), each with a client-generated UUID id.
     const created = addUserEvent({
@@ -421,6 +556,7 @@ export default function CreateEventScreen() {
       createdByRole: role,
       recurrence,
       repeatUntil:  recurrence !== 'none' ? repeatUntil : undefined,
+      requiresDateNames: kind === 'social' ? requiresDateNames : false,
     });
 
     // Persist each instance to Supabase (fire-and-forget; no-ops if unconfigured,
@@ -526,7 +662,28 @@ export default function CreateEventScreen() {
           />
         </View>
 
-        {/* ── Recurrence ── */}
+        {/* ── Collect date names (date-style social events only) ── */}
+        {!editing && kind === 'social' && (
+          <View style={s.field}>
+            <Pressable
+              style={s.dateToggleRow}
+              onPress={() => setRequiresDateNames(v => !v)}
+            >
+              <View style={[s.dateToggleBox, requiresDateNames && s.dateToggleBoxOn]}>
+                {requiresDateNames && <Text style={s.dateToggleCheck}>✓</Text>}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dateToggleLabel}>Collect date names</Text>
+                <Text style={s.dateToggleSub}>
+                  Adds a date-name submission section for date parties / formals. Leave off for regular socials.
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        )}
+
+        {/* ── Recurrence (create only — recurring rule isn't edited) ── */}
+        {!editing && (
         <View style={s.field}>
           <FieldLabel text="REPEATS" />
           <RecurrencePicker
@@ -534,9 +691,10 @@ export default function CreateEventScreen() {
             onChange={r => { setRecurrence(r); setRepeatUntil(''); }}
           />
         </View>
+        )}
 
         {/* ── Repeat Until (shown only when recurrence is active) ── */}
-        {recurrence !== 'none' && (
+        {!editing && recurrence !== 'none' && (
           <View style={s.field}>
             <FieldLabel text="REPEAT UNTIL" required />
             {errors.includes('Please set a repeat-until date.') && (
@@ -569,11 +727,11 @@ export default function CreateEventScreen() {
         {/* ── Submit ── */}
         <Pressable
           style={[s.createBtn, !canSubmit && s.createBtnDisabled]}
-          onPress={handleCreate}
+          onPress={handleSubmit}
           disabled={!canSubmit}
         >
           <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>
-            Create Event
+            {editing ? 'Save Changes' : 'Create Event'}
           </Text>
         </Pressable>
 
@@ -766,6 +924,33 @@ const s = StyleSheet.create({
   recChipOn:     { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
   recChipText:   { fontSize: 13, fontWeight: '600', color: '#64748b' },
   recChipTextOn: { color: '#a5b4fc' },
+
+  // Date-names toggle
+  dateToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dateToggleBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#475569',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  dateToggleBoxOn: { borderColor: '#6366f1', backgroundColor: '#6366f1' },
+  dateToggleCheck: { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 16 },
+  dateToggleLabel: { fontSize: 14, fontWeight: '600', color: '#e2e8f0' },
+  dateToggleSub:   { fontSize: 12, color: '#64748b', marginTop: 2 },
 
   // Audience
   audienceList: { gap: 8 },

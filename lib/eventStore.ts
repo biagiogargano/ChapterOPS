@@ -55,6 +55,8 @@ export interface UserCreatedEvent {
   seriesId?:     string;
   /** ISO date — last date of recurrence. */
   repeatUntil?:  string;
+  /** True only for date-style social events that collect date names. */
+  requiresDateNames?: boolean;
 }
 
 // ─── Role → allowed event kinds ───────────────────────────────────────────────
@@ -278,6 +280,93 @@ export function deleteEventSeries(seriesId: string): void {
   if (_supabaseEvents) _supabaseEvents = _supabaseEvents.filter(e => e.seriesId !== seriesId);
 }
 
+/** Editable fields for an officer-created event (recurrence rule is NOT edited). */
+export interface UpdateEventInput {
+  title:       string;
+  kind:        EventKind;
+  audience:    EventAudience;
+  dateString:  string;
+  time:        string;
+  location:    string;
+  description: string;
+}
+
+/**
+ * Update a created event's editable fields. Preserves id, seriesId, recurrence,
+ * repeatUntil, and createdByRole (no recurring-rule editing). Updates the local
+ * _userEvents entry and the Supabase cache optimistically. Returns the updated
+ * UserCreatedEvent so the caller can persist it via eventService.updateEvent.
+ */
+export function updateUserEvent(id: string, input: UpdateEventInput): UserCreatedEvent | undefined {
+  const current = findEventById(id);
+  if (!current) return undefined;
+
+  const existingUce = _userEvents.find(e => e.id === id);
+  const updated: UserCreatedEvent = {
+    id,
+    title:         input.title,
+    kind:          input.kind,
+    audience:      input.audience,
+    dateString:    input.dateString,
+    time:          input.time,
+    location:      input.location,
+    description:   input.description,
+    // Preserved (never edited here):
+    createdByRole:     existingUce?.createdByRole ?? current.createdByRole ?? '',
+    recurrence:        existingUce?.recurrence ?? ((current.recurrence as RecurrenceType | undefined) ?? 'none'),
+    seriesId:          existingUce?.seriesId ?? current.seriesId,
+    repeatUntil:       existingUce?.repeatUntil,
+    requiresDateNames: existingUce?.requiresDateNames ?? current.requiresDateNames,
+  };
+
+  const ui = _userEvents.findIndex(e => e.id === id);
+  if (ui >= 0) _userEvents[ui] = updated;
+  if (_supabaseEvents) {
+    const ci = _supabaseEvents.findIndex(e => e.id === id);
+    if (ci >= 0) _supabaseEvents[ci] = toMockEvent(updated);
+  }
+  return updated;
+}
+
+/**
+ * Apply SHARED editable fields (title/kind/audience/time/location/description) to
+ * every occurrence in a recurring series. Each occurrence keeps its OWN date,
+ * id, recurrence metadata, and RSVP state — date is intentionally NOT applied to
+ * the series (use updateUserEvent for a single occurrence's date). Updates the
+ * local store + Supabase cache; the caller persists via eventService.updateEventSeries.
+ */
+export function updateUserEventSeries(seriesId: string, input: UpdateEventInput): void {
+  for (let i = 0; i < _userEvents.length; i++) {
+    if (_userEvents[i].seriesId === seriesId) {
+      _userEvents[i] = {
+        ..._userEvents[i],
+        title:       input.title,
+        kind:        input.kind,
+        audience:    input.audience,
+        time:        input.time,
+        location:    input.location,
+        description: input.description,
+        // dateString preserved per occurrence
+      };
+    }
+  }
+  if (_supabaseEvents) {
+    _supabaseEvents = _supabaseEvents.map(e =>
+      e.seriesId === seriesId
+        ? {
+            ...e,
+            title:       input.title,
+            kind:        input.kind,
+            audience:    input.audience,
+            time:        input.time,
+            location:    input.location,
+            description: input.description,
+          }
+        : e,
+    );
+  }
+}
+
 // ─── Supabase event cache + id resolution ──────────────────────────────────────
 //
 // When Supabase events are loaded (by the root layout / Calendar / Today), they
@@ -346,6 +435,16 @@ export function isUserCreatedEvent(id: string): boolean {
   return true;
 }
 
+/**
+ * Edit permission: an officer-created event is editable by the creator role or
+ * by BROAD leadership (president / pro_consul). Seed events are never editable.
+ */
+export function canManageEvent(event: MockEvent, role: Role): boolean {
+  if (!isUserCreatedEvent(event.id)) return false;
+  if (role === 'president' || role === 'pro_consul') return true;
+  return event.createdByRole === role;
+}
+
 // ─── Read functions ───────────────────────────────────────────────────────────
 
 /**
@@ -365,6 +464,8 @@ export function toMockEvent(e: UserCreatedEvent): MockEvent {
     isRecurring: !!e.seriesId,
     seriesId:    e.seriesId,
     recurrence:  e.recurrence !== 'none' ? e.recurrence : undefined,
+    createdByRole: e.createdByRole,
+    requiresDateNames: e.requiresDateNames,
   };
 }
 

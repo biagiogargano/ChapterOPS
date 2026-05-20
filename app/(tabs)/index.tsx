@@ -41,7 +41,7 @@ import {
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -184,13 +184,14 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
     setRsvpEntry(eventId, role, { status: 'no_response' });
   }
 
+  // Tapping the title/meta opens the full Event Detail hub (quick buttons stay).
   const header = (
-    <View>
+    <Pressable onPress={openEventDetail}>
       <Text style={s.qaTitle}>{task.title}</Text>
       <Text style={[s.qaDue, isUrgent && s.qaDueUrgent]}>
         {task.dueLabel}{eventTitle ? `  ·  ${eventTitle}` : ''}
       </Text>
-    </View>
+    </Pressable>
   );
 
   if (status === 'attending') {
@@ -264,8 +265,15 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
  * writes to rsvpStore; typing alone never triggers a commit.
  */
 function NameCard({ task, role }: { task: MockTask; role: Role }) {
+  const router   = useRouter();
   const eventId  = resolveEventId(task.linkedEventId ?? task.linkedEvent ?? '');
   const isUrgent = task.urgency === 'overdue';
+
+  /** Route to the full Event Detail hub (same destination as the event card). */
+  function openEventDetail() {
+    const ev = getAllEvents().find(e => e.id === eventId);
+    if (ev) router.push(`/event/${ev.id}` as any);
+  }
 
   // Reactive entry: re-renders whenever setRsvpEntry fires on any screen.
   const entry = useRsvpEntry(eventId, role);
@@ -275,6 +283,15 @@ function NameCard({ task, role }: { task: MockTask; role: Role }) {
   const [editing, setEditing] = useState(false);
   // isSaved derives from the store (reactive), not from a copied boolean.
   const isSaved = entry.dateName.trim().length > 0 && !editing;
+
+  // Keep the local draft in sync with the store when the user is NOT actively
+  // editing. This clears stale draft text after a Clear performed on another
+  // surface (e.g. Event Detail). While editing, the draft is left untouched so
+  // we never overwrite text the user is typing. The effect only fires on actual
+  // store writes (Save / Clear) — typing alone never changes entry.dateName.
+  useEffect(() => {
+    if (!editing) setDraft(entry.dateName);
+  }, [entry.dateName, editing]);
 
   function handleSave() {
     const name = draft.trim();
@@ -296,12 +313,12 @@ function NameCard({ task, role }: { task: MockTask; role: Role }) {
   }
 
   const header = (
-    <View>
+    <Pressable onPress={openEventDetail}>
       <Text style={s.qaTitle}>{task.title}</Text>
       <Text style={[s.qaDue, isUrgent && s.qaDueUrgent]}>
         {task.dueLabel}{task.linkedEvent ? `  ·  ${task.linkedEvent}` : ''}
       </Text>
-    </View>
+    </Pressable>
   );
 
   // ── Saved state: show confirmed name + Edit / Clear actions ──────────────
@@ -654,7 +671,7 @@ function UpdateNoticeCard({ notice, onPress }: { notice: UpdateNotice; onPress: 
     <Pressable style={[s.noticeCard, { backgroundColor: cfg.bg }]} onPress={onPress}>
       <View style={[s.noticeStripe, { backgroundColor: cfg.stripe }]} />
       <View style={s.noticeBody}>
-        <Text style={[s.noticeText, { color: cfg.color }]} numberOfLines={2}>{notice.summary}</Text>
+        <Text style={[s.noticeText, { color: cfg.color }]} numberOfLines={3}>{notice.summary}</Text>
         <Text style={s.noticeHint}>Tap to view · dismisses</Text>
       </View>
     </Pressable>

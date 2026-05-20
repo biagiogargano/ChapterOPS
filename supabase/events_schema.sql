@@ -38,6 +38,9 @@ CREATE TABLE events (
   repeat_until    date,
 
   created_by_role text,
+  -- True only for date-style social events (date party / formal) that collect
+  -- date names. NOT every social event — gates the Date Submissions section.
+  requires_date_names boolean NOT NULL DEFAULT false,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 

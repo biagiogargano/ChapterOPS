@@ -1,6 +1,6 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { getStoredState } from '@/lib/devTaskStore';
-import { resolveEventId } from '@/lib/eventStore';
+import { getAllEvents, resolveEventId } from '@/lib/eventStore';
 import {
   PROOF_ICON,
   STATE_BG,
@@ -326,8 +326,23 @@ export default function TasksScreen() {
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
-  /** All task taps go to Task Detail — event info is surfaced there. */
+  /**
+   * Events are the action hub. Event-tied lightweight RSVP / date-name tasks
+   * route to Event Detail (full context + all event actions in one place).
+   * Everything else (structured tasks, acknowledgments, yes/no) → Task Detail.
+   */
   function nav(task: MockTask) {
+    const isEventAction =
+      (task.lightweightKind === 'rsvp' || task.lightweightKind === 'name_submission') &&
+      !!(task.linkedEventId ?? task.linkedEvent);
+    if (isEventAction) {
+      const eid = resolveEventId(task.linkedEventId ?? task.linkedEvent!);
+      const ev  = getAllEvents().find(e => e.id === eid);
+      if (ev) {
+        router.push(`/event/${ev.id}` as any);
+        return;
+      }
+    }
     router.push(`/task/${task.id}` as any);
   }
 
