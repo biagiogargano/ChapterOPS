@@ -4,13 +4,12 @@
  * Resolves a Supabase auth session into the active organization's membership
  * and the derived acting role, owning all loading/fallback/error phases.
  *
- * Phase 1, commit C6: implemented and mountable, but NOT yet authoritative —
- * it is wired into no screen/store/layout and the devRoleStore shim still uses
- * its own source. AUTH_ENABLED remains false. Auth inputs and the resolver are
- * injectable so the provider is testable and so it adds no runtime side effects
- * until explicitly mounted.
- *
- * Imports only lib modules (no screens/stores/layouts).
+ * Phase 1, commit C12b: the session now comes from AuthProvider (via useAuth),
+ * not from an internal supabase.auth subscription — a single auth source. The
+ * fallback-first behavior is unchanged: while AUTH_ENABLED is false the layout
+ * passes configuredOverride={false}, so the resolution effect short-circuits to
+ * the President fallback before any auth value is consulted. The `auth` prop is
+ * still injectable for tests. Imports only lib modules (no screens/stores/layouts).
  */
 
 import {
@@ -23,8 +22,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { useAuth, type AuthContextType } from './auth';
 import {
   isSupabaseConfigured,
   resolveIdentity as defaultResolveIdentity,
@@ -43,7 +41,7 @@ import type { Role } from './roles';
 import { ROLES } from './roles';
 import type { Membership, Organization, Member, Position } from '@/types';
 
-// ─── Auth input (decoupled from lib/auth.tsx until C8) ────────────────────────
+// ─── Auth input (sourced from AuthProvider via useAuth) ───────────────────────
 
 export interface IdentityAuthUser {
   id:    string;
@@ -56,9 +54,13 @@ export interface IdentityAuthInput {
   devBypass:   boolean;
 }
 
-function sessionToUser(session: Session | null): IdentityAuthUser | null {
-  if (!session?.user) return null;
-  return { id: session.user.id, email: session.user.email ?? '' };
+/** Map the AuthProvider context surface to IdentityProvider's auth input. */
+function ctxToAuthInput(ctx: AuthContextType): IdentityAuthInput {
+  return {
+    initialized: ctx.initialized,
+    user:        ctx.user ? { id: ctx.user.id, email: ctx.user.email ?? '' } : null,
+    devBypass:   false,
+  };
 }
 
 // ─── Context value ────────────────────────────────────────────────────────────
@@ -103,7 +105,7 @@ const IdentityContext = createContext<IdentityValue>(DEFAULT_VALUE);
 
 export interface IdentityProviderProps {
   children: ReactNode;
-  /** Inject auth input (tests / C8 wiring). When omitted, subscribes to supabase.auth. */
+  /** Inject auth input (tests). When omitted, reads the AuthProvider session via useAuth(). */
   auth?: IdentityAuthInput;
   /** Inject the resolver (tests). Defaults to memberService.resolveIdentity. */
   resolver?: (authUserId: string, email: string) => Promise<MemberResolution>;
@@ -117,35 +119,13 @@ export function IdentityProvider({
   resolver = defaultResolveIdentity,
   configuredOverride,
 }: IdentityProviderProps) {
-  // Internal auth source — used only when no auth is injected.
-  const [internalAuth, setInternalAuth] = useState<IdentityAuthInput>({
-    initialized: false,
-    user:        null,
-    devBypass:   false,
-  });
+  // Auth source: the AuthProvider session (the single supabase.auth subscription
+  // lives there). useAuth() is called unconditionally; an injected authProp
+  // overrides it for tests. IdentityProvider holds NO subscription of its own.
+  const ctxAuth = useAuth();
+  const auth = authProp ?? ctxToAuthInput(ctxAuth);
 
   const configured = configuredOverride ?? isSupabaseConfigured();
-
-  useEffect(() => {
-    // Skip the live auth subscription when auth is injected (tests) or when
-    // Supabase is treated as unconfigured (no-env / flag-off forced fallback).
-    // The fallback identity needs no session, so we avoid all auth side effects.
-    if (authProp || !configured) return;
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setInternalAuth({ initialized: true, user: sessionToUser(data.session), devBypass: false });
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
-      setInternalAuth({ initialized: true, user: sessionToUser(s), devBypass: false });
-    });
-
-    return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [authProp, configured]);
-
-  const auth = authProp ?? internalAuth;
 
   // Synchronous fallback seed: when unconfigured, initialize directly to the
   // fallback identity so the very first render is already resolved (President),
