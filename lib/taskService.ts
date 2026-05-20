@@ -94,6 +94,14 @@ export interface TaskStatePatch {
   rejectionNote?: string;
 }
 
+/** Full persisted interaction state for one task (used to hydrate devTaskStore). */
+export interface PersistedTaskState {
+  id:            string;
+  state:         TaskState;
+  proofContent:  string;
+  rejectionNote: string;
+}
+
 // ─── Normalization helpers (row ↔ MockTask) ───────────────────────────────────
 
 /**
@@ -190,6 +198,37 @@ export async function fetchAllTasks(): Promise<MockTask[]> {
     return (data as TaskRow[]).map(rowToMockTask);
   } catch (err) {
     console.warn('[taskService] fetchAllTasks threw:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch just the interaction state (state/proof/rejection) for every persisted
+ * task. Used by the startup hydrate to seed devTaskStore so proof content and
+ * rejection notes survive reload (rowToMockTask intentionally omits them).
+ */
+export async function fetchTaskStates(): Promise<PersistedTaskState[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('id, state, proof_content, rejection_note')
+      .eq('chapter_id', DEMO_CHAPTER_ID);
+
+    if (error) {
+      console.warn('[taskService] fetchTaskStates error:', error.message);
+      return [];
+    }
+    return (data as Array<{
+      id: string; state: TaskState; proof_content: string | null; rejection_note: string | null;
+    }>).map(r => ({
+      id:            r.id,
+      state:         r.state,
+      proofContent:  r.proof_content  ?? '',
+      rejectionNote: r.rejection_note ?? '',
+    }));
+  } catch (err) {
+    console.warn('[taskService] fetchTaskStates threw:', err);
     return [];
   }
 }

@@ -475,8 +475,44 @@ export function removeDynamicTaskById(id: string): void {
   if (idx >= 0) _dynamicTasks.splice(idx, 1);
 }
 
-/** All tasks: seed data + any auto-generated tasks. */
+// ─── Supabase task cache (structured tasks only) ───────────────────────────────
+//
+// When persistent tasks are loaded (root layout startup hydrate), the STRUCTURED
+// tasks are cached here. getAllTasks() then swaps each structured MOCK_TASK for
+// its persisted version (same id), so the persisted `state` becomes the default
+// shown after reload. Lightweight tasks (RSVP / name_submission) are NEVER
+// persisted — their completion stays owned by rsvpStore — so they always come
+// from MOCK_TASKS. Falls back entirely to MOCK_TASKS when the cache is unloaded.
+
+let _supabaseTasks: MockTask[] | null = null;   // null = not yet loaded
+
+/** Set the persisted task cache. Defensively keeps only structured tasks. */
+export function setSupabaseTaskCache(tasks: MockTask[]): void {
+  const structured = tasks.filter(t => t.type === 'structured');
+  if (structured.length === 0) return;          // keep mock fallback
+  _supabaseTasks = structured;
+}
+
+/** True if this id is a persisted (Supabase-backed) structured task. */
+export function isPersistedTask(id: string): boolean {
+  return _supabaseTasks !== null && _supabaseTasks.some(t => t.id === id);
+}
+
+/** All tasks: seed/persisted data + any auto-generated tasks. */
 function getAllTasks(): MockTask[] {
+  if (_supabaseTasks !== null) {
+    const byId = new Map(_supabaseTasks.map(t => [t.id, t]));
+    // Preserve MOCK_TASKS order (so role buckets render identically); swap each
+    // structured task for its persisted version when present. Lightweight tasks
+    // always remain the mock versions.
+    const merged = MOCK_TASKS.map(t =>
+      t.type === 'structured' ? (byId.get(t.id) ?? t) : t,
+    );
+    // Any persisted structured tasks not in MOCK_TASKS (e.g. future created
+    // tasks) are appended, then runtime dynamic RSVP tasks.
+    const extra = _supabaseTasks.filter(t => !MOCK_TASKS.some(m => m.id === t.id));
+    return [...merged, ...extra, ..._dynamicTasks];
+  }
   return [...MOCK_TASKS, ..._dynamicTasks];
 }
 
@@ -495,11 +531,16 @@ export function filterTasksForRole(role: Role): MockTask[] {
 
 // ─── Responsibility buckets ───────────────────────────────────────────────────
 
-export type ResponsibilityBucket = 'mine' | 'review' | 'alert' | 'supervising';
+export type ResponsibilityBucket = 'mine' | 'review' | 'alert' | 'reviewed' | 'supervising';
 
 /**
  * Classify a visible task into a responsibility bucket for the given role.
  * Returns null if the role cannot see the task.
+ *
+ * NOTE: this reads task.state (the seed/persisted definition state). After a
+ * reload, a reviewed task's persisted state is 'approved'/'rejected', so it
+ * leaves 'review' — the 'reviewed' bucket keeps it visible to the reviewer
+ * instead of vanishing into the (unrendered) 'supervising' bucket.
  */
 export function getTaskBucket(task: MockTask, role: Role): ResponsibilityBucket | null {
   // Visibility gate
@@ -511,6 +552,10 @@ export function getTaskBucket(task: MockTask, role: Role): ResponsibilityBucket 
 
   if (isMine)    return 'mine';
   if (inReview)  return 'review';
+
+  // A task this role can review that has already been acted on — keep it in a
+  // visible "Recently Reviewed" surface rather than dropping it.
+  if (canReview && (task.state === 'approved' || task.state === 'rejected')) return 'reviewed';
 
   // Non-mine overdue/escalated = chapter alert
   if (task.state === 'overdue' || task.state === 'escalated') return 'alert';
@@ -526,9 +571,10 @@ export function sortByUrgency(tasks: MockTask[]): MockTask[] {
 
 /** Get all tasks for a role, split into responsibility buckets. */
 export function getResponsibilityGroups(role: Role) {
-  const mine:       MockTask[] = [];
-  const review:     MockTask[] = [];
-  const alert:      MockTask[] = [];
+  const mine:        MockTask[] = [];
+  const review:      MockTask[] = [];
+  const alert:       MockTask[] = [];
+  const reviewed:    MockTask[] = [];
   const supervising: MockTask[] = [];
 
   for (const task of getAllTasks()) {
@@ -537,16 +583,18 @@ export function getResponsibilityGroups(role: Role) {
 
     const bucket = getTaskBucket(task, role);
     if (!bucket) continue;
-    if (bucket === 'mine')        mine.push(task);
-    else if (bucket === 'review') review.push(task);
-    else if (bucket === 'alert')  alert.push(task);
-    else                          supervising.push(task);
+    if (bucket === 'mine')          mine.push(task);
+    else if (bucket === 'review')   review.push(task);
+    else if (bucket === 'alert')    alert.push(task);
+    else if (bucket === 'reviewed') reviewed.push(task);
+    else                            supervising.push(task);
   }
 
   return {
     mine:        sortByUrgency(mine),
     review,
     alert:       sortByUrgency(alert),
+    reviewed,
     supervising: sortByUrgency(supervising.filter(t => t.state !== 'approved')),
   };
 }

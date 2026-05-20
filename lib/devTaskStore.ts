@@ -3,7 +3,8 @@
  * within a session (resets on app reload). Lets Role A submit proof, then
  * Role B (reviewer) open the same task and see the submitted content.
  */
-import type { TaskState } from '@/lib/mockTasks';
+import { isPersistedTask, type TaskState } from '@/lib/mockTasks';
+import { updateTaskState, type PersistedTaskState } from '@/lib/taskService';
 
 export interface StoredTask {
   state:         TaskState;
@@ -12,6 +13,22 @@ export interface StoredTask {
 }
 
 const _store: Record<string, StoredTask> = {};
+
+/**
+ * Seed interaction state from Supabase at startup so state, proofContent, and
+ * rejectionNote survive reload. Skips ids that already have a local entry, so an
+ * in-session edit is never clobbered by a slightly older persisted value.
+ */
+export function seedTaskStates(states: PersistedTaskState[]): void {
+  for (const s of states) {
+    if (_store[s.id]) continue;   // local write wins
+    _store[s.id] = {
+      state:         s.state,
+      proofContent:  s.proofContent,
+      rejectionNote: s.rejectionNote,
+    };
+  }
+}
 
 export function loadTaskState(
   taskId:   string,
@@ -30,6 +47,13 @@ export function loadTaskState(
 export function saveTaskState(taskId: string, patch: Partial<StoredTask>): void {
   if (_store[taskId]) {
     _store[taskId] = { ..._store[taskId], ...patch };
+  }
+  // Persist interaction-state changes for Supabase-backed (structured) tasks.
+  // Fire-and-forget (optimistic): the local write above is the source of truth
+  // in-session. No-ops for non-persisted tasks (RSVP/name use rsvpStore; mock
+  // fallback has no cache), and updateTaskState itself no-ops when unconfigured.
+  if (isPersistedTask(taskId)) {
+    void updateTaskState(taskId, patch);
   }
 }
 

@@ -1,16 +1,23 @@
 import { DevRoleProvider } from '@/lib/devRoleStore';
+import { seedTaskStates } from '@/lib/devTaskStore';
 import { fetchAllEvents } from '@/lib/eventService';
 import { setSupabaseEventCache } from '@/lib/eventStore';
+import { setSupabaseTaskCache } from '@/lib/mockTasks';
+import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
 // AUTH BYPASSED FOR DEV — restore AuthProvider + InitGate from git when ready
 export default function RootLayout() {
-  // One-time, app-wide hydration: load Supabase events into the shared cache
-  // before the tabs render so every screen (Calendar / Today / Tasks) uses the
-  // same Supabase UUID events. Falls back to MOCK_EVENTS if the fetch is empty.
+  // One-time, app-wide hydration: load Supabase events + structured tasks into
+  // their shared caches before the tabs render. Both fall back to their mock
+  // data when the fetch is empty (unconfigured / table not seeded yet).
   useEffect(() => {
     fetchAllEvents().then(setSupabaseEventCache);
+    fetchAllTasks().then(setSupabaseTaskCache);
+    // Seed task interaction state (state/proof/rejection) so reviewer feedback
+    // and proof content survive reload — not just the task's bucket state.
+    fetchTaskStates().then(seedTaskStates);
   }, []);
 
   return (

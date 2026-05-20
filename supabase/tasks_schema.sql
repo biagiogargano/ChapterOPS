@@ -52,7 +52,12 @@
 DROP TABLE IF EXISTS tasks CASCADE;
 
 CREATE TABLE tasks (
-  id                     uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- TEXT id (not uuid): tasks carry id-based relationships (parent_task_id) and
+  -- the app keys interaction state by task id. Keeping the existing mock ids
+  -- ('tk3', 'tk5', 'tk5a'…) as the primary key lets us seed + hydrate without
+  -- remapping parent/child links or devTaskStore keys during incremental
+  -- migration. Future created tasks can use UUID strings here too.
+  id                     text        PRIMARY KEY,
 
   -- Org scoping (matches events.chapter_id / DEMO_CHAPTER_ID)
   chapter_id             uuid        NOT NULL,
@@ -109,9 +114,9 @@ CREATE TABLE tasks (
   requires_approval      boolean     NOT NULL DEFAULT false,
   reviewer_role          text,
 
-  -- Workflow (self-referential parent/child)
+  -- Workflow (self-referential parent/child; text id to match the PK)
   is_workflow_parent     boolean     NOT NULL DEFAULT false,
-  parent_task_id         uuid        REFERENCES tasks(id) ON DELETE CASCADE,
+  parent_task_id         text        REFERENCES tasks(id) ON DELETE CASCADE,
   supervisor_role        text,
 
   -- Escalation

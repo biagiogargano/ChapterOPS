@@ -160,7 +160,7 @@ function StructuredCard({
         {reviewerLabel && !isRejected && (
           <Text style={s.reviewerText}>→ {reviewerLabel}</Text>
         )}
-        {isRejected && (
+        {isRejected && !showAssignee && (
           <Text style={s.rejectedCue}>Tap to revise and resubmit</Text>
         )}
 
@@ -299,9 +299,9 @@ export default function TasksScreen() {
   const { role }  = useDevRole();
   const roleLabel = ROLE_LABELS[role];
 
-  const { mine, review, alert } = getResponsibilityGroups(role);
+  const { mine, review, alert, reviewed } = getResponsibilityGroups(role);
 
-  const hasAny = mine.length + review.length + alert.length > 0;
+  const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
   /** All task taps go to Task Detail — event info is surfaced there. */
   function nav(task: MockTask) {
@@ -356,6 +356,17 @@ export default function TasksScreen() {
             <View style={s.section}>
               <SectionHeader label="NEEDS MY REVIEW" count={review.length} />
               {review.map(t => (
+                <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
+              ))}
+            </View>
+          )}
+
+          {/* Recently Reviewed — tasks I already approved/rejected (kept visible
+              so reviewed/rejected items don't vanish after reload) */}
+          {reviewed.length > 0 && (
+            <View style={s.section}>
+              <SectionHeader label="RECENTLY REVIEWED" count={reviewed.length} />
+              {reviewed.map(t => (
                 <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
               ))}
             </View>
