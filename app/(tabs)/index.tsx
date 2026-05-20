@@ -2,17 +2,25 @@ import { getStoredState, loadTaskState, saveTaskState } from '@/lib/devTaskStore
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
-import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
+import { findEventById, getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
 import { DAY_LABELS } from '@/lib/mockEvents';
 import {
   STATE_BG,
   STATE_COLOR,
   STATE_LABEL,
   STATE_STRIPE,
+  findTaskById,
   getResponsibilityGroups,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
+import {
+  acknowledgeNotice,
+  getNoticesForRole,
+  useUpdateNoticesVersion,
+  type UpdateNotice,
+  type UpdateSeverity,
+} from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
   hydrateRsvpsFromSupabase,
@@ -406,10 +414,13 @@ function TodayTaskCard({
   showAssignee: boolean;
   onPress:      () => void;
 }) {
-  const stripe     = STATE_STRIPE[task.state];
-  const stateColor = STATE_COLOR[task.state];
-  const stateBg    = STATE_BG[task.state];
-  const isUrgent   = task.state === 'overdue' || task.state === 'escalated';
+  // Use the LIVE state so an approved/submitted task is clearly marked here, not
+  // shown with a stale "Assigned" badge that looks like an action item.
+  const state      = getStoredState(task.id, task.state);
+  const stripe     = STATE_STRIPE[state];
+  const stateColor = STATE_COLOR[state];
+  const stateBg    = STATE_BG[state];
+  const isUrgent   = state === 'overdue' || state === 'escalated';
 
   return (
     <Pressable style={[s.taskCard, isUrgent && s.taskCardUrgent]} onPress={onPress}>
@@ -418,9 +429,9 @@ function TodayTaskCard({
         <View style={s.taskTitleRow}>
           <Text style={s.taskTitle} numberOfLines={2}>{task.title}</Text>
           <View style={[s.taskStateBadge, { backgroundColor: stateBg }]}>
-            {task.state === 'escalated' && <Text style={s.flame}>⚡</Text>}
+            {state === 'escalated' && <Text style={s.flame}>⚡</Text>}
             <Text style={[s.taskStateText, { color: stateColor }]}>
-              {STATE_LABEL[task.state]}
+              {STATE_LABEL[state]}
             </Text>
           </View>
         </View>
@@ -579,6 +590,27 @@ function AllClearRow() {
   );
 }
 
+// ─── Update notice card ─────────────────────────────────────────────────────
+
+const NOTICE_CFG: Record<UpdateSeverity, { color: string; bg: string; stripe: string }> = {
+  critical: { color: '#fca5a5', bg: '#1a0505', stripe: '#dc2626' },
+  moderate: { color: '#fbbf24', bg: '#1c1407', stripe: '#d97706' },
+  low:      { color: '#94a3b8', bg: '#1e293b', stripe: '#334155' },
+};
+
+function UpdateNoticeCard({ notice, onPress }: { notice: UpdateNotice; onPress: () => void }) {
+  const cfg = NOTICE_CFG[notice.severity];
+  return (
+    <Pressable style={[s.noticeCard, { backgroundColor: cfg.bg }]} onPress={onPress}>
+      <View style={[s.noticeStripe, { backgroundColor: cfg.stripe }]} />
+      <View style={s.noticeBody}>
+        <Text style={[s.noticeText, { color: cfg.color }]} numberOfLines={2}>{notice.summary}</Text>
+        <Text style={s.noticeHint}>Tap to view · dismisses</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TodayScreen() {
@@ -588,6 +620,20 @@ export default function TodayScreen() {
   const roleGroup = getRoleGroup(role);
   const isBrother  = roleGroup === 'brother';
   const isOfficerRole = isOfficer(role);
+
+  // Update/change notices for this role (reactive).
+  useUpdateNoticesVersion();
+  const notices = getNoticesForRole(role);
+
+  function handleNoticePress(n: UpdateNotice) {
+    acknowledgeNotice(n.id, role);   // dismiss for this role
+    if (n.entityType === 'task' && findTaskById(n.entityId)) {
+      router.push(`/task/${n.entityId}` as any);
+    } else if (n.entityType === 'event' && findEventById(n.entityId)) {
+      router.push(`/event/${n.entityId}` as any);
+    }
+    // entity gone (cancelled) → just dismissed
+  }
 
   // Live state (devTaskStore) so review routing reflects in-session changes.
   const { mine, review, alert } = getResponsibilityGroups(
@@ -671,6 +717,16 @@ export default function TodayScreen() {
         <Text style={s.chapter}>
           {DEMO_CHAPTER.name} · {ROLE_LABELS[role].toUpperCase()}
         </Text>
+
+        {/* ── UPDATES (change notices for this role) ── */}
+        {notices.length > 0 && (
+          <View style={s.section}>
+            <SLabel text="UPDATES" count={notices.length} />
+            {notices.map(n => (
+              <UpdateNoticeCard key={n.id} notice={n} onPress={() => handleNoticePress(n)} />
+            ))}
+          </View>
+        )}
 
         {/* ── BROTHER ── */}
         {roleGroup === 'brother' && (
@@ -975,6 +1031,13 @@ const s = StyleSheet.create({
   excuseStatusBadge:{ borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   excuseStatusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   jboardNote:       { fontSize: 12, color: '#fb923c', fontStyle: 'italic', lineHeight: 17 },
+
+  // ── Update notice card ──────────────────────────────────────────────────────
+  noticeCard:   { flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
+  noticeStripe: { width: 4 },
+  noticeBody:   { flex: 1, paddingVertical: 11, paddingHorizontal: 12, gap: 3 },
+  noticeText:   { fontSize: 14, fontWeight: '600', lineHeight: 19 },
+  noticeHint:   { fontSize: 11, color: '#64748b' },
 
   // ── All-clear ─────────────────────────────────────────────────────────────
   allClear:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0a1628', borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#1e293b' },

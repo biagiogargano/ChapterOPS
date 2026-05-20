@@ -4,6 +4,7 @@ import { fetchAllEvents } from '@/lib/eventService';
 import { setSupabaseEventCache } from '@/lib/eventStore';
 import { setSupabaseTaskCache } from '@/lib/mockTasks';
 import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
+import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
@@ -18,6 +19,8 @@ export default function RootLayout() {
     // Seed task interaction state (state/proof/rejection) so reviewer feedback
     // and proof content survive reload — not just the task's bucket state.
     fetchTaskStates().then(seedTaskStates);
+    // Load persisted update/change notices.
+    void hydrateUpdateNotices();
   }, []);
 
   return (

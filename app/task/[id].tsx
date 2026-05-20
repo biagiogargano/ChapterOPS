@@ -20,6 +20,7 @@ import {
   type TaskState,
 } from '@/lib/mockTasks';
 import { removeTask } from '@/lib/taskService';
+import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
   setRsvpEntry,
@@ -794,6 +795,16 @@ export default function TaskDetailScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
+          // Notify affected roles that the task was cancelled.
+          emitUpdateNotice({
+            entityType:    'task',
+            entityId:      task.id,
+            summary:       `${task.title} was cancelled`,
+            severity:      'critical',
+            audienceRoles: [task.assignedRole, task.reviewerRole, task.supervisorRole]
+              .filter((r): r is Role => !!r && r !== 'all'),
+            changedByRole: role,
+          });
           deleteUserTask(task.id);   // local + cache (optimistic) + tombstone
           void removeTask(task.id);  // Supabase row (no-op in mock fallback)
           router.back();

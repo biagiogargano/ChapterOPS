@@ -16,7 +16,8 @@ import {
   useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { ROLE_LABELS, isOfficer } from '@/lib/roles';
+import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
   filterTasksForRole,
@@ -477,18 +478,32 @@ export default function EventDetailScreen() {
 
   function handleDelete() {
     if (!event) return;
-    if (event.isRecurring && event.seriesId) {
+    const ev = event;
+    // Affected roles for a cancellation: officer events → officers; otherwise everyone.
+    const recipients: Role[] = ev.audience === 'officers' ? OFFICER_ROLES : [...OFFICER_ROLES, 'brother'];
+    function notifyCancelled() {
+      emitUpdateNotice({
+        entityType:    'event',
+        entityId:      ev.id,
+        summary:       `${ev.title} was cancelled`,
+        severity:      'critical',
+        audienceRoles: recipients,
+        changedByRole: role,
+      });
+    }
+
+    if (ev.isRecurring && ev.seriesId) {
       Alert.alert(
         'Delete Recurring Event',
-        `"${event.title}" is part of a recurring series.`,
+        `"${ev.title}" is part of a recurring series.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'This Event Only',
             onPress: () => {
-              const eid = event.id;
-              deleteEvent(eid);             // local + cache (optimistic)
-              void removeEvent(eid);        // Supabase row (no-ops if unconfigured)
+              notifyCancelled();
+              deleteEvent(ev.id);
+              void removeEvent(ev.id);
               router.back();
             },
           },
@@ -496,24 +511,24 @@ export default function EventDetailScreen() {
             text: 'Entire Series',
             style: 'destructive',
             onPress: () => {
-              const sid = event.seriesId!;
-              deleteEventSeries(sid);        // local + cache (optimistic)
-              void removeEventSeries(sid);   // Supabase rows (cascade rsvps)
+              notifyCancelled();
+              deleteEventSeries(ev.seriesId!);
+              void removeEventSeries(ev.seriesId!);
               router.back();
             },
           },
         ],
       );
     } else {
-      Alert.alert('Delete Event', `Delete "${event.title}"?`, [
+      Alert.alert('Delete Event', `Delete "${ev.title}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            const eid = event.id;
-            deleteEvent(eid);              // local + cache (optimistic)
-            void removeEvent(eid);         // Supabase row (no-ops if unconfigured)
+            notifyCancelled();
+            deleteEvent(ev.id);
+            void removeEvent(ev.id);
             router.back();
           },
         },

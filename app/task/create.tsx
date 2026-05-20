@@ -8,10 +8,12 @@ import {
   findTaskById,
   updateUserTask,
   type CreateTaskInput,
+  type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { insertTask, updateTask } from '@/lib/taskService';
+import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -69,6 +71,34 @@ function parseDueAt(dueAt?: string): { dateString: string; includeTime: boolean;
   h = h % 12; if (h === 0) h = 12;
   const minute = MINUTE_CHIPS.includes(rawMin) ? rawMin : '00';
   return { dateString, includeTime: true, hour: h, minute, ampm };
+}
+
+// Build a coalesced update notice from a task edit diff (null if nothing changed).
+function buildTaskEditNotice(
+  before: MockTask,
+  after: MockTask,
+): { summary: string; severity: UpdateSeverity; audience: Role[] } | null {
+  const changes: { label: string; sev: UpdateSeverity }[] = [];
+  if (before.title !== after.title) changes.push({ label: 'title', sev: 'moderate' });
+  if ((before.dueAt ?? '') !== (after.dueAt ?? '') || before.dueLabel !== after.dueLabel) changes.push({ label: 'due date', sev: 'critical' });
+  if (before.assignedRole !== after.assignedRole) changes.push({ label: 'assignee', sev: 'critical' });
+  if ((before.reviewerRole ?? '') !== (after.reviewerRole ?? '')) changes.push({ label: 'reviewer', sev: 'critical' });
+  if ((before.linkedEventId ?? '') !== (after.linkedEventId ?? '')) changes.push({ label: 'linked event', sev: 'critical' });
+  if ((before.requiresProof ?? false) !== (after.requiresProof ?? false) || (before.proofType ?? '') !== (after.proofType ?? '')) changes.push({ label: 'proof requirement', sev: 'moderate' });
+  if ((before.requiresApproval ?? false) !== (after.requiresApproval ?? false)) changes.push({ label: 'approval requirement', sev: 'moderate' });
+  if ((before.description ?? '') !== (after.description ?? '')) changes.push({ label: 'details', sev: 'low' });
+  if (changes.length === 0) return null;
+
+  const severity: UpdateSeverity =
+    changes.some(c => c.sev === 'critical') ? 'critical' :
+    changes.some(c => c.sev === 'moderate') ? 'moderate' : 'low';
+  const summary = `${after.title} updated: ${changes.map(c => c.label).join(', ')}`;
+
+  const audience = new Set<Role>();
+  for (const r of [before.assignedRole, after.assignedRole, before.reviewerRole, after.reviewerRole, after.supervisorRole]) {
+    if (r && r !== 'all') audience.add(r as Role);
+  }
+  return { summary, severity, audience: Array.from(audience) };
 }
 
 const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
@@ -345,7 +375,21 @@ export default function CreateTaskScreen() {
 
     if (editing && existing) {
       const updated = updateUserTask(existing.id, input);
-      if (updated) void updateTask(updated);   // persist (no-op in mock fallback)
+      if (updated) {
+        void updateTask(updated);   // persist (no-op in mock fallback)
+        // Emit an in-app update notice for affected roles (diff-gated, coalesced).
+        const notice = buildTaskEditNotice(existing, updated);
+        if (notice) {
+          emitUpdateNotice({
+            entityType:    'task',
+            entityId:      updated.id,
+            summary:       notice.summary,
+            severity:      notice.severity,
+            audienceRoles: notice.audience,
+            changedByRole: role,
+          });
+        }
+      }
       router.replace(`/task/${existing.id}` as any);
     } else {
       const task = addUserTask(input);
