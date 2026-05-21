@@ -387,6 +387,22 @@ const _mockIdToSupabaseId: Record<string, string> = {};
 const _deletedIds       = new Set<string>();
 const _deletedSeriesIds = new Set<string>();
 
+/**
+ * Clear all org-scoped event state (Supabase cache, optimistic user events,
+ * id map, and session tombstones). Used on an org transition so the next org's
+ * hydration starts clean. Data-only — there are no event subscribers to notify
+ * (screens re-read getAllEvents() on focus / DataBootstrap re-hydration).
+ *
+ * Not wired into runtime yet (Issue B-1 groundwork).
+ */
+export function resetOrgScopedEvents(): void {
+  _supabaseEvents = null;
+  _userEvents.length = 0;
+  for (const k of Object.keys(_mockIdToSupabaseId)) delete _mockIdToSupabaseId[k];
+  _deletedIds.clear();
+  _deletedSeriesIds.clear();
+}
+
 /** Called by screens after fetching events from Supabase. No-op on empty input. */
 export function setSupabaseEventCache(events: MockEvent[]): void {
   if (!events || events.length === 0) return;          // keep mock fallback

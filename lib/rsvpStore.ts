@@ -129,6 +129,17 @@ export async function hydrateRsvpsFromSupabase(eventId: string): Promise<void> {
 }
 
 /**
+ * Clear all RSVP entries on an org transition so the next org starts clean.
+ * Clears data only and notifies subscribers; the listener set is left intact.
+ * (The demo seeds live in _store too, but they only matter in the flag-off
+ * sandbox, which never switches orgs.) Not wired into runtime yet (Issue B-1).
+ */
+export function resetRsvps(): void {
+  for (const k of Object.keys(_store)) delete _store[k];
+  _notify();
+}
+
+/**
  * All non-default entries for a specific event instance.
  * Used by leadership views to see who responded and how.
  */

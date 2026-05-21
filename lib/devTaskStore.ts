@@ -93,3 +93,13 @@ export function getStoredState(taskId: string, defaultState: TaskState): TaskSta
 export function getStoredProof(taskId: string): string {
   return _store[taskId]?.proofContent ?? '';
 }
+
+/**
+ * Clear all task interaction state on an org transition so the next org starts
+ * clean. Clears data only and notifies subscribers; the listener set is left
+ * intact. Not wired into runtime yet (Issue B-1 groundwork).
+ */
+export function resetTaskStates(): void {
+  for (const k of Object.keys(_store)) delete _store[k];
+  _notify();
+}

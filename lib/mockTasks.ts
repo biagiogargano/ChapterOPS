@@ -679,6 +679,21 @@ export function setSupabaseTaskCache(tasks: MockTask[]): void {
 }
 
 /**
+ * Clear all org-scoped task state (Supabase cache, optimistic user tasks,
+ * auto-generated dynamic tasks, and delete tombstones) on an org transition so
+ * the next org's hydration starts clean. Data-only — mockTasks has no
+ * subscribers of its own (interaction-state reactivity lives in devTaskStore).
+ *
+ * Not wired into runtime yet (Issue B-1 groundwork).
+ */
+export function resetOrgScopedTasks(): void {
+  _supabaseTasks = null;
+  _userTasks.length = 0;
+  _dynamicTasks.length = 0;
+  _deletedTaskIds.clear();
+}
+
+/**
  * True if this id is backed by Supabase: a hydrated structured task, OR an
  * officer-created task this session (persisted via insertTask). Lets
  * saveTaskState persist state changes for freshly-created tasks too.

@@ -158,3 +158,13 @@ export async function hydrateUpdateNotices(
   _notices.splice(0, _notices.length, ...rows);
   _notify();
 }
+
+/**
+ * Clear all notices on an org transition so the next org starts clean. Clears
+ * data only and notifies subscribers; the listener set is left intact.
+ * Not wired into runtime yet (Issue B-1 groundwork).
+ */
+export function resetNotices(): void {
+  _notices.splice(0, _notices.length);
+  _notify();
+}
