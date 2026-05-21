@@ -196,6 +196,16 @@ export function IdentityProvider({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configured, auth.devBypass, auth.initialized, auth.user?.id, resolveNonce]);
 
+  // Clear any dev role override when the authenticated user changes (sign-out /
+  // account switch) so Account B never inherits Account A's selected dev role.
+  // The override is only ever honored in dev/fallback (allowOverride), so this
+  // does not affect production role resolution. Inert while AUTH_ENABLED is
+  // false: auth.user is always null and its id never changes, so this fires once
+  // on mount as a no-op (override already null) and never again.
+  useEffect(() => {
+    setDevRoleOverride(null);
+  }, [auth.user?.id]);
+
   // ── Derived values ──────────────────────────────────────────────────────────
   const activeMembership = useMemo(
     () => membershipForOrg(memberships, activeOrgId),
