@@ -496,7 +496,7 @@ function _taskUuid(): string {
 }
 
 /** Derive a human due label + urgency bucket from a real date (+ optional time). */
-function deriveDueMeta(dateString: string, time?: string): { dueLabel: string; urgency: TaskUrgency } {
+export function deriveDueMeta(dateString: string, time?: string): { dueLabel: string; urgency: TaskUrgency } {
   const due   = new Date(dateString + 'T00:00:00');
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
@@ -509,7 +509,7 @@ function deriveDueMeta(dateString: string, time?: string): { dueLabel: string; u
 }
 
 /** Visibility = assignee + leadership + reviewer (so the approver always sees it). */
-function deriveVisibleTo(assignedRole: Role, reviewerRole?: Role): Role[] {
+export function deriveVisibleTo(assignedRole: Role, reviewerRole?: Role): Role[] {
   const set = new Set<Role>(BROAD_ROLES);
   set.add(assignedRole);
   if (reviewerRole) set.add(reviewerRole);
