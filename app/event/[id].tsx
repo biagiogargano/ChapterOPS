@@ -22,11 +22,14 @@ import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
+  deleteUserTask,
   dueLabelOf,
   filterTasksForRole,
   isOverdue,
   type MockTask,
 } from '@/lib/mockTasks';
+import { rsvpReviewTaskId } from '@/lib/generatedTasks';
+import { removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -572,6 +575,15 @@ export default function EventDetailScreen() {
   function handleDelete() {
     if (!event) return;
     const ev = event;
+    // Cascade-delete the generated RSVP-review task tied to this event (Step 4).
+    // Deterministic id → a harmless no-op if this event never had one (optional
+    // events, or a non-primary recurrence instance). Local optimistic delete +
+    // fire-and-forget persisted delete (no-op when unconfigured).
+    function cascadeReviewTask() {
+      const reviewId = rsvpReviewTaskId(ev.id);
+      deleteUserTask(reviewId);
+      void removeTask(reviewId);
+    }
     // Affected roles for a cancellation: officer events → officers; otherwise everyone.
     const recipients: Role[] = ev.audience === 'officers' ? OFFICER_ROLES : [...OFFICER_ROLES, 'brother'];
     function notifyCancelled() {
@@ -597,6 +609,7 @@ export default function EventDetailScreen() {
               notifyCancelled();
               deleteEvent(ev.id);
               void removeEvent(ev.id);
+              cascadeReviewTask();
               router.back();
             },
           },
@@ -607,6 +620,7 @@ export default function EventDetailScreen() {
               notifyCancelled();
               deleteEventSeries(ev.seriesId!);
               void removeEventSeries(ev.seriesId!);
+              cascadeReviewTask();
               router.back();
             },
           },
@@ -622,6 +636,7 @@ export default function EventDetailScreen() {
             notifyCancelled();
             deleteEvent(ev.id);
             void removeEvent(ev.id);
+            cascadeReviewTask();
             router.back();
           },
         },
