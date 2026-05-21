@@ -1,3 +1,4 @@
+import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, type Role } from '@/lib/roles';
@@ -37,6 +38,7 @@ function RoleOption({
 
 export default function MeScreen() {
   const { role, setRole } = useDevRole();
+  const { signOut } = useAuth();
   const initials = DEMO_USER.full_name
     .split(' ')
     .map(n => n[0])
@@ -84,9 +86,9 @@ export default function MeScreen() {
         </View>
       </View>
 
-      {/* ── Sign-out placeholder ── */}
-      <Pressable style={s.signOutButton} disabled>
-        <Text style={s.signOutText}>Sign Out (dev mode — disabled)</Text>
+      {/* ── Sign out ── */}
+      <Pressable style={s.signOutButton} onPress={() => { void signOut(); }}>
+        <Text style={s.signOutText}>Sign Out</Text>
       </Pressable>
 
       <View style={{ height: 40 }} />
