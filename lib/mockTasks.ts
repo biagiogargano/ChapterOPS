@@ -567,6 +567,37 @@ export function addUserTask(input: CreateTaskInput): MockTask {
   return task;
 }
 
+/**
+ * Optimistically insert a fully-built structured task that carries a
+ * caller-provided DETERMINISTIC id (e.g. an event-generated RSVP-review task,
+ * id `task_rsvpreview_${eventId}`). Distinct from addUserTask, which mints a
+ * random id for officer-authored tasks — this helper trusts the caller's id so
+ * generation is idempotent. The caller builds the task (see
+ * generatedTasks.buildRsvpReviewTask) and owns persistence via
+ * taskService.insertTask, exactly like addUserTask.
+ *
+ * Idempotent / dedup-safe:
+ *   • returns undefined (no insert) if the id was deleted this session
+ *     (_deletedTaskIds tombstone) — a deleted generated task is not resurrected;
+ *   • returns the existing task (no duplicate push) if the id is already present
+ *     locally (_userTasks) or already hydrated into the Supabase cache
+ *     (_supabaseTasks);
+ *   • otherwise pushes to _userTasks and returns it.
+ *
+ * Read-time dedup in getAllTasks() already collapses the optimistic copy against
+ * the hydrated row by id, so this is fully compatible with later insertTask +
+ * hydration wiring. Reads nothing flag-specific — scoped-data behavior unchanged.
+ */
+export function addGeneratedTask(task: MockTask): MockTask | undefined {
+  if (_deletedTaskIds.has(task.id)) return undefined;
+  const existing =
+    _userTasks.find(t => t.id === task.id) ??
+    _supabaseTasks?.find(t => t.id === task.id);
+  if (existing) return existing;
+  _userTasks.push(task);
+  return task;
+}
+
 // ─── Edit / delete (user-created structured tasks only) ───────────────────────
 
 const _seedTaskIds       = new Set(MOCK_TASKS.map(t => t.id));
