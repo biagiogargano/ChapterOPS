@@ -1,5 +1,6 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchEventById, removeEvent, removeEventSeries } from '@/lib/eventService';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { canManageEvent, findEventById, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
 import {
   AUDIENCE_LABEL,
@@ -458,6 +459,9 @@ export default function EventDetailScreen() {
   const router     = useRouter();
   const { role }   = useDevRole();
 
+  // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
+  const dataOrgId = useActiveDataOrgId();
+
   // Seed from local store immediately (mock + session events resolve synchronously).
   // For Supabase UUID ids that aren't in the local store, fetch async.
   const [event, setEvent] = useState(() => findEventById(id ?? ''));
@@ -472,14 +476,14 @@ export default function EventDetailScreen() {
     if (!id || !isUUID(id)) return;           // local ids never need a Supabase call
     let cancelled = false;
 
-    fetchEventById(id).then(remote => {
+    fetchEventById(id, dataOrgId).then(remote => {
       if (cancelled) return;
       if (remote) setEvent(remote);           // Supabase found it — update event
       setLoading(false);                      // clear loading either way
     });
 
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, dataOrgId]);
 
   // Recompute related tasks on focus so a task deleted/unlinked elsewhere (e.g.
   // from Task Detail) disappears from this list immediately when we return.

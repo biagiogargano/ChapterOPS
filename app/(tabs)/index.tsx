@@ -2,6 +2,7 @@ import { getStoredState, loadTaskState, saveTaskState, useTaskStateVersion } fro
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { findEventById, getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
 import { DAY_LABELS } from '@/lib/mockEvents';
 import {
@@ -725,6 +726,8 @@ export default function TodayScreen() {
   const pendingExcuses = MOCK_EXCUSES.filter(e => getExcuseStatus(e.id) === 'pending');
 
   // ── Live event lists — refresh whenever screen gains focus ──────────────────
+  // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
+  const dataOrgId = useActiveDataOrgId();
   const [allEvents, setAllEvents] = useState<MockEvent[]>(() => getAllEvents());
 
   useFocusEffect(
@@ -733,7 +736,7 @@ export default function TodayScreen() {
       // Show whatever is cached immediately, then refresh from Supabase so the
       // shared cache (and this screen's event ids) are Supabase UUIDs.
       setAllEvents(getAllEvents());
-      fetchAllEvents().then(remote => {
+      fetchAllEvents(dataOrgId).then(remote => {
         if (cancelled) return;
         setSupabaseEventCache(remote);
         const all = getAllEvents();
@@ -745,7 +748,7 @@ export default function TodayScreen() {
         all.forEach(ev => { void hydrateRsvpsFromSupabase(ev.id); });
       });
       return () => { cancelled = true; };
-    }, []),
+    }, [dataOrgId]),
   );
 
   // Offset of today within the Mon-based week (0=Mon … 6=Sun)

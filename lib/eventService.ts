@@ -111,7 +111,7 @@ function rowToUserCreatedEvent(row: EventRow): UserCreatedEvent {
  * Fetch all events for the demo chapter, sorted by event_date then title.
  * Returns [] if Supabase is unconfigured or the request fails.
  */
-export async function fetchAllEvents(): Promise<MockEvent[]> {
+export async function fetchAllEvents(orgId: string = DEMO_CHAPTER_ID): Promise<MockEvent[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     // Fetch the table, then filter by chapter_id in JS (a server-side
@@ -127,7 +127,7 @@ export async function fetchAllEvents(): Promise<MockEvent[]> {
 
     const rows = (data ?? []) as EventRow[];
     return rows
-      .filter(r => r.chapter_id === DEMO_CHAPTER_ID)
+      .filter(r => r.chapter_id === orgId)
       .map(rowToMockEvent)
       .sort((a, b) =>
         a.dayOffset !== b.dayOffset
@@ -144,14 +144,14 @@ export async function fetchAllEvents(): Promise<MockEvent[]> {
  * Fetch a single event by UUID.
  * Returns undefined if not found, unconfigured, or request fails.
  */
-export async function fetchEventById(id: string): Promise<MockEvent | undefined> {
+export async function fetchEventById(id: string, orgId: string = DEMO_CHAPTER_ID): Promise<MockEvent | undefined> {
   if (!isSupabaseConfigured()) return undefined;
   try {
     const { data, error } = await supabase
       .from('events')
       .select('*')
       .eq('id', id)
-      .eq('chapter_id', DEMO_CHAPTER_ID)
+      .eq('chapter_id', orgId)
       .maybeSingle();
 
     if (error) {

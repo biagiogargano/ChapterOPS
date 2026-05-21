@@ -1,6 +1,7 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
 import { getAllEvents, setSupabaseEventCache } from '@/lib/eventStore';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import {
   AUDIENCE_LABEL,
   DAY_LABELS,
@@ -165,6 +166,9 @@ export default function CalendarScreen() {
   const [weekOffset,  setWeekOffset ] = useState(0);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
+  // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
+  const dataOrgId = useActiveDataOrgId();
+
   // Seed with local mock data immediately so the list is never blank,
   // then overwrite with Supabase data on every focus (with mock fallback).
   const [events, setEvents] = useState<MockEvent[]>(() => getAllEvents());
@@ -173,7 +177,7 @@ export default function CalendarScreen() {
     useCallback(() => {
       let cancelled = false;
 
-      fetchAllEvents().then(remote => {
+      fetchAllEvents(dataOrgId).then(remote => {
         if (cancelled) return;
 
         // Push into the shared cache so Today / Tasks / Event Detail all use the
@@ -184,7 +188,7 @@ export default function CalendarScreen() {
       });
 
       return () => { cancelled = true; };
-    }, []),
+    }, [dataOrgId]),
   );
 
   // ── "+" button in header — officers only ────────────────────────────────────
