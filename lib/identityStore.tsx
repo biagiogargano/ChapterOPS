@@ -39,6 +39,7 @@ import {
 } from './identityResolution';
 import type { Role } from './roles';
 import { ROLES } from './roles';
+import { getPreferredOrg, setPreferredOrg, clearPreferredOrg } from './orgPreference';
 import type { Membership, Organization, Member, Position } from '@/types';
 
 // ─── Auth input (sourced from AuthProvider via useAuth) ───────────────────────
@@ -232,10 +233,39 @@ export function IdentityProvider({
       if (current.some(m => m.organization.id === orgId)) {
         setActiveOrgId(orgId);
         setPhase('resolved');
+        // Persist this explicit choice per-user so it survives restart.
+        // Best-effort + guarded by an authenticated user — inert in fallback/
+        // flag-off (auth.user is null there, so nothing is written).
+        const uid = auth.user?.id;
+        if (uid) void setPreferredOrg(uid, orgId);
       }
       return current;
     });
-  }, []);
+  }, [auth.user?.id]);
+
+  // Restore a multi-org user's last selected org after restart. Runs only when
+  // resolution lands in 'selecting_org' (>1 membership, none chosen) and an
+  // authenticated user is present. Reads the per-user stored preference; if it's
+  // still a valid membership, re-selects it via the existing setActiveOrg path
+  // (which also re-persists). A stale/invalid stored id is ignored and cleaned
+  // up, leaving the user in 'selecting_org'. The cancelled guard prevents a slow
+  // read from applying after an account switch. Inert flag-off: fallback never
+  // reaches 'selecting_org' and auth.user is null.
+  useEffect(() => {
+    if (phase !== 'selecting_org') return;
+    const uid = auth.user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    void getPreferredOrg(uid).then(stored => {
+      if (cancelled || !stored) return;
+      if (memberships.some(m => m.organization.id === stored)) {
+        setActiveOrg(stored);
+      } else {
+        void clearPreferredOrg(uid);   // stale-key housekeeping
+      }
+    });
+    return () => { cancelled = true; };
+  }, [phase, auth.user?.id, memberships, setActiveOrg]);
 
   const value = useMemo<IdentityValue>(() => ({
     phase,
