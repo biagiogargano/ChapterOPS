@@ -29,7 +29,7 @@ export default function LoginScreen() {
 
   // ── Leaf guard ──────────────────────────────────────────────────────────────
   if (target === 'tabs')                                   return <Redirect href={'/(tabs)' as any} />;
-  if (target === 'onboarding' || target === 'org_select')  return <Redirect href={'/(auth)/pending' as any} />;
+  if (target === 'onboarding' || target === 'org_select')  return <Redirect href={'/(auth)/onboarding' as any} />;
   if (target === 'splash')                                 return <Splash />;
   if (target === 'error')
     return (

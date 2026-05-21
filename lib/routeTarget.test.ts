@@ -18,8 +18,8 @@ function check(name: string, got: string, want: string): void {
 
 check('tabs',       hrefForTarget('tabs'),       '/(tabs)');
 check('login',      hrefForTarget('login'),      '/(auth)/login');
-check('onboarding', hrefForTarget('onboarding'), '/(auth)/pending');
-check('org_select', hrefForTarget('org_select'), '/(auth)/pending');
+check('onboarding', hrefForTarget('onboarding'), '/(auth)/onboarding');
+check('org_select', hrefForTarget('org_select'), '/(auth)/onboarding');
 check('error',      hrefForTarget('error'),      '/(auth)/login');
 check('splash',     hrefForTarget('splash'),     '/(auth)/login');
 
