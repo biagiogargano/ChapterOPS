@@ -21,6 +21,9 @@ import {
   type MockEvent,
 } from '@/lib/mockEvents';
 import { OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
+import { buildRsvpReviewTask } from '@/lib/generatedTasks';
+import { addGeneratedTask } from '@/lib/mockTasks';
+import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -563,7 +566,25 @@ export default function CreateEventScreen() {
     // preserving the local-only fallback). Same UUIDs are used in both places.
     created.forEach(e => { void insertEvent(e); });
 
-    router.replace(`/event/${created[0].id}` as any);
+    // MVP P3: when RSVP is enabled (audience !== 'optional'), generate ONE
+    // "Review RSVP list for [event name]" task for the PRIMARY created event
+    // only (no per-recurrence fan-out). Deterministic id makes generation
+    // idempotent; addGeneratedTask returns undefined if it already exists or was
+    // deleted this session. Persistence is fire-and-forget (no-op when
+    // unconfigured) and never blocks event creation. Optional events generate
+    // nothing.
+    const primary = created[0];
+    if (primary.audience !== 'optional') {
+      const reviewTask = addGeneratedTask(buildRsvpReviewTask({
+        id:            primary.id,
+        title:         primary.title,
+        dateString:    primary.dateString,
+        createdByRole: role,   // Role of the creating officer (same value on the event)
+      }));
+      if (reviewTask) void insertTask(reviewTask);
+    }
+
+    router.replace(`/event/${primary.id}` as any);
   }
 
   // Repeat-until lower bound is the chosen event date (or today if none yet)
