@@ -25,6 +25,7 @@
 
 import { supabase } from './supabase';
 import { DEMO_CHAPTER_ID } from './eventService';
+import { getDataOrgId } from './dataOrgHolder';   // active data org for write paths (P2g-3)
 import type {
   LightweightKind,
   MockTask,
@@ -155,7 +156,7 @@ function mockTaskToRow(task: MockTask): Record<string, unknown> {
   const visibleToAll = task.visibleTo === 'all';
   return {
     id:                     task.id,
-    chapter_id:             DEMO_CHAPTER_ID,
+    chapter_id:             getDataOrgId(),
     title:                  task.title,
     type:                   task.type,
     lightweight_kind:       task.lightweightKind ?? null,
@@ -299,7 +300,7 @@ export async function updateTask(task: MockTask): Promise<boolean> {
       .from('tasks')
       .update({ ...payload, updated_at: new Date().toISOString() })
       .eq('id', task.id)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[taskService] updateTask error:', error.message);
@@ -330,7 +331,7 @@ export async function updateTaskState(id: string, patch: TaskStatePatch): Promis
       .from('tasks')
       .update(payload)
       .eq('id', id)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[taskService] updateTaskState error:', error.message);
@@ -351,7 +352,7 @@ export async function removeTask(id: string): Promise<boolean> {
       .from('tasks')
       .delete()
       .eq('id', id)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[taskService] removeTask error:', error.message);
