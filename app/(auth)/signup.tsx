@@ -1,4 +1,5 @@
 import { useAuth } from '@/lib/auth';
+import { useIdentity } from '@/lib/identityStore';
 import { useRouteTarget } from '@/lib/useRouteTarget';
 import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -13,10 +14,12 @@ import {
   View,
 } from 'react-native';
 import Splash from '../../components/auth/Splash';
+import ErrorRetry from '../../components/auth/ErrorRetry';
 
 export default function SignupScreen() {
   const target = useRouteTarget();
-  const { signUp } = useAuth();
+  const { signUp, signOut } = useAuth();
+  const { retry } = useIdentity();
   const router = useRouter();
 
   const [email, setEmail]       = useState('');
@@ -29,7 +32,15 @@ export default function SignupScreen() {
   // ── Leaf guard ──────────────────────────────────────────────────────────────
   if (target === 'tabs')                                   return <Redirect href={'/(tabs)' as any} />;
   if (target === 'onboarding' || target === 'org_select')  return <Redirect href={'/(auth)/pending' as any} />;
-  if (target === 'splash' || target === 'error')           return <Splash />;
+  if (target === 'splash')                                 return <Splash />;
+  if (target === 'error')
+    return (
+      <ErrorRetry
+        message="We couldn’t load your profile. Check your connection and try again."
+        onRetry={retry}
+        onSignOut={() => { void signOut(); }}
+      />
+    );
   // target === 'login' (no session) → render the form
 
   async function handleSignUp() {

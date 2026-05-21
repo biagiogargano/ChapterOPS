@@ -1,9 +1,11 @@
 import { useAuth } from '@/lib/auth';
+import { useIdentity } from '@/lib/identityStore';
 import { useRouteTarget } from '@/lib/useRouteTarget';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Splash from '../../components/auth/Splash';
+import ErrorRetry from '../../components/auth/ErrorRetry';
 
 /**
  * Pending — safe terminus for a signed-in user with NO organization membership.
@@ -13,12 +15,21 @@ import Splash from '../../components/auth/Splash';
 export default function PendingScreen() {
   const target = useRouteTarget();
   const { signOut } = useAuth();
+  const { retry } = useIdentity();
   const [busy, setBusy] = useState(false);
 
   // ── Leaf guard ──────────────────────────────────────────────────────────────
-  if (target === 'tabs')                          return <Redirect href={'/(tabs)' as any} />;
-  if (target === 'login')                         return <Redirect href={'/(auth)/login' as any} />;
-  if (target === 'splash' || target === 'error')  return <Splash />;
+  if (target === 'tabs')   return <Redirect href={'/(tabs)' as any} />;
+  if (target === 'login')  return <Redirect href={'/(auth)/login' as any} />;
+  if (target === 'splash') return <Splash />;
+  if (target === 'error')
+    return (
+      <ErrorRetry
+        message="We couldn’t load your profile. Check your connection and try again."
+        onRetry={retry}
+        onSignOut={() => { void signOut(); }}
+      />
+    );
   // target === 'onboarding' | 'org_select' → render the terminus
 
   async function handleSignOut() {
