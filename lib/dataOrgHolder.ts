@@ -1,16 +1,14 @@
 /**
  * dataOrgHolder.ts — module-level holder for the active DATA org id.
  *
- * Phase 2, checkpoint P2g-1: the seam through which non-React write paths will
- * eventually scope their queries/payloads (without threading orgId through every
- * call site). DataBootstrap keeps it in sync with the active org via
- * setDataOrgId(); write paths will read getDataOrgId() in later P2g checkpoints.
+ * Phase 2: the seam through which non-React write paths scope their queries/
+ * payloads (without threading orgId through every call site). DataBootstrap
+ * keeps it in sync with the active org via setDataOrgId(); the event/task/notice
+ * write paths read getDataOrgId() (P2g-2/3/4).
  *
  * Default is DEMO_CHAPTER_ID, and while ORG_SCOPED_DATA is false DataBootstrap
- * sets it to DEMO_CHAPTER_ID, so reads here are the same constant writes use
- * today — fully inert until both the writes are wired AND the flag flips.
- *
- * NOTE: getDataOrgId() is intentionally consumed by NOTHING yet (P2g-1).
+ * sets it to DEMO_CHAPTER_ID, so writes target the same constant as today —
+ * fully inert until the flag flips.
  */
 
 import { DEMO_CHAPTER_ID } from './orgConstants';
