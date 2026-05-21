@@ -188,13 +188,13 @@ function mockTaskToRow(task: MockTask): Record<string, unknown> {
 // ─── Public API (scaffolding — not yet called by any screen) ──────────────────
 
 /** Fetch all tasks for the demo chapter. Returns [] when unconfigured/failed. */
-export async function fetchAllTasks(): Promise<MockTask[]> {
+export async function fetchAllTasks(orgId: string = DEMO_CHAPTER_ID): Promise<MockTask[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', orgId);
 
     if (error) {
       console.warn('[taskService] fetchAllTasks error:', error.message);
@@ -212,13 +212,13 @@ export async function fetchAllTasks(): Promise<MockTask[]> {
  * task. Used by the startup hydrate to seed devTaskStore so proof content and
  * rejection notes survive reload (rowToMockTask intentionally omits them).
  */
-export async function fetchTaskStates(): Promise<PersistedTaskState[]> {
+export async function fetchTaskStates(orgId: string = DEMO_CHAPTER_ID): Promise<PersistedTaskState[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     const { data, error } = await supabase
       .from('tasks')
       .select('id, state, proof_content, rejection_note')
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', orgId);
 
     if (error) {
       console.warn('[taskService] fetchTaskStates error:', error.message);
@@ -239,14 +239,14 @@ export async function fetchTaskStates(): Promise<PersistedTaskState[]> {
 }
 
 /** Fetch one task by id. Returns undefined when not found/unconfigured/failed. */
-export async function fetchTaskById(id: string): Promise<MockTask | undefined> {
+export async function fetchTaskById(id: string, orgId: string = DEMO_CHAPTER_ID): Promise<MockTask | undefined> {
   if (!isSupabaseConfigured()) return undefined;
   try {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('id', id)
-      .eq('chapter_id', DEMO_CHAPTER_ID)
+      .eq('chapter_id', orgId)
       .maybeSingle();
 
     if (error) {
