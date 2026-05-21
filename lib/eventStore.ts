@@ -20,6 +20,7 @@ import {
   type TaskUrgency,
 } from './mockTasks';
 import type { Role } from './roles';
+import { ORG_SCOPED_DATA } from './flags';
 
 // Re-export types so callers only need one import
 export type { EventAudience, EventKind, MockEvent };
@@ -490,8 +491,10 @@ export function toMockEvent(e: UserCreatedEvent): MockEvent {
  * This is the single source of truth every screen should read.
  */
 export function getAllEvents(): MockEvent[] {
-  // Prefer the Supabase cache when loaded; otherwise fall back to MOCK_EVENTS.
-  const base = _supabaseEvents ?? MOCK_EVENTS;
+  // Prefer the Supabase cache when loaded. When ORG_SCOPED_DATA is on, a real
+  // org with no loaded cache shows an EMPTY base (no MOCK_EVENTS seed leak);
+  // flag-off keeps the demo/mock fallback exactly as before.
+  const base = _supabaseEvents ?? (ORG_SCOPED_DATA ? [] : MOCK_EVENTS);
   // Dedup: a freshly-created event lives in _userEvents (optimistic) AND, once
   // persisted + re-fetched, in the Supabase cache under the same UUID. Drop the
   // local copy when the cache already has that id.

@@ -33,6 +33,7 @@
  *   • dynamic RSVP-task generation is client-side and coupled to eventStore.
  */
 import { OFFICER_ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
+import { ORG_SCOPED_DATA } from '@/lib/flags';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -705,6 +706,17 @@ export function isPersistedTask(id: string): boolean {
 
 /** All tasks: seed/persisted data + user-created + any auto-generated tasks. */
 function getAllTasks(): MockTask[] {
+  // Scoped mode (ORG_SCOPED_DATA on): return only persisted org tasks +
+  // optimistic user-created tasks + runtime dynamic (RSVP) tasks. No MOCK_TASKS
+  // seed merge/fallback, so a real org shows only its own data (empty when it
+  // has none). Flag-off behavior below is unchanged.
+  if (ORG_SCOPED_DATA) {
+    const base     = _supabaseTasks ?? [];
+    const baseIds  = new Set(base.map(t => t.id));
+    const localUser = _userTasks.filter(t => !baseIds.has(t.id));
+    return [...base, ...localUser, ..._dynamicTasks];
+  }
+
   if (_supabaseTasks !== null) {
     const byId      = new Map(_supabaseTasks.map(t => [t.id, t]));
     const cacheIds  = new Set(_supabaseTasks.map(t => t.id));
