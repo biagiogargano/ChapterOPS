@@ -25,6 +25,11 @@ import type { UserCreatedEvent, RecurrenceType } from './eventStore';
 import { DEMO_CHAPTER_ID } from './orgConstants';
 export { DEMO_CHAPTER_ID };
 
+// Active data org for write paths (P2g-2). Reads keep their orgId param; writes
+// target the active org via the holder. While ORG_SCOPED_DATA is false this
+// returns DEMO_CHAPTER_ID, so writes are identical to today.
+import { getDataOrgId } from './dataOrgHolder';
+
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
 /**
@@ -185,7 +190,7 @@ export async function insertEvent(event: UserCreatedEvent): Promise<MockEvent | 
       .from('events')
       .insert({
         id:              event.id,            // client-generated UUID (shared with local copy)
-        chapter_id:      DEMO_CHAPTER_ID,
+        chapter_id:      getDataOrgId(),
         title:           event.title,
         kind:            event.kind,
         audience:        event.audience,
@@ -235,7 +240,7 @@ export async function updateEvent(event: UserCreatedEvent): Promise<boolean> {
         description: event.description,
       })
       .eq('id', event.id)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[eventService] updateEvent error:', error.message);
@@ -270,7 +275,7 @@ export async function updateEventSeries(
         description: fields.description,
       })
       .eq('series_id', seriesId)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[eventService] updateEventSeries error:', error.message);
@@ -294,7 +299,7 @@ export async function removeEvent(id: string): Promise<boolean> {
       .from('events')
       .delete()
       .eq('id', id)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[eventService] removeEvent error:', error.message);
@@ -319,7 +324,7 @@ export async function removeEventSeries(seriesId: string): Promise<boolean> {
       .from('events')
       .delete()
       .eq('series_id', seriesId)
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', getDataOrgId());
 
     if (error) {
       console.warn('[eventService] removeEventSeries error:', error.message);
