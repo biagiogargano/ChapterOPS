@@ -15,8 +15,9 @@ import {
 } from '@/lib/mockTasks';
 import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
+import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // ─── Summary bar helpers ──────────────────────────────────────────────────────
@@ -303,6 +304,13 @@ export default function TasksScreen() {
   const { role }   = useDevRole();
   const roleLabel  = ROLE_LABELS[role];
   const officer    = isOfficer(role);
+
+  // Recompute task buckets whenever this tab regains focus, so a task created on
+  // another screen (pushed into the non-reactive _userTasks store) appears here
+  // without a reload. Mirrors the focus-refresh Today already uses. The callback
+  // is stable (useCallback []), so it fires only on focus — no render loop.
+  const [, _bumpFocus] = useState(0);
+  useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
   // Officer-only "+ Create" task button in the tab header.
   useEffect(() => {

@@ -20,7 +20,7 @@
  * hydration runs exactly as before (inert).
  */
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { fetchAllEvents } from '@/lib/eventService';
 import { setSupabaseEventCache } from '@/lib/eventStore';
 import { setSupabaseTaskCache } from '@/lib/mockTasks';
@@ -38,10 +38,12 @@ export default function DataBootstrap({ children }: { children: ReactNode }) {
   const { phase } = useIdentity();
   const reqIdRef = useRef(0);
 
-  // Keep the data-org holder in sync with the active org so (future) write paths
-  // target the right org. Always runs on orgId change (independent of hydration
-  // phase gating). Inert while flag-off (orgId === DEMO_CHAPTER_ID).
-  useEffect(() => { setDataOrgId(orgId); }, [orgId]);
+  // Keep the data-org holder in sync with the active org so write paths target
+  // the same org reads use. useLayoutEffect (not useEffect) so the holder is set
+  // synchronously at commit — before paint and before any user-triggered write
+  // can run — eliminating the post-paint lag that let writes land in a stale
+  // org. Inert while flag-off (orgId === DEMO_CHAPTER_ID).
+  useLayoutEffect(() => { setDataOrgId(orgId); }, [orgId]);
 
   // When scoping is on, only hydrate on a stable phase. When off, always ready.
   const ready = !ORG_SCOPED_DATA || phase === 'resolved' || phase === 'fallback';
