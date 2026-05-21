@@ -142,9 +142,10 @@ export function getNoticesForRole(role: string): UpdateNotice[] {
 // ─── Hydrate (startup) ────────────────────────────────────────────────────────
 
 /** Load persisted notices into the store (replaces contents). No-op data when
- *  Supabase is unconfigured (session-only fallback). */
-export async function hydrateUpdateNotices(): Promise<void> {
-  const rows = await fetchAllNotices();
+ *  Supabase is unconfigured (session-only fallback). orgId defaults to the demo
+ *  chapter; DataBootstrap passes the active org id. */
+export async function hydrateUpdateNotices(orgId?: string): Promise<void> {
+  const rows = await fetchAllNotices(orgId);
   if (rows.length === 0) return;
   _notices.splice(0, _notices.length, ...rows);
   _notify();

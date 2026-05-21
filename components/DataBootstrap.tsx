@@ -7,9 +7,8 @@
  * effect, so startup behavior is unchanged.
  *
  * While ORG_SCOPED_DATA is false, useActiveDataOrgId() returns DEMO_CHAPTER_ID,
- * so this hydrates the same data the root effect did. Event and task reads take
- * the orgId param; notices keep their current default signature (parameterized
- * in a later checkpoint).
+ * so this hydrates the same data the root effect did. Event, task, and notice
+ * reads all take the orgId param.
  *
  * A monotonic request id guards against a stale hydration (from a previous
  * orgId) overwriting newer cache data when the active org changes.
@@ -33,12 +32,11 @@ export default function DataBootstrap({ children }: { children: ReactNode }) {
     const reqId = ++reqIdRef.current;
     const fresh = () => reqId === reqIdRef.current;
 
-    // Events + tasks: org-scoped reads (P2b/P2d param). Notices keep the default
-    // signature until parameterized in a later checkpoint.
+    // Events, tasks, and notices: org-scoped reads (P2b/P2d/P2e param).
     fetchAllEvents(orgId).then(remote => { if (fresh()) setSupabaseEventCache(remote); });
     fetchAllTasks(orgId).then(remote => { if (fresh()) setSupabaseTaskCache(remote); });
     fetchTaskStates(orgId).then(states => { if (fresh()) seedTaskStates(states); });
-    void hydrateUpdateNotices();
+    void hydrateUpdateNotices(orgId);
   }, [orgId]);
 
   return <>{children}</>;

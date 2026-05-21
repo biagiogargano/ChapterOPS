@@ -59,14 +59,14 @@ function noticeToRow(n: UpdateNotice): Record<string, unknown> {
   };
 }
 
-/** Fetch all notices for the demo chapter. [] when unconfigured / failed. */
-export async function fetchAllNotices(): Promise<UpdateNotice[]> {
+/** Fetch all notices for an org (defaults to the demo chapter). [] when unconfigured / failed. */
+export async function fetchAllNotices(orgId: string = DEMO_CHAPTER_ID): Promise<UpdateNotice[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     const { data, error } = await supabase
       .from('update_notices')
       .select('*')
-      .eq('chapter_id', DEMO_CHAPTER_ID);
+      .eq('chapter_id', orgId);
 
     if (error) {
       console.warn('[updateNoticeService] fetchAllNotices error:', error.message);
