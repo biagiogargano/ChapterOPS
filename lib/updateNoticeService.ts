@@ -6,6 +6,7 @@
 
 import { supabase } from './supabase';
 import { DEMO_CHAPTER_ID } from './eventService';
+import { getDataOrgId } from './dataOrgHolder';   // active data org for write paths (P2g-4)
 import type { UpdateNotice, UpdateSeverity } from './updateNoticeStore';
 
 function isSupabaseConfigured(): boolean {
@@ -46,7 +47,7 @@ function rowToNotice(r: NoticeRow): UpdateNotice {
 function noticeToRow(n: UpdateNotice): Record<string, unknown> {
   return {
     id:              n.id,
-    chapter_id:      DEMO_CHAPTER_ID,
+    chapter_id:      getDataOrgId(),
     entity_type:     n.entityType,
     entity_id:       n.entityId,
     summary:         n.summary,
