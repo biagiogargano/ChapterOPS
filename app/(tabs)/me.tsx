@@ -70,21 +70,23 @@ export default function MeScreen() {
         </View>
       </View>
 
-      {/* ── Role switcher ── */}
-      <View style={s.switcherCard}>
-        <SectionLabel text="ROLE SWITCHER" />
-        <Text style={s.switcherHint}>Switch roles to preview role-specific views</Text>
-        <View style={s.roleList}>
-          {ROLE_SWITCHER_OPTIONS.map(r => (
-            <RoleOption
-              key={r}
-              role={r}
-              active={role === r}
-              onPress={() => setRole(r)}
-            />
-          ))}
+      {/* ── Role switcher (dev only — prevents role impersonation in real builds) ── */}
+      {__DEV__ && (
+        <View style={s.switcherCard}>
+          <SectionLabel text="ROLE SWITCHER" />
+          <Text style={s.switcherHint}>Switch roles to preview role-specific views</Text>
+          <View style={s.roleList}>
+            {ROLE_SWITCHER_OPTIONS.map(r => (
+              <RoleOption
+                key={r}
+                role={r}
+                active={role === r}
+                onPress={() => setRole(r)}
+              />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* ── Sign out ── */}
       <Pressable style={s.signOutButton} onPress={() => { void signOut(); }}>
