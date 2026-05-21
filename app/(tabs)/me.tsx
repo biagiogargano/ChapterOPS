@@ -51,10 +51,12 @@ export default function MeScreen() {
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Dev badge */}
-      <View style={s.devBadge}>
-        <Text style={s.devText}>DEV MODE · auth bypassed</Text>
-      </View>
+      {/* Dev badge (dev only — hidden in real builds) */}
+      {__DEV__ && (
+        <View style={s.devBadge}>
+          <Text style={s.devText}>DEV MODE · auth bypassed</Text>
+        </View>
+      )}
 
       {/* ── User card ── */}
       <View style={s.userCard}>
