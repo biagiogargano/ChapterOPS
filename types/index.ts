@@ -34,9 +34,10 @@ export type MembershipStage = 'pledge' | 'new_member' | 'active' | 'alumni';
 
 /** A chapter/club/organization — the org-scoping unit. One demo row for MVP. */
 export interface Organization {
-  id:       string;   // uuid; demo = DEMO_CHAPTER_ID
-  name:     string;
-  template: OrgType;  // default 'sigma_chi'
+  id:        string;          // uuid; demo = DEMO_CHAPTER_ID
+  name:      string;
+  template:  OrgType;         // default 'sigma_chi'
+  joinCode?: string | null;   // optional; present once join codes exist (C13)
 }
 
 /** A person's membership in ONE organization. A user in N orgs has N member rows. */

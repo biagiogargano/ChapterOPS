@@ -33,8 +33,13 @@ CREATE TABLE organizations (
   name        text        NOT NULL,
   template    text        NOT NULL DEFAULT 'sigma_chi'
     CHECK (template IN ('sigma_chi','generic_fraternity','club','custom')),
+  join_code   text,                          -- short human-typeable code for joining (C13)
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Case-insensitive uniqueness for join codes (only when present).
+CREATE UNIQUE INDEX organizations_join_code_idx
+  ON organizations (lower(join_code)) WHERE join_code IS NOT NULL;
 
 ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;
 

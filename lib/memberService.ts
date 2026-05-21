@@ -50,6 +50,7 @@ interface OrgRow {
   id:         string;
   name:       string;
   template:   string;
+  join_code:  string | null;
   created_at: string;
 }
 
@@ -83,6 +84,7 @@ function rowToOrganization(r: OrgRow): Organization {
     id:       r.id,
     name:     r.name,
     template: r.template as OrgType,
+    joinCode: r.join_code ?? null,
   };
 }
 
@@ -428,5 +430,109 @@ export async function resolveIdentity(
   } catch (err) {
     console.warn('[memberService] resolveIdentity threw:', err);
     return { kind: 'error', reason: 'transient' };
+  }
+}
+
+// ─── Onboarding writes (C13) — RPC-backed, transactional ──────────────────────
+//
+// These call the Postgres functions defined in supabase/identity_join_code.sql
+// (create_organization / join_organization_by_code), each a single transaction,
+// so an org + creator membership + position are created atomically (no orphans).
+// Not wired into any UI yet (C13b).
+
+/** Outcome of an org create/join attempt. */
+export type OrgWriteResult =
+  | { kind: 'ok'; orgId: string }
+  | { kind: 'not_found' }                 // join: code matched no organization
+  | { kind: 'error'; message: string };
+
+/**
+ * Look up an organization by its (case-insensitive) join code. Read-only.
+ * Returns null if not found / unconfigured / error.
+ */
+export async function findOrgByJoinCode(code: string): Promise<Organization | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const c = code.trim();
+    if (!c) return null;
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .ilike('join_code', c)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[memberService] findOrgByJoinCode error:', error.message);
+      return null;
+    }
+    return data ? rowToOrganization(data as OrgRow) : null;
+  } catch (err) {
+    console.warn('[memberService] findOrgByJoinCode threw:', err);
+    return null;
+  }
+}
+
+/**
+ * Create a new organization and the creator's President membership, atomically,
+ * via the create_organization RPC. Returns the new org id.
+ */
+export async function createOrganization(
+  name:       string,
+  template:   string,
+  authUserId: string,
+  email:      string,
+  fullName:   string,
+): Promise<OrgWriteResult> {
+  if (!isSupabaseConfigured()) return { kind: 'error', message: 'Supabase is not configured.' };
+  try {
+    const { data, error } = await supabase.rpc('create_organization', {
+      p_name:         name.trim(),
+      p_template:     template,
+      p_auth_user_id: authUserId,
+      p_email:        email.trim(),
+      p_full_name:    fullName,
+    });
+
+    if (error) {
+      console.warn('[memberService] createOrganization error:', error.message);
+      return { kind: 'error', message: error.message };
+    }
+    if (!data) return { kind: 'error', message: 'Organization was not created.' };
+    return { kind: 'ok', orgId: data as string };
+  } catch (err) {
+    console.warn('[memberService] createOrganization threw:', err);
+    return { kind: 'error', message: 'Could not create organization.' };
+  }
+}
+
+/**
+ * Join an existing organization by code (as a brother), atomically and
+ * idempotently, via the join_organization_by_code RPC. Returns the org id, or
+ * not_found when the code matches no organization.
+ */
+export async function joinOrganizationByCode(
+  code:       string,
+  authUserId: string,
+  email:      string,
+  fullName:   string,
+): Promise<OrgWriteResult> {
+  if (!isSupabaseConfigured()) return { kind: 'error', message: 'Supabase is not configured.' };
+  try {
+    const { data, error } = await supabase.rpc('join_organization_by_code', {
+      p_code:         code.trim(),
+      p_auth_user_id: authUserId,
+      p_email:        email.trim(),
+      p_full_name:    fullName,
+    });
+
+    if (error) {
+      console.warn('[memberService] joinOrganizationByCode error:', error.message);
+      return { kind: 'error', message: error.message };
+    }
+    if (!data) return { kind: 'not_found' };   // RPC returns NULL for an unknown code
+    return { kind: 'ok', orgId: data as string };
+  } catch (err) {
+    console.warn('[memberService] joinOrganizationByCode threw:', err);
+    return { kind: 'error', message: 'Could not join organization.' };
   }
 }
