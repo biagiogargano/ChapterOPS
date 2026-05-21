@@ -30,12 +30,18 @@ import { seedTaskStates } from '@/lib/devTaskStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useIdentity } from '@/lib/identityStore';
 import { ORG_SCOPED_DATA } from '@/lib/flags';
+import { setDataOrgId } from '@/lib/dataOrgHolder';
 
 export default function DataBootstrap({ children }: { children: ReactNode }) {
   // DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false → identical to today.
   const orgId = useActiveDataOrgId();
   const { phase } = useIdentity();
   const reqIdRef = useRef(0);
+
+  // Keep the data-org holder in sync with the active org so (future) write paths
+  // target the right org. Always runs on orgId change (independent of hydration
+  // phase gating). Inert while flag-off (orgId === DEMO_CHAPTER_ID).
+  useEffect(() => { setDataOrgId(orgId); }, [orgId]);
 
   // When scoping is on, only hydrate on a stable phase. When off, always ready.
   const ready = !ORG_SCOPED_DATA || phase === 'resolved' || phase === 'fallback';

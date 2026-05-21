@@ -17,8 +17,13 @@ import type { UserCreatedEvent, RecurrenceType } from './eventStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Chapter UUID used for all demo data. Must match events_seed.sql. */
-export const DEMO_CHAPTER_ID = 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0';
+/**
+ * Chapter UUID used for all demo data. Must match events_seed.sql. Defined in
+ * lib/orgConstants.ts (P2g-1) and re-exported here for backward compatibility —
+ * existing `import { DEMO_CHAPTER_ID } from './eventService'` keeps working.
+ */
+import { DEMO_CHAPTER_ID } from './orgConstants';
+export { DEMO_CHAPTER_ID };
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
