@@ -12,6 +12,12 @@
  *
  * A monotonic request id guards against a stale hydration (from a previous
  * orgId) overwriting newer cache data when the active org changes.
+ *
+ * Phase gating (P2f): while ORG_SCOPED_DATA is on, hydration only runs on a
+ * stable identity phase ('resolved' / 'fallback'); during transient phases
+ * (initializing / resolving / error / selecting_org) it is skipped to avoid a
+ * demo-then-real double load. While the flag is off, `ready` is always true, so
+ * hydration runs exactly as before (inert).
  */
 
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -22,22 +28,32 @@ import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
 import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { seedTaskStates } from '@/lib/devTaskStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
+import { useIdentity } from '@/lib/identityStore';
+import { ORG_SCOPED_DATA } from '@/lib/flags';
 
 export default function DataBootstrap({ children }: { children: ReactNode }) {
   // DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false → identical to today.
   const orgId = useActiveDataOrgId();
+  const { phase } = useIdentity();
   const reqIdRef = useRef(0);
 
+  // When scoping is on, only hydrate on a stable phase. When off, always ready.
+  const ready = !ORG_SCOPED_DATA || phase === 'resolved' || phase === 'fallback';
+
   useEffect(() => {
+    if (!ready) return;   // skip hydration during transient phases (scoped only)
+
     const reqId = ++reqIdRef.current;
     const fresh = () => reqId === reqIdRef.current;
 
-    // Events, tasks, and notices: org-scoped reads (P2b/P2d/P2e param).
+    // Events, tasks, and notices: org-scoped reads (P2b/P2d/P2e param). The
+    // fresh() guard (incl. the notice isCurrent guard, P2f) prevents a stale
+    // hydration from overwriting newer cache data.
     fetchAllEvents(orgId).then(remote => { if (fresh()) setSupabaseEventCache(remote); });
     fetchAllTasks(orgId).then(remote => { if (fresh()) setSupabaseTaskCache(remote); });
     fetchTaskStates(orgId).then(states => { if (fresh()) seedTaskStates(states); });
-    void hydrateUpdateNotices(orgId);
-  }, [orgId]);
+    void hydrateUpdateNotices(orgId, fresh);
+  }, [orgId, ready]);
 
   return <>{children}</>;
 }

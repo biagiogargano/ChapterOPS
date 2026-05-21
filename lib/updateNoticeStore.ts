@@ -143,10 +143,18 @@ export function getNoticesForRole(role: string): UpdateNotice[] {
 
 /** Load persisted notices into the store (replaces contents). No-op data when
  *  Supabase is unconfigured (session-only fallback). orgId defaults to the demo
- *  chapter; DataBootstrap passes the active org id. */
-export async function hydrateUpdateNotices(orgId?: string): Promise<void> {
+ *  chapter; DataBootstrap passes the active org id.
+ *
+ *  isCurrent (optional, P2f): a freshness guard checked right before the splice,
+ *  so a stale hydration (from a previous org) can't overwrite newer notices when
+ *  the active org changes. Backward-compatible — omit it for the old behavior. */
+export async function hydrateUpdateNotices(
+  orgId?: string,
+  isCurrent?: () => boolean,
+): Promise<void> {
   const rows = await fetchAllNotices(orgId);
   if (rows.length === 0) return;
+  if (isCurrent && !isCurrent()) return;   // a newer hydration superseded this one
   _notices.splice(0, _notices.length, ...rows);
   _notify();
 }
