@@ -1,7 +1,9 @@
 import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
+import { useIdentity } from '@/lib/identityStore';
 import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, type Role } from '@/lib/roles';
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -34,11 +36,46 @@ function RoleOption({
   );
 }
 
+function OrgOption({
+  name,
+  active,
+  onPress,
+}: {
+  name: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[s.roleOption, active && s.roleOptionActive]}
+      onPress={onPress}
+    >
+      <View style={[s.roleRadio, active && s.roleRadioActive]}>
+        {active && <View style={s.roleRadioDot} />}
+      </View>
+      <Text style={[s.roleOptionText, active && s.roleOptionTextActive]}>
+        {name}
+      </Text>
+    </Pressable>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MeScreen() {
   const { role, setRole } = useDevRole();
   const { signOut } = useAuth();
+  const { memberships, activeOrgId, setActiveOrg } = useIdentity();
+  const router = useRouter();
+
+  // Switch the active org, then return to the root tabs so we don't linger on a
+  // detail screen that referenced the previous org. No-op when tapping the org
+  // that's already active.
+  function handleSwitchOrg(orgId: string) {
+    if (orgId === activeOrgId) return;
+    setActiveOrg(orgId);
+    router.replace('/(tabs)' as any);
+  }
   const initials = DEMO_USER.full_name
     .split(' ')
     .map(n => n[0])
@@ -71,6 +108,24 @@ export default function MeScreen() {
           </View>
         </View>
       </View>
+
+      {/* ── Org switcher (only for multi-org members; hidden in the single-org sandbox) ── */}
+      {memberships.length > 1 && (
+        <View style={s.switcherCard}>
+          <SectionLabel text="ORGANIZATIONS" />
+          <Text style={s.switcherHint}>Switch between your chapters</Text>
+          <View style={s.roleList}>
+            {memberships.map(m => (
+              <OrgOption
+                key={m.organization.id}
+                name={m.organization.name}
+                active={m.organization.id === activeOrgId}
+                onPress={() => handleSwitchOrg(m.organization.id)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* ── Role switcher (dev only — prevents role impersonation in real builds) ── */}
       {__DEV__ && (
