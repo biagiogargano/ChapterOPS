@@ -18,6 +18,11 @@
  * (initializing / resolving / error / selecting_org) it is skipped to avoid a
  * demo-then-real double load. While the flag is off, `ready` is always true, so
  * hydration runs exactly as before (inert).
+ *
+ * Org-transition reset (B-2): when the active org actually CHANGES (not on first
+ * mount), the org-scoped caches/stores are cleared before hydrating the new org
+ * so the previous org's data can't linger. Inert flag-off (orgId never changes
+ * from DEMO_CHAPTER_ID, so the transition branch never fires).
  */
 
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
@@ -31,12 +36,15 @@ import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useIdentity } from '@/lib/identityStore';
 import { ORG_SCOPED_DATA } from '@/lib/flags';
 import { setDataOrgId } from '@/lib/dataOrgHolder';
+import { resetOrgScopedData } from '@/lib/orgScopeReset';
 
 export default function DataBootstrap({ children }: { children: ReactNode }) {
   // DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false → identical to today.
   const orgId = useActiveDataOrgId();
   const { phase } = useIdentity();
   const reqIdRef = useRef(0);
+  // Tracks the org the caches currently hold. undefined = first mount (no reset).
+  const prevOrgIdRef = useRef<string | undefined>(undefined);
 
   // Keep the data-org holder in sync with the active org so write paths target
   // the same org reads use. useLayoutEffect (not useEffect) so the holder is set
@@ -50,6 +58,13 @@ export default function DataBootstrap({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;   // skip hydration during transient phases (scoped only)
+
+    // On an actual org transition (not first mount), clear the previous org's
+    // caches/stores BEFORE hydrating the new org so its data can't linger.
+    if (prevOrgIdRef.current !== undefined && prevOrgIdRef.current !== orgId) {
+      resetOrgScopedData();
+    }
+    prevOrgIdRef.current = orgId;
 
     const reqId = ++reqIdRef.current;
     const fresh = () => reqId === reqIdRef.current;
