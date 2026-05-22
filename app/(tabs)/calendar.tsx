@@ -13,7 +13,7 @@ import {
 } from '@/lib/mockEvents';
 import { isOfficer } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -172,6 +172,20 @@ export default function CalendarScreen() {
   // Seed with local mock data immediately so the list is never blank,
   // then overwrite with Supabase data on every focus (with mock fallback).
   const [events, setEvents] = useState<MockEvent[]>(() => getAllEvents());
+
+  // On an ACTUAL active-org change (not first mount), clear this screen's local
+  // event list synchronously BEFORE paint so a kept-alive tab can't render the
+  // previous org's events for a frame. The focus effect below then refetches the
+  // new org. First-mount guard (prevOrg seeded to current) avoids clearing the
+  // initial seed. Inert flag-off: dataOrgId is constant DEMO_CHAPTER_ID, so the
+  // branch never fires. Does not fetch here — focus refresh is unchanged.
+  const prevOrg = useRef(dataOrgId);
+  useLayoutEffect(() => {
+    if (prevOrg.current !== dataOrgId) {
+      setEvents([]);
+      prevOrg.current = dataOrgId;
+    }
+  }, [dataOrgId]);
 
   useFocusEffect(
     useCallback(() => {

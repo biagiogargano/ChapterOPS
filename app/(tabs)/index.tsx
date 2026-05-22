@@ -42,7 +42,7 @@ import {
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -729,6 +729,19 @@ export default function TodayScreen() {
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
   const dataOrgId = useActiveDataOrgId();
   const [allEvents, setAllEvents] = useState<MockEvent[]>(() => getAllEvents());
+
+  // On an ACTUAL active-org change (not first mount), clear this screen's local
+  // event list synchronously BEFORE paint so a kept-alive tab can't render the
+  // previous org's events for a frame. The focus effect below then refetches the
+  // new org. First-mount guard avoids clearing the initial seed. Inert flag-off
+  // (dataOrgId constant). Does not fetch here — focus refresh is unchanged.
+  const prevOrg = useRef(dataOrgId);
+  useLayoutEffect(() => {
+    if (prevOrg.current !== dataOrgId) {
+      setAllEvents([]);
+      prevOrg.current = dataOrgId;
+    }
+  }, [dataOrgId]);
 
   useFocusEffect(
     useCallback(() => {
