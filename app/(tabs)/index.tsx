@@ -3,7 +3,7 @@ import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchAllEvents } from '@/lib/eventService';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
-import { findEventById, getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
+import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
 import { DAY_LABELS } from '@/lib/mockEvents';
 import {
   STATE_BG,
@@ -11,7 +11,6 @@ import {
   STATE_LABEL,
   STATE_STRIPE,
   dueLabelOf,
-  findTaskById,
   getResponsibilityGroups,
   isOverdue,
   urgencyOf,
@@ -19,11 +18,8 @@ import {
   type TaskState,
 } from '@/lib/mockTasks';
 import {
-  acknowledgeNotice,
   getNoticesForRole,
   useUpdateNoticesVersion,
-  type UpdateNotice,
-  type UpdateSeverity,
 } from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
@@ -41,7 +37,8 @@ import {
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
+import { Bell } from 'lucide-react-native';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -658,40 +655,38 @@ function AllClearRow() {
   );
 }
 
-// ─── Update notice card ─────────────────────────────────────────────────────
-
-const NOTICE_CFG: Record<UpdateSeverity, { color: string; bg: string; stripe: string }> = {
-  critical: { color: '#fca5a5', bg: '#1a0505', stripe: '#dc2626' },
-  moderate: { color: '#fbbf24', bg: '#1c1407', stripe: '#d97706' },
-  low:      { color: '#94a3b8', bg: '#1e293b', stripe: '#334155' },
-};
-
-function UpdateNoticeCard({ notice, onPress }: { notice: UpdateNotice; onPress: () => void }) {
-  const cfg = NOTICE_CFG[notice.severity];
-  return (
-    <Pressable style={[s.noticeCard, { backgroundColor: cfg.bg }]} onPress={onPress}>
-      <View style={[s.noticeStripe, { backgroundColor: cfg.stripe }]} />
-      <View style={s.noticeBody}>
-        <Text style={[s.noticeText, { color: cfg.color }]} numberOfLines={3}>{notice.summary}</Text>
-        <Text style={s.noticeHint}>Tap to view · dismisses</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TodayScreen() {
-  const router    = useRouter();
+  const router     = useRouter();
+  const navigation = useNavigation();
   const { role }  = useDevRole();
   const firstName = DEMO_USER.full_name.split(' ')[0];
   const roleGroup = getRoleGroup(role);
   const isBrother  = roleGroup === 'brother';
   const isOfficerRole = isOfficer(role);
 
-  // Update/change notices for this role (reactive).
+  // Update/change notices for this role (reactive). Notices now live behind a
+  // header bell (Today-only for v1) instead of an inline body section; here we
+  // only need the unread count for the badge.
   useUpdateNoticesVersion();
-  const notices = getNoticesForRole(role);
+  const notices     = getNoticesForRole(role);
+  const unreadCount = notices.length;
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={() => router.push('/notifications' as any)} style={s.bellBtn} hitSlop={8}>
+          <Bell color="#cbd5e1" size={22} />
+          {unreadCount > 0 && (
+            <View style={s.bellBadge}>
+              <Text style={s.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      ),
+    });
+  }, [navigation, unreadCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derived reminders (compute-on-read). Subscribe to BOTH stores so the count
   // and card badges recompute immediately on an RSVP response or a task
@@ -701,16 +696,6 @@ export default function TodayScreen() {
   const reminders    = deriveReminders(role);
   const reminderById = new Map(reminders.map(r => [r.entityId, r]));
   const topSeverity  = reminders[0]?.severity ?? 'low';
-
-  function handleNoticePress(n: UpdateNotice) {
-    acknowledgeNotice(n.id, role);   // dismiss for this role
-    if (n.entityType === 'task' && findTaskById(n.entityId)) {
-      router.push(`/task/${n.entityId}` as any);
-    } else if (n.entityType === 'event' && findEventById(n.entityId)) {
-      router.push(`/event/${n.entityId}` as any);
-    }
-    // entity gone (cancelled) → just dismissed
-  }
 
   // Live state (devTaskStore) so review routing reflects in-session changes.
   const { mine, review, alert } = getResponsibilityGroups(
@@ -828,16 +813,6 @@ export default function TodayScreen() {
             <Text style={s.needsAttnText}>
               {reminders.length} {reminders.length === 1 ? 'item needs' : 'items need'} your attention
             </Text>
-          </View>
-        )}
-
-        {/* ── UPDATES (change notices for this role) ── */}
-        {notices.length > 0 && (
-          <View style={s.section}>
-            <SLabel text="UPDATES" count={notices.length} />
-            {notices.map(n => (
-              <UpdateNoticeCard key={n.id} notice={n} onPress={() => handleNoticePress(n)} />
-            ))}
           </View>
         )}
 
@@ -1037,6 +1012,11 @@ const s = StyleSheet.create({
     marginBottom: 20, borderWidth: 1, borderColor: '#92400e',
   },
   devText: { color: '#fbbf24', fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+
+  // Header notification bell (Today-only for v1)
+  bellBtn:       { paddingHorizontal: 14, paddingVertical: 4 },
+  bellBadge:     { position: 'absolute', top: -3, right: 8, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   greeting: { fontSize: 28, fontWeight: '800', color: '#f8fafc', marginBottom: 4 },
   chapter:  { fontSize: 12, color: '#6366f1', fontWeight: '700', letterSpacing: 0.5, marginBottom: 28 },
