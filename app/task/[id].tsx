@@ -145,15 +145,17 @@ function AssigneeCallout({
 
 // ─── Info block ───────────────────────────────────────────────────────────────
 
+// Top-of-screen essentials only: Due, Assigned To, and the linked event (the
+// latter suppressed when the tappable "View Event" action renders). Secondary
+// metadata (proof / reviewer / supervisor / workflow) lives in the lower
+// DETAILS section so the top stays scannable.
 function InfoBlock({
   task,
   isAssignee,
-  parentTask,
   hideEventRow,
 }: {
   task:          MockTask;
   isAssignee:    boolean;
-  parentTask?:   MockTask;
   hideEventRow?: boolean;   // suppressed when the tappable "View Event" action renders
 }) {
   return (
@@ -168,27 +170,29 @@ function InfoBlock({
       {task.linkedEvent && !hideEventRow && (
         <InfoRow icon="📌" label="Event" value={task.linkedEvent} accent />
       )}
-      {task.isWorkflowParent && (
-        <InfoRow icon="📋" label="Type" value="Workflow summary" />
-      )}
-      {parentTask && (
-        <InfoRow icon="🔗" label="Part of Workflow" value={parentTask.title} accent />
-      )}
-      {task.requiresProof && task.proofType && (
-        <InfoRow
-          icon={PROOF_ICON[task.proofType]}
-          label="Proof Required"
-          value={PROOF_LABEL[task.proofType]}
-        />
-      )}
-      {task.requiresApproval && task.reviewerRole && task.lightweightKind !== 'rsvp' && (
-        <InfoRow icon="✅" label="Reviewed By" value={ROLE_LABELS[task.reviewerRole]} />
-      )}
-      {task.supervisorRole && task.supervisorRole !== task.reviewerRole && (
-        <InfoRow icon="👁" label="Supervised By" value={ROLE_LABELS[task.supervisorRole]} />
-      )}
     </View>
   );
+}
+
+// Secondary metadata rows for the lower DETAILS section. Returns null when the
+// task carries none of them (so we don't render an empty box).
+function SecondaryMeta({ task, parentTask }: { task: MockTask; parentTask?: MockTask }) {
+  const rows = [
+    task.isWorkflowParent ? <InfoRow key="type" icon="📋" label="Type" value="Workflow summary" /> : null,
+    parentTask ? <InfoRow key="parent" icon="🔗" label="Part of Workflow" value={parentTask.title} accent /> : null,
+    task.requiresProof && task.proofType
+      ? <InfoRow key="proof" icon={PROOF_ICON[task.proofType]} label="Proof Required" value={PROOF_LABEL[task.proofType]} />
+      : null,
+    task.requiresApproval && task.reviewerRole && task.lightweightKind !== 'rsvp'
+      ? <InfoRow key="reviewer" icon="✅" label="Reviewed By" value={ROLE_LABELS[task.reviewerRole]} />
+      : null,
+    task.supervisorRole && task.supervisorRole !== task.reviewerRole
+      ? <InfoRow key="supervisor" icon="👁" label="Supervised By" value={ROLE_LABELS[task.supervisorRole]} />
+      : null,
+  ].filter(Boolean);
+
+  if (rows.length === 0) return null;
+  return <View style={[s.infoBlock, { marginTop: 16 }]}>{rows}</View>;
 }
 
 function InfoRow({
@@ -911,7 +915,7 @@ export default function TaskDetailScreen() {
         )}
 
         {/* ── Info block ── */}
-        <InfoBlock task={task} isAssignee={isAssignee} parentTask={parentTask} hideEventRow={!!linkedEv} />
+        <InfoBlock task={task} isAssignee={isAssignee} hideEventRow={!!linkedEv} />
 
         {/* ── View Event button — shown when task is tied to a specific event ── */}
         {linkedEv && (
@@ -933,7 +937,9 @@ export default function TaskDetailScreen() {
           </Pressable>
         )}
 
-        {/* ── Rejection feedback ── */}
+        {/* ════════ PRIMARY ACTION (kept high so the user sees what to do) ════════ */}
+
+        {/* ── Rejection feedback — actionable context for the assignee's resubmit ── */}
         {taskState === 'rejected' && rejNote && (
           <>
             <Divider />
@@ -941,14 +947,6 @@ export default function TaskDetailScreen() {
             <View style={s.rejectionNote}>
               <Text style={s.rejectionNoteText}>{rejNote}</Text>
             </View>
-          </>
-        )}
-
-        {/* ── Workflow steps ── */}
-        {showWorkflow && (
-          <>
-            <Divider />
-            <WorkflowChildrenSection parentId={task.id} />
           </>
         )}
 
@@ -1024,6 +1022,16 @@ export default function TaskDetailScreen() {
           </>
         )}
 
+        {/* ════════ SECONDARY / RARE (moved lower) ════════ */}
+
+        {/* ── Workflow steps ── */}
+        {showWorkflow && (
+          <>
+            <Divider />
+            <WorkflowChildrenSection parentId={task.id} />
+          </>
+        )}
+
         {/* ── Escalation path ── */}
         {showEscalation && (
           <>
@@ -1032,10 +1040,11 @@ export default function TaskDetailScreen() {
           </>
         )}
 
-        {/* ── Description ── */}
+        {/* ── Details: description + secondary metadata ── */}
         <Divider />
         <SLabel text="DETAILS" />
         <Text style={s.description}>{task.description}</Text>
+        <SecondaryMeta task={task} parentTask={parentTask} />
 
         {/* ── Delete (creator/leadership only, user-created tasks) ── */}
         {canManage && (
