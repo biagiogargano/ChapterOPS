@@ -23,6 +23,15 @@ const REVIEWER_ROLES: Role[] = ['pro_consul', 'president'];
 const SUPERVISOR_ROLES: Role[] = ['pro_consul', 'president'];
 const PROOF_TYPES: ProofType[] = ['text', 'link', 'document', 'image', 'screenshot'];
 
+const DUE_PRESETS: { label: string; days: number }[] = [
+  { label: '2 wks before', days: -14 },
+  { label: '1 wk before',  days: -7 },
+  { label: '3 days before', days: -3 },
+  { label: '1 day before', days: -1 },
+  { label: 'On day',       days: 0 },
+  { label: '1 day after',  days: 1 },
+];
+
 let _keySeq = 0;
 function newSpecKey(): string {
   return `s${Date.now().toString(36)}${(_keySeq++).toString(36)}`;
@@ -66,6 +75,9 @@ export default function TemplateEditScreen() {
   const [specs, setSpecs] = useState<EventTaskSpec[]>(() =>
     source ? source.taskSpecs.map(s => ({ ...s, key: newSpecKey() })) : [blankSpec()],
   );
+  // Per-task "Options" disclosure (approval/proof). Collapsed by default; the
+  // underlying values still apply whether or not the section is expanded.
+  const [openOptions, setOpenOptions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     navigation.setOptions({ title: editing ? 'Edit Template' : 'New Template' });
@@ -86,6 +98,13 @@ export default function TemplateEditScreen() {
       if (j < 0 || j >= prev.length) return prev;
       const next = [...prev];
       [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  function toggleOptions(key: string) {
+    setOpenOptions(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }
@@ -178,9 +197,16 @@ export default function TemplateEditScreen() {
               ))}
             </View>
 
-            {/* Due offset */}
+            {/* Due offset — quick presets + fine-tune */}
             <Text style={s.subLabel}>Due</Text>
-            <View style={s.stepperRow}>
+            <View style={s.chipWrap}>
+              {DUE_PRESETS.map(p => (
+                <Pressable key={p.label} style={[s.chip, spec.dueOffsetDays === p.days && s.chipOn]} onPress={() => patchSpec(i, { dueOffsetDays: p.days })}>
+                  <Text style={[s.chipText, spec.dueOffsetDays === p.days && s.chipTextOn]}>{p.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={[s.stepperRow, { marginTop: 8 }]}>
               <Pressable style={s.stepBtn} onPress={() => patchSpec(i, { dueOffsetDays: spec.dueOffsetDays - 1 })}>
                 <Text style={s.stepBtnText}>−</Text>
               </Pressable>
@@ -190,47 +216,56 @@ export default function TemplateEditScreen() {
               </Pressable>
             </View>
 
-            {/* Approval */}
-            <Pressable style={s.toggleRow} onPress={() => patchSpec(i, { requiresApproval: !spec.requiresApproval })}>
-              <View style={[s.box, spec.requiresApproval && s.boxOn]}>{spec.requiresApproval && <Text style={s.boxCheck}>✓</Text>}</View>
-              <Text style={s.toggleLabel}>Requires approval</Text>
+            {/* Options (approval / proof) — collapsed by default to keep rows compact */}
+            <Pressable style={s.optionsToggle} onPress={() => toggleOptions(spec.key)}>
+              <Text style={s.optionsToggleText}>Options (approval, proof)</Text>
+              <Text style={s.optionsChevron}>{openOptions.has(spec.key) ? '▴' : '▾'}</Text>
             </Pressable>
-            {spec.requiresApproval && (
-              <>
-                <Text style={s.subLabel}>Reviewed by</Text>
-                <View style={s.chipWrap}>
-                  {REVIEWER_ROLES.map(r => (
-                    <Pressable key={r} style={[s.chip, (spec.reviewerRole ?? 'pro_consul') === r && s.chipOn]} onPress={() => patchSpec(i, { reviewerRole: r })}>
-                      <Text style={[s.chipText, (spec.reviewerRole ?? 'pro_consul') === r && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={s.subLabel}>Also oversee (optional)</Text>
-                <View style={s.chipWrap}>
-                  <Pressable style={[s.chip, !spec.supervisorRole && s.chipOn]} onPress={() => patchSpec(i, { supervisorRole: undefined })}>
-                    <Text style={[s.chipText, !spec.supervisorRole && s.chipTextOn]}>None</Text>
-                  </Pressable>
-                  {SUPERVISOR_ROLES.map(r => (
-                    <Pressable key={r} style={[s.chip, spec.supervisorRole === r && s.chipOn]} onPress={() => patchSpec(i, { supervisorRole: r })}>
-                      <Text style={[s.chipText, spec.supervisorRole === r && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
+            {openOptions.has(spec.key) && (
+              <View>
+                {/* Approval */}
+                <Pressable style={s.toggleRow} onPress={() => patchSpec(i, { requiresApproval: !spec.requiresApproval })}>
+                  <View style={[s.box, spec.requiresApproval && s.boxOn]}>{spec.requiresApproval && <Text style={s.boxCheck}>✓</Text>}</View>
+                  <Text style={s.toggleLabel}>Requires approval</Text>
+                </Pressable>
+                {spec.requiresApproval && (
+                  <>
+                    <Text style={s.subLabel}>Reviewed by</Text>
+                    <View style={s.chipWrap}>
+                      {REVIEWER_ROLES.map(r => (
+                        <Pressable key={r} style={[s.chip, (spec.reviewerRole ?? 'pro_consul') === r && s.chipOn]} onPress={() => patchSpec(i, { reviewerRole: r })}>
+                          <Text style={[s.chipText, (spec.reviewerRole ?? 'pro_consul') === r && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={s.subLabel}>Also oversee (optional)</Text>
+                    <View style={s.chipWrap}>
+                      <Pressable style={[s.chip, !spec.supervisorRole && s.chipOn]} onPress={() => patchSpec(i, { supervisorRole: undefined })}>
+                        <Text style={[s.chipText, !spec.supervisorRole && s.chipTextOn]}>None</Text>
+                      </Pressable>
+                      {SUPERVISOR_ROLES.map(r => (
+                        <Pressable key={r} style={[s.chip, spec.supervisorRole === r && s.chipOn]} onPress={() => patchSpec(i, { supervisorRole: r })}>
+                          <Text style={[s.chipText, spec.supervisorRole === r && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
 
-            {/* Proof */}
-            <Pressable style={s.toggleRow} onPress={() => patchSpec(i, { requiresProof: !spec.requiresProof })}>
-              <View style={[s.box, spec.requiresProof && s.boxOn]}>{spec.requiresProof && <Text style={s.boxCheck}>✓</Text>}</View>
-              <Text style={s.toggleLabel}>Requires proof</Text>
-            </Pressable>
-            {spec.requiresProof && (
-              <View style={s.chipWrap}>
-                {PROOF_TYPES.map(p => (
-                  <Pressable key={p} style={[s.chip, (spec.proofType ?? 'text') === p && s.chipOn]} onPress={() => patchSpec(i, { proofType: p })}>
-                    <Text style={[s.chipText, (spec.proofType ?? 'text') === p && s.chipTextOn]}>{PROOF_LABEL[p]}</Text>
-                  </Pressable>
-                ))}
+                {/* Proof */}
+                <Pressable style={s.toggleRow} onPress={() => patchSpec(i, { requiresProof: !spec.requiresProof })}>
+                  <View style={[s.box, spec.requiresProof && s.boxOn]}>{spec.requiresProof && <Text style={s.boxCheck}>✓</Text>}</View>
+                  <Text style={s.toggleLabel}>Requires proof</Text>
+                </Pressable>
+                {spec.requiresProof && (
+                  <View style={s.chipWrap}>
+                    {PROOF_TYPES.map(p => (
+                      <Pressable key={p} style={[s.chip, (spec.proofType ?? 'text') === p && s.chipOn]} onPress={() => patchSpec(i, { proofType: p })}>
+                        <Text style={[s.chipText, (spec.proofType ?? 'text') === p && s.chipTextOn]}>{PROOF_LABEL[p]}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -283,6 +318,10 @@ const s = StyleSheet.create({
   stepBtn:    { width: 40, height: 40, borderRadius: 8, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', alignItems: 'center', justifyContent: 'center' },
   stepBtnText:{ fontSize: 20, color: '#a5b4fc', lineHeight: 24 },
   stepValue:  { flex: 1, textAlign: 'center', fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+
+  optionsToggle:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingVertical: 6 },
+  optionsToggleText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  optionsChevron:    { fontSize: 13, color: '#64748b' },
 
   toggleRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   box:        { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
