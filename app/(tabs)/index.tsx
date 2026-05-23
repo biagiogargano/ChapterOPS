@@ -1,6 +1,8 @@
 import { getStoredState, loadTaskState, saveTaskState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
+import { useIdentity } from '@/lib/identityStore';
+import { AUTH_ENABLED } from '@/lib/flags';
 import { fetchAllEvents } from '@/lib/eventService';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
@@ -563,7 +565,11 @@ export default function TodayScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
   const { role }  = useDevRole();
-  const firstName = DEMO_USER.full_name.split(' ')[0];
+  const identity  = useIdentity();
+  // Real identity when auth is on; demo values in the flag-off sandbox.
+  const fullName  = AUTH_ENABLED ? (identity.member?.fullName ?? '') : DEMO_USER.full_name;
+  const firstName = fullName ? fullName.split(' ')[0] : 'there';
+  const orgName   = (AUTH_ENABLED ? identity.organization?.name : DEMO_CHAPTER.name) ?? '';
   const roleGroup = getRoleGroup(role);
   const isBrother  = roleGroup === 'brother';
   const isOfficerRole = isOfficer(role);
@@ -694,15 +700,17 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Dev badge */}
-        <View style={s.devBadge}>
-          <Text style={s.devText}>DEV MODE · auth bypassed</Text>
-        </View>
+        {/* Dev badge — only meaningful while auth is bypassed (flag-off) */}
+        {!AUTH_ENABLED && (
+          <View style={s.devBadge}>
+            <Text style={s.devText}>DEV MODE · auth bypassed</Text>
+          </View>
+        )}
 
         {/* Header */}
         <Text style={s.greeting}>Good morning, {firstName}</Text>
         <Text style={s.chapter}>
-          {DEMO_CHAPTER.name} · {ROLE_LABELS[role].toUpperCase()}
+          {orgName} · {ROLE_LABELS[role].toUpperCase()}
         </Text>
 
         {/* ── Needs Attention summary — informational caption (NOT a button).

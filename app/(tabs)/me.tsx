@@ -3,6 +3,7 @@ import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
+import { AUTH_ENABLED } from '@/lib/flags';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -65,8 +66,12 @@ function OrgOption({
 export default function MeScreen() {
   const { role, setRole } = useDevRole();
   const { signOut } = useAuth();
-  const { memberships, activeOrgId, setActiveOrg } = useIdentity();
+  const { memberships, activeOrgId, setActiveOrg, member, organization } = useIdentity();
   const router = useRouter();
+
+  // Real identity when auth is on; demo values in the flag-off sandbox.
+  const userName = (AUTH_ENABLED ? member?.fullName : DEMO_USER.full_name) || 'Member';
+  const orgName  = (AUTH_ENABLED ? organization?.name : DEMO_CHAPTER.name) || '';
 
   // Switch the active org, then return to the root tabs so we don't linger on a
   // detail screen that referenced the previous org. No-op when tapping the org
@@ -76,7 +81,7 @@ export default function MeScreen() {
     setActiveOrg(orgId);
     router.replace('/(tabs)' as any);
   }
-  const initials = DEMO_USER.full_name
+  const initials = userName
     .split(' ')
     .map(n => n[0])
     .join('')
@@ -88,8 +93,8 @@ export default function MeScreen() {
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Dev badge (dev only — hidden in real builds) */}
-      {__DEV__ && (
+      {/* Dev badge (dev only, and only while auth is actually bypassed) */}
+      {__DEV__ && !AUTH_ENABLED && (
         <View style={s.devBadge}>
           <Text style={s.devText}>DEV MODE · auth bypassed</Text>
         </View>
@@ -101,8 +106,8 @@ export default function MeScreen() {
           <Text style={s.avatarText}>{initials}</Text>
         </View>
         <View style={s.userInfo}>
-          <Text style={s.userName}>{DEMO_USER.full_name}</Text>
-          <Text style={s.userChapter}>{DEMO_CHAPTER.name}</Text>
+          <Text style={s.userName}>{userName}</Text>
+          <Text style={s.userChapter}>{orgName}</Text>
           <View style={s.rolePill}>
             <Text style={s.rolePillText}>{ROLE_LABELS[role]}</Text>
           </View>
