@@ -790,6 +790,13 @@ export default function TodayScreen() {
 
   const hasUrgentContent = urgentMine.length > 0 || review.length > 0 || alert.length > 0;
 
+  // Whether the active role branch renders <AllClearRow/> (the officer branch
+  // also requires an empty week). Used to suppress the redundant "No events
+  // scheduled today" placeholder when we've already said the user is caught up.
+  const showAllClear = roleGroup === 'officer'
+    ? (!hasUrgentContent && weekMine.length === 0)
+    : !hasUrgentContent;
+
   return (
     <ReminderCtx.Provider value={reminderById}>
     <KeyboardAvoidingView
@@ -968,9 +975,13 @@ export default function TodayScreen() {
             )}
           </View>
           {todayEvents.length === 0 ? (
-            <View style={s.noEvents}>
-              <Text style={s.noEventsText}>No events scheduled today</Text>
-            </View>
+            // Suppress this placeholder when AllClearRow already told the user
+            // they're caught up — avoids two stacked empty-state messages.
+            showAllClear ? null : (
+              <View style={s.noEvents}>
+                <Text style={s.noEventsText}>No events scheduled today</Text>
+              </View>
+            )
           ) : (
             todayEvents.map(ev => (
               <EventCard
