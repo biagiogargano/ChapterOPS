@@ -24,6 +24,7 @@ import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
 import { NO_TEMPLATE } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import SearchablePicker from '@/components/SearchablePicker';
 import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
@@ -451,6 +452,8 @@ export default function CreateEventScreen() {
   // Merged built-in + custom templates for the picker (reactive to edits).
   useCustomTemplatesVersion();
   const templateOptions = mergedTemplateOptions();
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const selectedTemplateLabel = templateOptions.find(o => o.id === templateId)?.label ?? 'None';
   // Specs of the selected template, for the preview (read-only; same data the
   // generator uses, so the preview can't drift from what gets created).
   const previewSpecs = templateId !== NO_TEMPLATE
@@ -749,17 +752,10 @@ export default function CreateEventScreen() {
         {!editing && (
           <View style={s.field}>
             <FieldLabel text="APPLY TEMPLATE" />
-            <View style={s.recWrap}>
-              {templateOptions.map(opt => (
-                <Pressable
-                  key={opt.id}
-                  style={[s.recChip, templateId === opt.id && s.recChipOn]}
-                  onPress={() => setTemplateId(opt.id)}
-                >
-                  <Text style={[s.recChipText, templateId === opt.id && s.recChipTextOn]}>{opt.label}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Pressable style={s.templateSelectRow} onPress={() => setTemplatePickerOpen(true)}>
+              <Text style={s.templateSelectValue} numberOfLines={1}>{selectedTemplateLabel}</Text>
+              <Text style={s.templateSelectChevron}>▾</Text>
+            </Pressable>
             {templateId !== NO_TEMPLATE && (
               <Text style={s.templateHint}>Auto-creates a set of prep tasks for this event when you create it.</Text>
             )}
@@ -848,6 +844,16 @@ export default function CreateEventScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <SearchablePicker
+        visible={templatePickerOpen}
+        title="Apply a template"
+        hint="Auto-creates this template's prep tasks when you create the event."
+        searchPlaceholder="Filter templates…"
+        options={templateOptions}
+        onSelect={(id) => { setTemplateId(id); setTemplatePickerOpen(false); }}
+        onClose={() => setTemplatePickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -868,6 +874,9 @@ const s = StyleSheet.create({
   fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   templateHint:  { fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 17 },
   manageTemplatesLink: { fontSize: 13, fontWeight: '600', color: '#818cf8', marginTop: 10 },
+  templateSelectRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  templateSelectValue:   { flex: 1, fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  templateSelectChevron: { fontSize: 13, color: '#64748b', marginLeft: 8 },
 
   // Template preview
   previewBlock:     { backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
