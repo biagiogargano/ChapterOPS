@@ -32,6 +32,7 @@ import {
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
+import { allTemplateTaskIdsForEvent } from '@/lib/eventTemplates';
 import { removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -610,14 +611,17 @@ export default function EventDetailScreen() {
   function handleDelete() {
     if (!event) return;
     const ev = event;
-    // Cascade-delete the generated RSVP-review task tied to this event (Step 4).
-    // Deterministic id → a harmless no-op if this event never had one (optional
-    // events, or a non-primary recurrence instance). Local optimistic delete +
-    // fire-and-forget persisted delete (no-op when unconfigured).
+    // Cascade-delete the generated tasks tied to this event: the RSVP-review task
+    // plus any event-template tasks. All ids are deterministic, so deleting them
+    // is a harmless no-op when this event never had them (optional events, a
+    // non-primary recurrence instance, or no template applied). Local optimistic
+    // delete + fire-and-forget persisted delete (no-op when unconfigured).
     function cascadeReviewTask() {
-      const reviewId = rsvpReviewTaskId(ev.id);
-      deleteUserTask(reviewId);
-      void removeTask(reviewId);
+      const ids = [rsvpReviewTaskId(ev.id), ...allTemplateTaskIdsForEvent(ev.id)];
+      for (const id of ids) {
+        deleteUserTask(id);
+        void removeTask(id);
+      }
     }
     // Affected roles for a cancellation: officer events → officers; otherwise everyone.
     const recipients: Role[] = ev.audience === 'officers' ? OFFICER_ROLES : [...OFFICER_ROLES, 'brother'];

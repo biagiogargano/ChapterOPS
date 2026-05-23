@@ -22,6 +22,7 @@ import {
 } from '@/lib/mockEvents';
 import { OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
+import { buildTasksFromTemplate, EVENT_TEMPLATE_OPTIONS, NO_TEMPLATE } from '@/lib/eventTemplates';
 import { addGeneratedTask } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
@@ -436,6 +437,7 @@ export default function CreateEventScreen() {
   const [recurrence,  setRecurrence ] = useState<RecurrenceType>('none');
   const [repeatUntil, setRepeatUntil] = useState('');
   const [requiresDateNames, setRequiresDateNames] = useState(existing?.requiresDateNames ?? false);
+  const [templateId,  setTemplateId ] = useState<string>(NO_TEMPLATE);
   const [errors,      setErrors     ] = useState<string[]>([]);
 
   // Reset kind when role changes to one that disallows it (create mode only —
@@ -587,6 +589,21 @@ export default function CreateEventScreen() {
       if (reviewTask) void insertTask(reviewTask);
     }
 
+    // Apply an event-task template (deterministic + idempotent). Create-only and
+    // for the PRIMARY created event only (no per-recurrence fan-out), mirroring
+    // the RSVP-review generation above. "None" generates nothing.
+    if (templateId !== NO_TEMPLATE) {
+      buildTasksFromTemplate(templateId, {
+        id:            primary.id,
+        title:         primary.title,
+        dateString:    primary.dateString,
+        createdByRole: role,
+      }).forEach(t => {
+        const added = addGeneratedTask(t);
+        if (added) void insertTask(added);
+      });
+    }
+
     router.replace(`/event/${primary.id}` as any);
   }
 
@@ -706,6 +723,27 @@ export default function CreateEventScreen() {
           </View>
         )}
 
+        {/* ── Apply task template (create only) ── */}
+        {!editing && (
+          <View style={s.field}>
+            <FieldLabel text="APPLY TEMPLATE" />
+            <View style={s.recWrap}>
+              {EVENT_TEMPLATE_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.id}
+                  style={[s.recChip, templateId === opt.id && s.recChipOn]}
+                  onPress={() => setTemplateId(opt.id)}
+                >
+                  <Text style={[s.recChipText, templateId === opt.id && s.recChipTextOn]}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {templateId !== NO_TEMPLATE && (
+              <Text style={s.templateHint}>Auto-creates a set of prep tasks for this event when you create it.</Text>
+            )}
+          </View>
+        )}
+
         {/* ── Recurrence (create only — recurring rule isn't edited) ── */}
         {!editing && (
         <View style={s.field}>
@@ -779,6 +817,7 @@ const s = StyleSheet.create({
   field:         { marginBottom: 28 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
+  templateHint:  { fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 17 },
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
 
