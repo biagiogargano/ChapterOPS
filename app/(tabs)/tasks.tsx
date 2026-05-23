@@ -11,6 +11,7 @@ import {
   getAllTasks,
   getResponsibilityGroups,
   isOverdue,
+  sortByUrgency,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
@@ -341,6 +342,73 @@ function OfficerOverview({
   );
 }
 
+// ─── Filter + sort ────────────────────────────────────────────────────────────
+
+type StatusFilter = 'all' | 'todo' | 'inreview' | 'done' | 'overdue';
+type SortBy       = 'due' | 'urgency';
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'all',      label: 'All' },
+  { id: 'todo',     label: 'To do' },
+  { id: 'inreview', label: 'In review' },
+  { id: 'done',     label: 'Done' },
+  { id: 'overdue',  label: 'Overdue' },
+];
+
+const SORTS: { id: SortBy; label: string }[] = [
+  { id: 'due',     label: 'Due date' },
+  { id: 'urgency', label: 'Urgency' },
+];
+
+/** Does a task's effective state match the chosen status filter? */
+function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
+  if (filter === 'all') return true;
+  const st      = getStoredState(t.id, t.state);
+  const overdue = isOverdue(t.dueAt, st) || st === 'escalated';
+  switch (filter) {
+    case 'overdue':  return overdue;
+    case 'done':     return st === 'approved';
+    case 'inreview': return st === 'submitted';
+    case 'todo':     return !overdue && (st === 'assigned' || st === 'rejected');
+  }
+}
+
+/** Apply the active filter + sort to a bucket's tasks (pure). */
+function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy): MockTask[] {
+  const filtered = tasks.filter(t => matchesStatus(t, filter));
+  if (sortBy === 'urgency') return sortByUrgency(filtered);
+  return [...filtered].sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'));
+}
+
+function FilterSortBar({
+  status, sortBy, onStatus, onSort,
+}: {
+  status:   StatusFilter;
+  sortBy:   SortBy;
+  onStatus: (s: StatusFilter) => void;
+  onSort:   (s: SortBy) => void;
+}) {
+  return (
+    <View style={s.controls}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+        {STATUS_FILTERS.map(f => (
+          <Pressable key={f.id} style={[s.filterChip, status === f.id && s.filterChipOn]} onPress={() => onStatus(f.id)}>
+            <Text style={[s.filterChipText, status === f.id && s.filterChipTextOn]}>{f.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <View style={s.sortRow}>
+        <Text style={s.sortLabel}>Sort:</Text>
+        {SORTS.map(o => (
+          <Pressable key={o.id} style={[s.sortChip, sortBy === o.id && s.sortChipOn]} onPress={() => onSort(o.id)}>
+            <Text style={[s.sortChipText, sortBy === o.id && s.sortChipTextOn]}>{o.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
@@ -378,6 +446,17 @@ export default function TasksScreen() {
   );
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
+
+  // Filter + sort (session-only). Applied within each existing bucket so the
+  // responsibility grouping is preserved.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortBy, setSortBy] = useState<SortBy>('due');
+
+  const viewAlert    = applyView(alert,    statusFilter, sortBy);
+  const viewMine     = applyView(mine,     statusFilter, sortBy);
+  const viewReview   = applyView(review,   statusFilter, sortBy);
+  const viewReviewed = applyView(reviewed, statusFilter, sortBy);
+  const hasAnyView   = viewAlert.length + viewMine.length + viewReview.length + viewReviewed.length > 0;
 
   // Officer overview metrics — CHAPTER-WIDE (not visibility-scoped) so every
   // officer sees the same glance. Read-only aggregation of existing stores.
@@ -443,39 +522,49 @@ export default function TasksScreen() {
       {/* Summary bar — only shown when there are personal tasks */}
       {mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
 
+      {/* Filter + sort controls — only when there are tasks to act on */}
+      {hasAny && (
+        <FilterSortBar status={statusFilter} sortBy={sortBy} onStatus={setStatusFilter} onSort={setSortBy} />
+      )}
+
       {!hasAny ? (
         <View style={s.emptyFull}>
           <Text style={s.emptyIcon}>✓</Text>
           <Text style={s.emptyTitle}>All clear</Text>
           <Text style={s.emptyText}>No tasks assigned to {roleLabel}</Text>
         </View>
+      ) : !hasAnyView ? (
+        <View style={s.emptyFull}>
+          <Text style={s.emptyTitle}>No matches</Text>
+          <Text style={s.emptyText}>No tasks match this filter.</Text>
+        </View>
       ) : (
         <>
           {/* Chapter Alerts — overdue/escalated tasks not mine */}
-          {alert.length > 0 && (
+          {viewAlert.length > 0 && (
             <View style={s.section}>
-              <SectionHeader label="CHAPTER ALERTS" count={alert.length} urgent />
-              {alert.map(t => (
+              <SectionHeader label="CHAPTER ALERTS" count={viewAlert.length} urgent />
+              {viewAlert.map(t => (
                 <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
               ))}
             </View>
           )}
 
           {/* My Tasks — personal responsibility */}
-          {mine.length > 0 && (
+          {viewMine.length > 0 && (
             <View style={s.section}>
-              <SectionHeader label="MY TASKS" count={mine.length} />
-              {mine.map(t => (
+              <SectionHeader label="MY TASKS" count={viewMine.length} />
+              {viewMine.map(t => (
                 <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
               ))}
             </View>
           )}
 
           {/* Needs My Review — submitted, awaiting my approval */}
-          {review.length > 0 && (
+          {viewReview.length > 0 && (
             <View style={s.section}>
-              <SectionHeader label="NEEDS MY REVIEW" count={review.length} />
-              {review.map(t => (
+              <SectionHeader label="NEEDS MY REVIEW" count={viewReview.length} />
+              {viewReview.map(t => (
                 <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
               ))}
             </View>
@@ -483,10 +572,10 @@ export default function TasksScreen() {
 
           {/* Recently Reviewed — tasks I already approved/rejected (kept visible
               so reviewed/rejected items don't vanish after reload) */}
-          {reviewed.length > 0 && (
+          {viewReviewed.length > 0 && (
             <View style={s.section}>
-              <SectionHeader label="RECENTLY REVIEWED" count={reviewed.length} />
-              {reviewed.map(t => (
+              <SectionHeader label="RECENTLY REVIEWED" count={viewReviewed.length} />
+              {viewReviewed.map(t => (
                 <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
               ))}
             </View>
@@ -508,6 +597,20 @@ const s = StyleSheet.create({
   // Header create button
   createHdrBtn:  { paddingHorizontal: 12, paddingVertical: 4 },
   createHdrText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
+
+  // Filter + sort controls
+  controls:        { marginBottom: 16, gap: 10 },
+  filterRow:       { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
+  filterChip:      { backgroundColor: '#1e293b', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
+  filterChipOn:    { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  filterChipText:  { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
+  filterChipTextOn:{ color: '#a5b4fc' },
+  sortRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  sortLabel:       { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  sortChip:        { backgroundColor: '#1e293b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#334155' },
+  sortChipOn:      { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  sortChipText:    { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
+  sortChipTextOn:  { color: '#a5b4fc' },
 
   // Officer overview
   overview:      { marginBottom: 16 },
