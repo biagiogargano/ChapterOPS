@@ -20,11 +20,11 @@ import {
   type EventKind,
   type MockEvent,
 } from '@/lib/mockEvents';
-import { OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
+import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
 import { NO_TEMPLATE } from '@/lib/eventTemplates';
-import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
-import { addGeneratedTask } from '@/lib/mockTasks';
+import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -124,6 +124,13 @@ const AUDIENCE_OPTIONS: { value: EventAudience; label: string; sub: string }[] =
 ];
 
 const RECURRENCE_OPTS: RecurrenceType[] = ['none', 'daily', 'weekly', 'biweekly', 'monthly'];
+
+// Human label for a template task's due offset (negative = before the event).
+function dueOffsetLabel(n: number): string {
+  if (n === 0) return 'On event day';
+  const d = Math.abs(n);
+  return `${d} day${d === 1 ? '' : 's'} ${n < 0 ? 'before' : 'after'}`;
+}
 
 // ─── FieldLabel ───────────────────────────────────────────────────────────────
 
@@ -444,6 +451,11 @@ export default function CreateEventScreen() {
   // Merged built-in + custom templates for the picker (reactive to edits).
   useCustomTemplatesVersion();
   const templateOptions = mergedTemplateOptions();
+  // Specs of the selected template, for the preview (read-only; same data the
+  // generator uses, so the preview can't drift from what gets created).
+  const previewSpecs = templateId !== NO_TEMPLATE
+    ? (getTemplateById(templateId)?.taskSpecs ?? [])
+    : [];
 
   // Reset kind when role changes to one that disallows it (create mode only —
   // never mutate the kind of an event being edited).
@@ -752,6 +764,30 @@ export default function CreateEventScreen() {
           </View>
         )}
 
+        {/* ── Template preview: tasks that will be generated (create only) ── */}
+        {!editing && previewSpecs.length > 0 && (
+          <View style={s.field}>
+            <FieldLabel text="TASKS THIS TEMPLATE CREATES" />
+            <View style={s.previewBlock}>
+              {previewSpecs.map((spec, idx) => (
+                <View key={idx} style={[s.previewRow, idx > 0 && s.previewRowBorder]}>
+                  <Text style={s.previewTitle} numberOfLines={2}>
+                    {spec.title.replace(/\{event\}/g, title.trim() || 'this event')}
+                  </Text>
+                  <Text style={s.previewMeta}>
+                    {ROLE_LABELS[spec.assignedRole]} · {dueOffsetLabel(spec.dueOffsetDays)}
+                    {spec.requiresApproval ? `  ·  Approval: ${ROLE_LABELS[spec.reviewerRole ?? 'pro_consul']}` : ''}
+                    {spec.requiresProof ? `  ·  Proof: ${PROOF_LABEL[spec.proofType ?? 'text']}` : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <Text style={s.previewFootnote}>
+              {previewSpecs.length} task{previewSpecs.length === 1 ? '' : 's'} will be created when you create this event.
+            </Text>
+          </View>
+        )}
+
         {/* ── Recurrence (create only — recurring rule isn't edited) ── */}
         {!editing && (
         <View style={s.field}>
@@ -827,6 +863,14 @@ const s = StyleSheet.create({
   fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   templateHint:  { fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 17 },
   manageTemplatesLink: { fontSize: 13, fontWeight: '600', color: '#818cf8', marginTop: 10 },
+
+  // Template preview
+  previewBlock:     { backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
+  previewRow:       { paddingHorizontal: 14, paddingVertical: 11, gap: 3 },
+  previewRowBorder: { borderTopWidth: 1, borderTopColor: '#0f172a' },
+  previewTitle:     { fontSize: 14, fontWeight: '600', color: '#f1f5f9', lineHeight: 19 },
+  previewMeta:      { fontSize: 12, color: '#64748b' },
+  previewFootnote:  { fontSize: 12, color: '#64748b', marginTop: 8 },
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
 
