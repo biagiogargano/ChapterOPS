@@ -80,6 +80,15 @@ export default function TemplateEditScreen() {
   function addSpec() {
     setSpecs(prev => [...prev, blankSpec()]);
   }
+  function moveSpec(i: number, dir: -1 | 1) {
+    setSpecs(prev => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
 
   const validSpecs = specs.filter(s => s.title.trim().length > 0);
   const canSave    = name.trim().length > 0 && validSpecs.length > 0;
@@ -124,11 +133,19 @@ export default function TemplateEditScreen() {
           <View key={spec.key} style={s.specCard}>
             <View style={s.specHeader}>
               <Text style={s.specHeaderText}>TASK {i + 1}</Text>
-              {specs.length > 1 && (
-                <Pressable onPress={() => removeSpec(i)} hitSlop={8}>
-                  <Text style={s.removeText}>Remove</Text>
+              <View style={s.specHeaderActions}>
+                <Pressable onPress={() => moveSpec(i, -1)} disabled={i === 0} hitSlop={6}>
+                  <Text style={[s.moveText, i === 0 && s.moveTextOff]}>↑</Text>
                 </Pressable>
-              )}
+                <Pressable onPress={() => moveSpec(i, 1)} disabled={i === specs.length - 1} hitSlop={6}>
+                  <Text style={[s.moveText, i === specs.length - 1 && s.moveTextOff]}>↓</Text>
+                </Pressable>
+                {specs.length > 1 && (
+                  <Pressable onPress={() => removeSpec(i)} hitSlop={6}>
+                    <Text style={s.removeText}>Remove</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
 
             <TextInput
@@ -137,6 +154,17 @@ export default function TemplateEditScreen() {
               placeholderTextColor="#475569"
               value={spec.title}
               onChangeText={v => patchSpec(i, { title: v })}
+              autoCapitalize="sentences"
+            />
+            <TextInput
+              style={[s.input, s.inputMultiline]}
+              placeholder="Description (optional)"
+              placeholderTextColor="#475569"
+              value={spec.description}
+              onChangeText={v => patchSpec(i, { description: v })}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
               autoCapitalize="sentences"
             />
 
@@ -235,10 +263,14 @@ const s = StyleSheet.create({
     backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155',
     color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12,
   },
+  inputMultiline: { minHeight: 56, marginTop: 8, fontSize: 14 },
 
   specCard: { backgroundColor: '#162032', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 14, marginTop: 16 },
   specHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   specHeaderText: { fontSize: 11, fontWeight: '700', color: '#818cf8', letterSpacing: 0.6 },
+  specHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  moveText:    { fontSize: 17, fontWeight: '700', color: '#818cf8', lineHeight: 20 },
+  moveTextOff: { color: '#334155' },
   removeText: { fontSize: 12, fontWeight: '600', color: '#f87171' },
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
