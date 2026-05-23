@@ -588,6 +588,16 @@ export function addUserTask(input: CreateTaskInput): MockTask {
  * the hydrated row by id, so this is fully compatible with later insertTask +
  * hydration wiring. Reads nothing flag-specific — scoped-data behavior unchanged.
  */
+/**
+ * Clear the deleted-task tombstone for the given ids so they can be regenerated.
+ * Used by "Replace template tasks": deleting a generated task tombstones its
+ * deterministic id, which would otherwise block re-creating the same id when the
+ * SAME template is re-applied. Local session state only — no persistence/schema.
+ */
+export function clearGeneratedTombstones(ids: string[]): void {
+  for (const id of ids) _deletedTaskIds.delete(id);
+}
+
 export function addGeneratedTask(task: MockTask): MockTask | undefined {
   if (_deletedTaskIds.has(task.id)) return undefined;
   const existing =

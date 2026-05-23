@@ -23,6 +23,7 @@ import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
   addGeneratedTask,
+  clearGeneratedTombstones,
   deleteUserTask,
   dueLabelOf,
   filterTasksForRole,
@@ -561,18 +562,17 @@ export default function EventDetailScreen() {
       const d = getEventDate(e.dayOffset);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
-    // Generate the template's tasks for each target event; count only NEW ones
+    const inputFor = (e: typeof ev) => ({
+      id: e.id, title: e.title, dateString: dsFor(e), createdByRole: role,
+    });
+
+    // Add-style generation for a list of events; counts only NEW tasks
     // (addGeneratedTask returns the existing task when already present → idempotent).
-    const generate = (targets: (typeof ev)[]): number => {
+    const generateAdd = (targets: (typeof ev)[]): number => {
       const existingIds = new Set(getAllTasks().map(t => t.id));
       let added = 0;
       targets.forEach(e => {
-        buildTasksForTemplateId(templateId, {
-          id:            e.id,
-          title:         e.title,
-          dateString:    dsFor(e),
-          createdByRole: role,
-        }).forEach(t => {
+        buildTasksForTemplateId(templateId, inputFor(e)).forEach(t => {
           const a = addGeneratedTask(t);
           if (a && !existingIds.has(t.id)) { added++; void insertTask(a); }
         });
@@ -581,25 +581,76 @@ export default function EventDetailScreen() {
       return added;
     };
 
+    // Replace this event's existing template tasks. Tasks already submitted or
+    // approved are PROTECTED (kept); only not-yet-acted-on ones are removed.
+    const doReplace = (e: typeof ev, existingTmpl: MockTask[]) => {
+      const PROTECTED = new Set<string>(['submitted', 'approved']);
+      const removable = existingTmpl.filter(t => !PROTECTED.has(getStoredState(t.id, t.state)));
+      const kept      = existingTmpl.filter(t =>  PROTECTED.has(getStoredState(t.id, t.state)));
+      const perform = () => {
+        removable.forEach(t => { deleteUserTask(t.id); void removeTask(t.id); });
+        const newTasks = buildTasksForTemplateId(templateId, inputFor(e));
+        // Un-tombstone the ids we're about to (re)generate so a same-template replace works.
+        clearGeneratedTombstones(newTasks.map(t => t.id));
+        const existingIds = new Set(getAllTasks().map(t => t.id));
+        let added = 0;
+        newTasks.forEach(t => { const a = addGeneratedTask(t); if (a && !existingIds.has(t.id)) { added++; void insertTask(a); } });
+        _bumpFocus(n => n + 1);
+        const keptMsg = kept.length > 0 ? ` ${kept.length} in-review/done task${kept.length === 1 ? '' : 's'} kept.` : '';
+        Alert.alert('Template replaced', `Removed ${removable.length}, added ${added}.${keptMsg}`);
+      };
+      if (kept.length > 0) {
+        Alert.alert(
+          'Some tasks will be kept',
+          `${kept.length} task${kept.length === 1 ? '' : 's'} in review or done will be kept; ${removable.length} will be replaced. Continue?`,
+          [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', style: 'destructive', onPress: perform }],
+        );
+      } else {
+        perform();
+      }
+    };
+
+    // Single-event apply: prompt Add vs Replace only when it already has template tasks.
+    const applySingle = (e: typeof ev) => {
+      const existingTmpl = getAllTasks().filter(
+        t => !!t.linkedEventId && t.linkedEventId === e.id && t.id.startsWith('tmpl_'),
+      );
+      if (existingTmpl.length === 0) {
+        const n = generateAdd([e]);
+        Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
+        return;
+      }
+      Alert.alert(
+        'Event already has template tasks',
+        'Add this template on top of the existing tasks, or replace the existing template tasks?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add on top',
+            onPress: () => {
+              const n = generateAdd([e]);
+              Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'}.` : 'Those tasks are already on this event.');
+            },
+          },
+          { text: 'Replace', style: 'destructive', onPress: () => doReplace(e, existingTmpl) },
+        ],
+      );
+    };
+
     const occurrences = (ev.isRecurring && ev.seriesId)
       ? getAllEvents().filter(e => e.seriesId === ev.seriesId)
       : [];
 
-    // Recurring series → let the officer choose scope (mirrors edit/delete).
+    // Recurring series → choose scope. Entire-series stays add-only for now
+    // (single-event Add/Replace is this checkpoint's scope).
     if (occurrences.length > 1) {
       Alert.alert('Apply template', `"${ev.title}" is part of a recurring series.`, [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'This Event Only',
-          onPress: () => {
-            const n = generate([ev]);
-            Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
-          },
-        },
+        { text: 'This Event Only', onPress: () => applySingle(ev) },
         {
           text: 'Entire Series',
           onPress: () => {
-            const n = generate(occurrences);
+            const n = generateAdd(occurrences);
             Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} across ${occurrences.length} events.` : 'Those tasks are already on the series.');
           },
         },
@@ -607,8 +658,7 @@ export default function EventDetailScreen() {
       return;
     }
 
-    const n = generate([ev]);
-    Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
+    applySingle(ev);
   }
 
   useEffect(() => {
