@@ -299,6 +299,14 @@ export default function CreateTaskScreen() {
 
   const events = useMemo(() => getAllEvents(), []);
 
+  // Launched from Event Detail ("+ Add Task") → the linked event is fixed to that
+  // event; show a read-only summary instead of the full picker. Editing an
+  // existing task (taskId) keeps the normal picker. Standalone create unchanged.
+  const lockedToEvent    = !editing && !!params.eventId;
+  const lockedEventTitle = lockedToEvent
+    ? (events.find(e => e.id === params.eventId)?.title ?? 'this event')
+    : '';
+
   // Reviewer options = leadership roles, excluding the assignee (a task can't
   // review itself). Recompute + reset when assignee changes (skip while locked).
   const reviewerOptions = useMemo<Role[]>(
@@ -406,9 +414,15 @@ export default function CreateTaskScreen() {
     } else {
       const task = addUserTask(input);
       void insertTask(task);
-      // Launched from an event ("+ Add Task") → return to that Event Detail so the
-      // new task shows under Related Tasks. Standalone create → Task Detail.
-      router.replace((params.eventId ? `/event/${params.eventId}` : `/task/${task.id}`) as any);
+      if (params.eventId) {
+        // Launched from Event Detail ("+ Add Task"): return to the existing Event
+        // Detail underneath rather than pushing a duplicate. Its focus effect
+        // re-reads related tasks, so the new task appears there.
+        router.back();
+      } else {
+        // Standalone create → open the new task's detail (unchanged).
+        router.replace(`/task/${task.id}` as any);
+      }
     }
   }
 
@@ -464,28 +478,35 @@ export default function CreateTaskScreen() {
           </View>
         </View>
 
-        {/* Linked event (optional) */}
+        {/* Linked event — locked summary when launched from an event, else picker */}
         <View style={s.field}>
           <FieldLabel text="LINK TO EVENT" />
-          <View style={s.eventList}>
-            <Pressable
-              style={[s.eventRow, !linkedEventId && s.eventRowOn]}
-              onPress={() => setLinkedEventId(undefined)}
-            >
-              <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
-            </Pressable>
-            {events.map(e => {
-              const on   = linkedEventId === e.id;
-              const date = getEventDate(e.dayOffset);
-              const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
-              return (
-                <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => setLinkedEventId(e.id)}>
-                  <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
-                  <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {lockedToEvent ? (
+            <View style={s.lockedEventRow}>
+              <Text style={s.lockedEventLabel}>LINKED TO</Text>
+              <Text style={s.lockedEventTitle} numberOfLines={1}>{lockedEventTitle}</Text>
+            </View>
+          ) : (
+            <View style={s.eventList}>
+              <Pressable
+                style={[s.eventRow, !linkedEventId && s.eventRowOn]}
+                onPress={() => setLinkedEventId(undefined)}
+              >
+                <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
+              </Pressable>
+              {events.map(e => {
+                const on   = linkedEventId === e.id;
+                const date = getEventDate(e.dayOffset);
+                const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
+                return (
+                  <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => setLinkedEventId(e.id)}>
+                    <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
+                    <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {/* Due date */}
@@ -644,6 +665,11 @@ const s = StyleSheet.create({
   eventRowTitle:   { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
   eventRowTitleOn: { color: '#a5b4fc' },
   eventRowSub:     { fontSize: 12, color: '#64748b' },
+
+  // Locked linked-event summary (Task Create launched from an event)
+  lockedEventRow:   { backgroundColor: '#1e1b4b', borderWidth: 1, borderColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
+  lockedEventLabel: { fontSize: 10, fontWeight: '700', color: '#6366f1', letterSpacing: 0.6 },
+  lockedEventTitle: { fontSize: 14, fontWeight: '600', color: '#a5b4fc' },
 
   // Toggle
   toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },

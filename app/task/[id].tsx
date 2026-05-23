@@ -149,10 +149,12 @@ function InfoBlock({
   task,
   isAssignee,
   parentTask,
+  hideEventRow,
 }: {
-  task:        MockTask;
-  isAssignee:  boolean;
-  parentTask?: MockTask;
+  task:          MockTask;
+  isAssignee:    boolean;
+  parentTask?:   MockTask;
+  hideEventRow?: boolean;   // suppressed when the tappable "View Event" action renders
 }) {
   return (
     <View style={s.infoBlock}>
@@ -163,7 +165,7 @@ function InfoBlock({
         value={isAssignee ? 'You' : task.assignedTo}
         highlight={isAssignee}
       />
-      {task.linkedEvent && (
+      {task.linkedEvent && !hideEventRow && (
         <InfoRow icon="📌" label="Event" value={task.linkedEvent} accent />
       )}
       {task.isWorkflowParent && (
@@ -741,7 +743,7 @@ function EscalationSection({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TaskDetailScreen() {
-  const { id }     = useLocalSearchParams<{ id: string }>();
+  const { id, fromEventId } = useLocalSearchParams<{ id: string; fromEventId?: string }>();
   const navigation = useNavigation();
   const router     = useRouter();
   const { role }   = useDevRole();
@@ -909,13 +911,19 @@ export default function TaskDetailScreen() {
         )}
 
         {/* ── Info block ── */}
-        <InfoBlock task={task} isAssignee={isAssignee} parentTask={parentTask} />
+        <InfoBlock task={task} isAssignee={isAssignee} parentTask={parentTask} hideEventRow={!!linkedEv} />
 
         {/* ── View Event button — shown when task is tied to a specific event ── */}
         {linkedEv && (
           <Pressable
             style={s.viewEventBtn}
-            onPress={() => router.push(`/event/${linkedEv.id}` as any)}
+            onPress={() => {
+              // If we drilled in from this same Event Detail (Related Tasks),
+              // return to it instead of pushing a duplicate. Otherwise (entered
+              // from Today/Tasks) push normally.
+              if (fromEventId && fromEventId === linkedEv.id) router.back();
+              else router.push(`/event/${linkedEv.id}` as any);
+            }}
           >
             <View style={s.viewEventLeft}>
               <Text style={s.viewEventLabel}>LINKED EVENT</Text>

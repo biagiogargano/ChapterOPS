@@ -785,7 +785,7 @@ export default function EventDetailScreen() {
               <RelatedTaskCard
                 key={task.id}
                 task={task}
-                onPress={() => router.push(`/task/${task.id}` as any)}
+                onPress={() => router.push(`/task/${task.id}?fromEventId=${event.id}` as any)}
               />
             ))
           )}
