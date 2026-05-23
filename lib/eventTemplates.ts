@@ -116,6 +116,112 @@ export const EVENT_TEMPLATES: EventTaskTemplate[] = [
       },
     ],
   },
+  {
+    id:    'recruitment',
+    label: 'Recruitment Event',
+    taskSpecs: [
+      {
+        key:           'venue',
+        title:         'Confirm venue & logistics for {event}',
+        description:   'Lock the venue, schedule, and setup plan for {event}.',
+        assignedRole:  'recruitment_chair',
+        dueOffsetDays: -7,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+        supervisorRole: 'president',   // higher-stakes: the event itself
+      },
+      {
+        key:           'rushlist',
+        title:         'Finalize rush / invite list for {event}',
+        description:   'Build and finalize the prospective-member invite list for {event}.',
+        assignedRole:  'recruitment_chair',
+        dueOffsetDays: -5,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+      {
+        key:           'budget',
+        title:         'Budget & materials for {event}',
+        description:   'Confirm the budget and prepare materials/giveaways for {event}.',
+        assignedRole:  'recruitment_chair',
+        dueOffsetDays: -4,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+      {
+        key:           'riskplan',
+        title:         'Safety plan for {event}',
+        description:   'Submit the safety/risk plan for {event}.',
+        assignedRole:  'risk_manager',
+        dueOffsetDays: -3,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+        supervisorRole: 'president',   // higher-stakes
+      },
+      {
+        key:           'followup',
+        title:         'Follow-up & bid tracking for {event}',
+        description:   'Track interested prospects and follow-ups after {event}.',
+        assignedRole:  'recruitment_chair',
+        dueOffsetDays: 1,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+    ],
+  },
+  {
+    id:    'formal',
+    label: 'Formal',
+    taskSpecs: [
+      {
+        key:           'venue',
+        title:         'Confirm venue & transportation for {event}',
+        description:   'Lock the venue, transportation, and timeline for {event}.',
+        assignedRole:  'social_chair',
+        dueOffsetDays: -14,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+        supervisorRole: 'president',   // higher-stakes: the event itself
+      },
+      {
+        key:           'guestlist',
+        title:         'Finalize guest / date list for {event}',
+        description:   'Collect and finalize the guest/date list for {event}.',
+        assignedRole:  'risk_manager',
+        dueOffsetDays: -7,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+      {
+        key:           'riskplan',
+        title:         'Risk management plan for {event}',
+        description:   'Submit the risk-management and safety plan for {event}.',
+        assignedRole:  'risk_manager',
+        dueOffsetDays: -7,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+        supervisorRole: 'president',   // higher-stakes
+      },
+      {
+        key:           'monitors',
+        title:         'Assign sober monitors & safety brief for {event}',
+        description:   'Assign sober monitors and run the safety brief for {event}.',
+        assignedRole:  'risk_manager',
+        dueOffsetDays: -1,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+      {
+        key:           'incident',
+        title:         'Post-event incident report for {event}',
+        description:   'File the post-event incident/debrief report for {event}.',
+        assignedRole:  'risk_manager',
+        dueOffsetDays: 1,
+        requiresApproval: true,
+        reviewerRole:  'pro_consul',
+      },
+    ],
+  },
 ];
 
 /** Picker options: a "None" sentinel followed by every registered template. */
