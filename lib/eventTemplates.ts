@@ -279,14 +279,19 @@ function buildTaskFromSpec(templateId: string, event: EventTemplateInput, spec: 
   };
 }
 
+/** Build all tasks for a concrete template object (built-in OR custom). Pure. */
+export function buildTasksFromTemplateObject(template: EventTaskTemplate, event: EventTemplateInput): MockTask[] {
+  return template.taskSpecs.map(spec => buildTaskFromSpec(template.id, event, spec));
+}
+
 /**
- * Build all tasks for a template applied to an event. Returns [] for the "None"
- * sentinel or an unknown template id. Pure — adds nothing to any store.
+ * Build all tasks for a BUILT-IN template id applied to an event. Returns [] for
+ * the "None" sentinel or an unknown id. Pure. (Custom templates resolve through
+ * customTemplatesStore.buildTasksForTemplateId.)
  */
 export function buildTasksFromTemplate(templateId: string, event: EventTemplateInput): MockTask[] {
   const template = getEventTemplate(templateId);
-  if (!template) return [];
-  return template.taskSpecs.map(spec => buildTaskFromSpec(templateId, event, spec));
+  return template ? buildTasksFromTemplateObject(template, event) : [];
 }
 
 /**

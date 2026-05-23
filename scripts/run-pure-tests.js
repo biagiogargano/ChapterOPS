@@ -23,8 +23,9 @@ const toPosix  = p => p.split(path.sep).join('/');
 
 // The suites that must run (matches the lib/*.test.ts set we maintain).
 const EXPECTED = [
-  'claimStatus', 'eventOps', 'eventTemplates', 'generatedTasks', 'identityResolution',
-  'initRoute', 'mockTasks', 'orgPreference', 'orgScope', 'positions', 'routeTarget',
+  'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTemplates', 'generatedTasks',
+  'identityResolution', 'initRoute', 'mockTasks', 'orgPreference', 'orgScope', 'positions',
+  'routeTarget',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────
@@ -73,7 +74,8 @@ const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === '@react-native-async-storage/async-storage') {
     const store = {};
-    return { default: {
+    // __esModule so TS's esModuleInterop __importDefault doesn't double-wrap it.
+    return { __esModule: true, default: {
       getItem:    async k => (k in store ? store[k] : null),
       setItem:    async (k, v) => { store[k] = String(v); },
       removeItem: async k => { delete store[k]; },
@@ -81,6 +83,12 @@ Module._load = function (request, parent, isMain) {
   }
   if (request.startsWith('@/lib/')) return origLoad(path.join(outLib, request.slice('@/lib/'.length)), parent, isMain);
   if (request.startsWith('@/'))     return origLoad(path.join(outDir, request.slice(2)), parent, isMain);
+  // Resolve real node_modules (e.g. react, imported by store version-hooks) from
+  // the project root — the temp compile dir has no node_modules of its own.
+  if (request === 'react' || request.startsWith('react/')) {
+    try { return origLoad(require.resolve(request, { paths: [projRoot] }), parent, isMain); }
+    catch { /* fall through */ }
+  }
   return origLoad(request, parent, isMain);
 };
 
