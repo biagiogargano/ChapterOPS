@@ -27,7 +27,10 @@ import {
   filterTasksForRole,
   isOverdue,
   type MockTask,
+  type TaskState,
 } from '@/lib/mockTasks';
+import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
 import { removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
@@ -261,9 +264,23 @@ function RsvpSection({
   );
 }
 
+// Collapse the effective task state into a small completion/status badge.
+// Uses existing TaskState only — no new state system. approved = done.
+function taskBadgeFor(state: TaskState, overdue: boolean): { label: string; color: string; bg: string } {
+  if (state === 'approved')                          return { label: 'Done',      color: '#4ade80', bg: '#052e16' };
+  if (state === 'submitted')                         return { label: 'In review', color: '#fbbf24', bg: '#1c1407' };
+  if (overdue || state === 'overdue' || state === 'escalated')
+                                                     return { label: 'Overdue',   color: '#f87171', bg: '#1a0505' };
+  return { label: 'Open', color: '#94a3b8', bg: '#1e293b' };   // assigned / rejected
+}
+
 function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
-  const overdue     = isOverdue(task.dueAt, task.state);   // date-driven (fallback to state)
-  const statusColor = STATE_COLOR[task.state];
+  // Effective state from the interaction store (falls back to the task's own
+  // state). Parent calls useTaskStateVersion(), so this re-renders on changes.
+  const state       = getStoredState(task.id, task.state);
+  const overdue     = isOverdue(task.dueAt, state);   // date-driven (fallback to state)
+  const statusColor = STATE_COLOR[state];
+  const badge       = taskBadgeFor(state, overdue);
 
   return (
     <Pressable style={[s.taskCard, overdue && s.taskCardOverdue]} onPress={onPress}>
@@ -271,6 +288,9 @@ function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => voi
       <View style={s.taskBody}>
         <Text style={s.taskTitle} numberOfLines={1}>{task.title}</Text>
         <Text style={[s.taskDue, overdue && s.taskDueRed]}>{dueLabelOf(task)}</Text>
+      </View>
+      <View style={[s.taskBadge, { backgroundColor: badge.bg }]}>
+        <Text style={[s.taskBadgeText, { color: badge.color }]}>{badge.label}</Text>
       </View>
       <View style={[s.taskStatusDot, { backgroundColor: statusColor }]} />
       <Text style={s.taskChevron}>›</Text>
@@ -508,6 +528,15 @@ export default function EventDetailScreen() {
   // Hide RSVP tasks from the list — RSVP is already surfaced by RsvpSection above
   const relatedTasks = allRelatedTasks.filter(t => t.lightweightKind !== 'rsvp');
 
+  // Re-render when any task interaction state changes so the prep-progress strip
+  // and the per-task badges stay in sync with the Task Detail state machine.
+  useTaskStateVersion();
+  // Prep-task progress (completed = approved). RSVP summary intentionally omitted.
+  const taskOps = summarizeEventOps(
+    [],
+    relatedTasks.map(t => ({ state: getStoredState(t.id, t.state) })),
+  ).tasks;
+
   useEffect(() => {
     if (!event) return;
     const canEdit = canManageEvent(event, role);
@@ -687,6 +716,15 @@ export default function EventDetailScreen() {
         <DetailRow icon="📍" label="Location" value={event.location} />
         <DetailRow icon="👥" label="Who"      value={AUDIENCE_LABEL[event.audience]} />
       </View>
+
+      {/* ── Status strip (prep-task progress only; hidden when no tasks) ── */}
+      {taskOps.total > 0 && (
+        <View style={s.statusStrip}>
+          <Text style={s.statusStripText}>
+            Prep tasks: {taskOps.completed}/{taskOps.total} complete
+          </Text>
+        </View>
+      )}
 
       {/* ── About ── */}
       <SectionLabel text="ABOUT" />
@@ -875,6 +913,22 @@ const s = StyleSheet.create({
     color: '#f1f5f9',
   },
 
+  // Status strip (prep-task progress)
+  statusStrip: {
+    backgroundColor: '#172554',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: -12,
+    marginBottom: 28,
+  },
+  statusStripText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#bfdbfe',
+    letterSpacing: 0.2,
+  },
+
   // Section label
   sectionLabel: {
     fontSize: 11,
@@ -1053,6 +1107,17 @@ const s = StyleSheet.create({
   },
   taskDueRed: {
     color: '#f87171',
+  },
+  taskBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  taskBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   taskStatusDot: {
     width: 7,
