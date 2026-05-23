@@ -748,7 +748,10 @@ export default function CreateEventScreen() {
           </View>
         )}
 
-        {/* ── Apply task template (create only) ── */}
+        {/* ── Apply task template + inline preview (create only) ── */}
+        {/* The preview is nested INSIDE this field (not a separate sibling section)
+            so selecting a template grows one block in place — on iOS, inserting a
+            new top-level section here reset the ScrollView to the top. */}
         {!editing && (
           <View style={s.field}>
             <FieldLabel text="APPLY TEMPLATE" />
@@ -759,33 +762,33 @@ export default function CreateEventScreen() {
             {templateId !== NO_TEMPLATE && (
               <Text style={s.templateHint}>Auto-creates a set of prep tasks for this event when you create it.</Text>
             )}
-            <Pressable onPress={() => router.push('/templates' as any)}>
-              <Text style={s.manageTemplatesLink}>Manage templates →</Text>
-            </Pressable>
-          </View>
-        )}
 
-        {/* ── Template preview: tasks that will be generated (create only) ── */}
-        {!editing && previewSpecs.length > 0 && (
-          <View style={s.field}>
-            <FieldLabel text="TASKS THIS TEMPLATE CREATES" />
-            <View style={s.previewBlock}>
-              {previewSpecs.map((spec, idx) => (
-                <View key={idx} style={[s.previewRow, idx > 0 && s.previewRowBorder]}>
-                  <Text style={s.previewTitle} numberOfLines={2}>
-                    {spec.title.replace(/\{event\}/g, title.trim() || 'this event')}
-                  </Text>
-                  <Text style={s.previewMeta}>
-                    {ROLE_LABELS[spec.assignedRole]} · {dueOffsetLabel(spec.dueOffsetDays)}
-                    {spec.requiresApproval ? `  ·  Approval: ${ROLE_LABELS[spec.reviewerRole ?? 'pro_consul']}` : ''}
-                    {spec.requiresProof ? `  ·  Proof: ${PROOF_LABEL[spec.proofType ?? 'text']}` : ''}
-                  </Text>
+            {previewSpecs.length > 0 && (
+              <View style={{ marginTop: 14 }}>
+                <Text style={s.previewSubLabel}>TASKS THIS TEMPLATE CREATES</Text>
+                <View style={s.previewBlock}>
+                  {previewSpecs.map((spec, idx) => (
+                    <View key={idx} style={[s.previewRow, idx > 0 && s.previewRowBorder]}>
+                      <Text style={s.previewTitle} numberOfLines={2}>
+                        {spec.title.replace(/\{event\}/g, title.trim() || 'this event')}
+                      </Text>
+                      <Text style={s.previewMeta}>
+                        {ROLE_LABELS[spec.assignedRole]} · {dueOffsetLabel(spec.dueOffsetDays)}
+                        {spec.requiresApproval ? `  ·  Approval: ${ROLE_LABELS[spec.reviewerRole ?? 'pro_consul']}` : ''}
+                        {spec.requiresProof ? `  ·  Proof: ${PROOF_LABEL[spec.proofType ?? 'text']}` : ''}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-            <Text style={s.previewFootnote}>
-              {previewSpecs.length} task{previewSpecs.length === 1 ? '' : 's'} will be created when you create this event.
-            </Text>
+                <Text style={s.previewFootnote}>
+                  {previewSpecs.length} task{previewSpecs.length === 1 ? '' : 's'} will be created when you create this event.
+                </Text>
+              </View>
+            )}
+
+            <Pressable onPress={() => router.push('/templates' as any)}>
+              <Text style={[s.manageTemplatesLink, { marginTop: 14 }]}>Manage templates →</Text>
+            </Pressable>
           </View>
         )}
 
@@ -880,6 +883,7 @@ const s = StyleSheet.create({
   templateSelectChevron: { fontSize: 13, color: '#64748b', marginLeft: 8 },
 
   // Template preview
+  previewSubLabel:  { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 10 },
   previewBlock:     { backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
   previewRow:       { paddingHorizontal: 14, paddingVertical: 11, gap: 3 },
   previewRowBorder: { borderTopWidth: 1, borderTopColor: '#0f172a' },
