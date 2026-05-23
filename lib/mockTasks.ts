@@ -736,7 +736,7 @@ export function isPersistedTask(id: string): boolean {
 }
 
 /** All tasks: seed/persisted data + user-created + any auto-generated tasks. */
-function getAllTasks(): MockTask[] {
+export function getAllTasks(): MockTask[] {
   // Scoped mode (ORG_SCOPED_DATA on): return only persisted org tasks +
   // optimistic user-created tasks + runtime dynamic (RSVP) tasks. No MOCK_TASKS
   // seed merge/fallback, so a real org shows only its own data (empty when it

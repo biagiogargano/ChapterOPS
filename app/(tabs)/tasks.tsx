@@ -8,7 +8,7 @@ import {
   STATE_COLOR,
   STATE_STRIPE,
   dueLabelOf,
-  filterTasksForRole,
+  getAllTasks,
   getResponsibilityGroups,
   isOverdue,
   type MockTask,
@@ -317,31 +317,22 @@ function OverviewStat({ label, value, color }: { label: string; value: number; c
  * such event.
  */
 function OfficerOverview({
-  role,
-  mine,
-  review,
-  alert,
-  onPrepPress,
+  overdueCount,
+  reviewCount,
   prepCount,
+  onPrepPress,
 }: {
-  role:        string;
-  mine:        MockTask[];
-  review:      MockTask[];
-  alert:       MockTask[];
-  onPrepPress: () => void;
-  prepCount:   number;
+  overdueCount: number;
+  reviewCount:  number;
+  prepCount:    number;
+  onPrepPress:  () => void;
 }) {
-  const overdueCount = [...mine, ...alert, ...review].filter(t => {
-    const st = getStoredState(t.id, t.state);
-    return isOverdue(t.dueAt, st) || st === 'escalated';
-  }).length;
-
   return (
     <View style={s.overview}>
       <Text style={s.overviewTitle}>CHAPTER OVERVIEW</Text>
       <View style={s.overviewRow}>
-        <OverviewStat label="Overdue"            value={overdueCount}  color="#f87171" />
-        <OverviewStat label="Awaiting my review" value={review.length} color="#fbbf24" />
+        <OverviewStat label="Overdue"            value={overdueCount} color="#f87171" />
+        <OverviewStat label="Awaiting my review" value={reviewCount}  color="#fbbf24" />
         <Pressable style={{ flex: 1 }} onPress={prepCount > 0 ? onPrepPress : undefined}>
           <OverviewStat label="Events need prep" value={prepCount} color="#818cf8" />
         </Pressable>
@@ -388,16 +379,18 @@ export default function TasksScreen() {
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
-  // Officer overview: upcoming events (today onward this week) that have linked
-  // prep tasks not all approved yet. Read-only aggregation; soonest first.
-  const todayOffset = (new Date().getDay() + 6) % 7;
+  // Officer overview metrics — CHAPTER-WIDE (not visibility-scoped) so every
+  // officer sees the same glance. Read-only aggregation of existing stores.
+  const allTasks = officer ? getAllTasks().filter(t => !t.isWorkflowParent) : [];
+  const overdueCount = allTasks.filter(t => {
+    const st = getStoredState(t.id, t.state);
+    return isOverdue(t.dueAt, st) || st === 'escalated';
+  }).length;
+  // Events that have linked prep tasks not all approved yet (soonest first).
   const eventsNeedingPrep = officer
     ? getAllEvents()
         .filter(ev => {
-          if (ev.dayOffset < todayOffset) return false;
-          const related = filterTasksForRole(role).filter(
-            t => !t.isWorkflowParent && t.linkedEventId === ev.id && t.lightweightKind !== 'rsvp',
-          );
+          const related = allTasks.filter(t => t.linkedEventId === ev.id && t.lightweightKind !== 'rsvp');
           if (related.length === 0) return false;
           const done = related.filter(t => getStoredState(t.id, t.state) === 'approved').length;
           return done < related.length;
@@ -440,10 +433,8 @@ export default function TasksScreen() {
       {/* Officer overview — read-only chapter glance (officer roles only) */}
       {officer && (
         <OfficerOverview
-          role={role}
-          mine={mine}
-          review={review}
-          alert={alert}
+          overdueCount={overdueCount}
+          reviewCount={review.length}
           prepCount={eventsNeedingPrep.length}
           onPrepPress={() => router.push(`/event/${eventsNeedingPrep[0].id}` as any)}
         />
