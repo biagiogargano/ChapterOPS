@@ -8,6 +8,7 @@ import {
   STATE_COLOR,
   STATE_STRIPE,
   dueLabelOf,
+  filterTasksForRole,
   getResponsibilityGroups,
   isOverdue,
   type MockTask,
@@ -296,6 +297,59 @@ function SectionHeader({
   );
 }
 
+// ─── Officer overview (read-only chapter glance) ──────────────────────────────
+
+function OverviewStat({ label, value, color }: { label: string; value: number; color: string }) {
+  const dim = value === 0;
+  return (
+    <View style={s.statTile}>
+      <Text style={[s.statValue, { color: dim ? '#475569' : color }]}>{value}</Text>
+      <Text style={s.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/**
+ * Read-only officer glance: overdue (within this officer's visibility), tasks
+ * awaiting my review, and upcoming events with incomplete prep. Pure aggregation
+ * of existing stores — no new data. The first two summarize sections already on
+ * this tab; "events need prep" is off-tab, so its tile deep-links to the soonest
+ * such event.
+ */
+function OfficerOverview({
+  role,
+  mine,
+  review,
+  alert,
+  onPrepPress,
+  prepCount,
+}: {
+  role:        string;
+  mine:        MockTask[];
+  review:      MockTask[];
+  alert:       MockTask[];
+  onPrepPress: () => void;
+  prepCount:   number;
+}) {
+  const overdueCount = [...mine, ...alert, ...review].filter(t => {
+    const st = getStoredState(t.id, t.state);
+    return isOverdue(t.dueAt, st) || st === 'escalated';
+  }).length;
+
+  return (
+    <View style={s.overview}>
+      <Text style={s.overviewTitle}>CHAPTER OVERVIEW</Text>
+      <View style={s.overviewRow}>
+        <OverviewStat label="Overdue"            value={overdueCount}  color="#f87171" />
+        <OverviewStat label="Awaiting my review" value={review.length} color="#fbbf24" />
+        <Pressable style={{ flex: 1 }} onPress={prepCount > 0 ? onPrepPress : undefined}>
+          <OverviewStat label="Events need prep" value={prepCount} color="#818cf8" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
@@ -334,6 +388,23 @@ export default function TasksScreen() {
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
+  // Officer overview: upcoming events (today onward this week) that have linked
+  // prep tasks not all approved yet. Read-only aggregation; soonest first.
+  const todayOffset = (new Date().getDay() + 6) % 7;
+  const eventsNeedingPrep = officer
+    ? getAllEvents()
+        .filter(ev => {
+          if (ev.dayOffset < todayOffset) return false;
+          const related = filterTasksForRole(role).filter(
+            t => !t.isWorkflowParent && t.linkedEventId === ev.id && t.lightweightKind !== 'rsvp',
+          );
+          if (related.length === 0) return false;
+          const done = related.filter(t => getStoredState(t.id, t.state) === 'approved').length;
+          return done < related.length;
+        })
+        .sort((a, b) => a.dayOffset - b.dayOffset)
+    : [];
+
   /**
    * Events are the action hub. Event-tied lightweight RSVP / date-name tasks
    * route to Event Detail (full context + all event actions in one place).
@@ -365,6 +436,18 @@ export default function TasksScreen() {
         <View style={s.roleDot} />
         <Text style={s.roleBarText}>Filtered for {roleLabel}</Text>
       </View>
+
+      {/* Officer overview — read-only chapter glance (officer roles only) */}
+      {officer && (
+        <OfficerOverview
+          role={role}
+          mine={mine}
+          review={review}
+          alert={alert}
+          prepCount={eventsNeedingPrep.length}
+          onPrepPress={() => router.push(`/event/${eventsNeedingPrep[0].id}` as any)}
+        />
+      )}
 
       {/* Summary bar — only shown when there are personal tasks */}
       {mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
@@ -434,6 +517,14 @@ const s = StyleSheet.create({
   // Header create button
   createHdrBtn:  { paddingHorizontal: 12, paddingVertical: 4 },
   createHdrText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
+
+  // Officer overview
+  overview:      { marginBottom: 16 },
+  overviewTitle: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 4 },
+  overviewRow:   { flexDirection: 'row', gap: 8 },
+  statTile:      { flex: 1, backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', gap: 3 },
+  statValue:     { fontSize: 22, fontWeight: '800' },
+  statLabel:     { fontSize: 10, fontWeight: '600', color: '#64748b', textAlign: 'center', letterSpacing: 0.2 },
 
   // Role bar
   roleBar: {
