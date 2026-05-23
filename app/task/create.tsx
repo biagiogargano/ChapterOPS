@@ -334,6 +334,18 @@ export default function CreateTaskScreen() {
     (!requiresProof    || !!proofType) &&
     (!requiresApproval || (!!reviewerRole && reviewerRole !== assignedRole));
 
+  // Reactive "what's missing" hint so the disabled Create button explains itself.
+  const missing: string[] = [];
+  if (!title.trim())                                                          missing.push('a title');
+  if (!dateString)                                                            missing.push('a due date');
+  if (requiresProof && !proofType)                                            missing.push('a proof type');
+  if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole))   missing.push('a reviewer');
+  const missingHint = missing.length === 0
+    ? ''
+    : `Add ${missing.length === 1
+        ? missing[0]
+        : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`} to ${editing ? 'save' : 'create'} this task.`;
+
   function handleSubmit() {
     const errs: string[] = [];
     if (!title.trim())  errs.push('Task title is required.');
@@ -394,7 +406,9 @@ export default function CreateTaskScreen() {
     } else {
       const task = addUserTask(input);
       void insertTask(task);
-      router.replace(`/task/${task.id}` as any);
+      // Launched from an event ("+ Add Task") → return to that Event Detail so the
+      // new task shows under Related Tasks. Standalone create → Task Detail.
+      router.replace((params.eventId ? `/event/${params.eventId}` : `/task/${task.id}`) as any);
     }
   }
 
@@ -568,6 +582,9 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Submit */}
+        {missingHint !== '' && (
+          <Text style={s.missingHint}>{missingHint}</Text>
+        )}
         <Pressable style={[s.createBtn, !canSubmit && s.createBtnDisabled]} onPress={handleSubmit} disabled={!canSubmit}>
           <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>
             {editing ? 'Save Changes' : 'Create Task'}
@@ -597,6 +614,7 @@ const s = StyleSheet.create({
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
+  missingHint:   { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 10 },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
 
   textInput: {
