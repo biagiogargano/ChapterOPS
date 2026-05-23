@@ -37,6 +37,7 @@ import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
 import { NO_TEMPLATE } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -49,7 +50,6 @@ function isUUID(s: string): boolean { return UUID_RE.test(s); }
 import {
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -954,27 +954,15 @@ export default function EventDetailScreen() {
     </ScrollView>
 
     {/* ── Apply-template picker (officer) ── */}
-    <Modal
+    <SearchablePicker
       visible={templatePickerOpen}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setTemplatePickerOpen(false)}
-    >
-      <Pressable style={s.modalBackdrop} onPress={() => setTemplatePickerOpen(false)}>
-        <Pressable style={s.modalCard} onPress={() => {}}>
-          <Text style={s.modalTitle}>Apply a template</Text>
-          <Text style={s.modalHint}>Adds the template's prep tasks to this event.</Text>
-          {templateChoices.map(opt => (
-            <Pressable key={opt.id} style={s.modalRow} onPress={() => applyTemplateToEvent(opt.id)}>
-              <Text style={s.modalRowText}>{opt.label}</Text>
-            </Pressable>
-          ))}
-          <Pressable style={s.modalCancel} onPress={() => setTemplatePickerOpen(false)}>
-            <Text style={s.modalCancelText}>Cancel</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      title="Apply a template"
+      hint="Adds the template's prep tasks to this event."
+      searchPlaceholder="Filter templates…"
+      options={templateChoices}
+      onSelect={(id) => applyTemplateToEvent(id)}
+      onClose={() => setTemplatePickerOpen(false)}
+    />
     </KeyboardAvoidingView>
   );
 }
@@ -1093,16 +1081,6 @@ const s = StyleSheet.create({
   },
 
   // Related tasks header row (+ Add Task)
-  // Apply-template picker modal
-  modalBackdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 28 },
-  modalCard:       { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#334155' },
-  modalTitle:      { fontSize: 16, fontWeight: '800', color: '#f8fafc' },
-  modalHint:       { fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 12 },
-  modalRow:        { paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', marginBottom: 8 },
-  modalRowText:    { fontSize: 15, fontWeight: '600', color: '#a5b4fc' },
-  modalCancel:     { paddingVertical: 12, alignItems: 'center', marginTop: 2 },
-  modalCancelText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
-
   relatedHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   relatedHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   prepProgressText:   { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 12 },
