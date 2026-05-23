@@ -51,41 +51,6 @@ import {
   View,
 } from 'react-native';
 
-// ─── Mock excuse data (for pre-populated review cards) ────────────────────────
-
-type ExcuseStatus = 'pending' | 'approved' | 'denied' | 'jboard';
-
-interface MockExcuse {
-  id:              string;
-  memberName:      string;
-  roleName:        string;
-  eventTitle:      string;
-  excuse:          string;
-  coveringPerson?: string;
-}
-
-const MOCK_EXCUSES: MockExcuse[] = [
-  {
-    id:          'exc1',
-    memberName:  'Alex Johnson',
-    roleName:    'Risk Manager',
-    eventTitle:  'Chapter Meeting',
-    excuse:      'Class conflict — CHEM 301 midterm',
-  },
-  {
-    id:           'exc2',
-    memberName:   'Marcus Davis',
-    roleName:     'Social Chair',
-    eventTitle:   'E-Board Meeting',
-    excuse:       'Out of town — family obligation',
-    coveringPerson: 'Tyler Reed (Recruitment Chair)',
-  },
-];
-
-const _excuseStore: Record<string, ExcuseStatus> = {};
-function getExcuseStatus(id: string): ExcuseStatus  { return _excuseStore[id] ?? 'pending'; }
-function setExcuseStatus(id: string, s: ExcuseStatus) { _excuseStore[id] = s; }
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getRoleGroup(role: Role) {
@@ -537,69 +502,6 @@ function AlertCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
   );
 }
 
-// ─── Excuse review card ────────────────────────────────────────────────────────
-
-function ExcuseReviewCard({ excuse }: { excuse: MockExcuse }) {
-  const [status, setStatus] = useState<ExcuseStatus>(getExcuseStatus(excuse.id));
-
-  function act(s: ExcuseStatus) {
-    setExcuseStatus(excuse.id, s);
-    setStatus(s);
-  }
-
-  const statusConfig = {
-    approved: { label: 'Approved',           color: '#4ade80', bg: '#052e16' },
-    denied:   { label: 'Denied',             color: '#f87171', bg: '#1a0505' },
-    jboard:   { label: 'Flagged — J-Board',  color: '#fb923c', bg: '#1a0800' },
-    pending:  { label: '',                   color: '',        bg: ''        },
-  };
-
-  if (status !== 'pending') {
-    const cfg = statusConfig[status];
-    return (
-      <View style={[s.excuseCard, { backgroundColor: cfg.bg, borderColor: cfg.color + '55' }]}>
-        <View style={s.excuseHeader}>
-          <Text style={s.excuseMember}>{excuse.memberName}</Text>
-          <View style={[s.excuseStatusBadge, { backgroundColor: cfg.bg }]}>
-            <Text style={[s.excuseStatusText, { color: cfg.color }]}>{cfg.label}</Text>
-          </View>
-        </View>
-        <Text style={s.excuseEvent}>{excuse.eventTitle}</Text>
-        {status === 'jboard' && (
-          <Text style={s.jboardNote}>Flagged for Standards Committee review at next meeting.</Text>
-        )}
-      </View>
-    );
-  }
-
-  return (
-    <View style={s.excuseCard}>
-      <View style={s.excuseHeader}>
-        <View>
-          <Text style={s.excuseMember}>{excuse.memberName}</Text>
-          <Text style={s.excuseRole}>{excuse.roleName}</Text>
-        </View>
-        <Text style={s.excuseEventBadge}>{excuse.eventTitle}</Text>
-      </View>
-      <Text style={s.excuseText}>"{excuse.excuse}"</Text>
-      {excuse.coveringPerson && (
-        <Text style={s.excuseCovering}>Covering: {excuse.coveringPerson}</Text>
-      )}
-      <View style={s.excuseActions}>
-        <Pressable style={s.excuseApprove}  onPress={() => act('approved')}>
-          <Text style={s.excuseApproveText}>Approve</Text>
-        </Pressable>
-        <Pressable style={s.excuseDeny}     onPress={() => act('denied')}>
-          <Text style={s.excuseDenyText}>Deny</Text>
-        </Pressable>
-        <Pressable style={s.excuseJboard}   onPress={() => act('jboard')}>
-          <Text style={s.excuseJboardText}>J-Board</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 // ─── Event card — taps navigate to event detail ──────────────────────────────
 
 function EventCard({
@@ -707,8 +609,6 @@ export default function TodayScreen() {
   // stored urgency when a task has no dueAt).
   const urgentMine = mine.filter(t => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; });
   const weekMine   = mine.filter(t => urgencyOf(t) === 'week');
-
-  const pendingExcuses = MOCK_EXCUSES.filter(e => getExcuseStatus(e.id) === 'pending');
 
   // ── Live event lists — refresh whenever screen gains focus ──────────────────
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
@@ -838,14 +738,6 @@ export default function TodayScreen() {
                 {urgentMine.map(renderMineTask)}
               </View>
             )}
-            {weekMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="COMING UP" count={weekMine.length} />
-                {weekMine.map(t => (
-                  <TodayTaskCard key={t.id} task={t} showAssignee={false} onPress={() => navTask(t)} />
-                ))}
-              </View>
-            )}
             {!hasUrgentContent && weekMine.length === 0 && <AllClearRow />}
           </>
         )}
@@ -857,12 +749,6 @@ export default function TodayScreen() {
               <View style={s.section}>
                 <SLabel text="MY TASKS" count={urgentMine.length} />
                 {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {pendingExcuses.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="EXCUSES TO REVIEW" count={pendingExcuses.length} />
-                {MOCK_EXCUSES.map(e => <ExcuseReviewCard key={e.id} excuse={e} />)}
               </View>
             )}
             {alert.length > 0 && (
@@ -896,12 +782,6 @@ export default function TodayScreen() {
                 {review.map(t => (
                   <TodayTaskCard key={t.id} task={t} showAssignee onPress={() => navTask(t)} />
                 ))}
-              </View>
-            )}
-            {pendingExcuses.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="EXCUSES TO REVIEW" count={pendingExcuses.length} />
-                {MOCK_EXCUSES.map(e => <ExcuseReviewCard key={e.id} excuse={e} />)}
               </View>
             )}
             {!hasUrgentContent && <AllClearRow />}
@@ -974,13 +854,11 @@ export default function TodayScreen() {
           <View style={s.section}>
             <SLabel text="COMING UP" />
             <View style={s.upcomingBlock}>
-              {(roleGroup === 'brother' || roleGroup === 'annotator' || roleGroup === 'leadership') &&
-                weekMine.map(t => (
-                  <Pressable key={t.id} onPress={() => navTask(t)}>
-                    <UpcomingRow label={t.title} meta={t.dueLabel} />
-                  </Pressable>
-                ))
-              }
+              {weekMine.map(t => (
+                <Pressable key={t.id} onPress={() => navTask(t)}>
+                  <UpcomingRow label={t.title} meta={t.dueLabel} />
+                </Pressable>
+              ))}
               {comingUpEvs.map(ev => (
                 <Pressable key={ev.id} onPress={() => router.push(`/event/${ev.id}` as any)}>
                   <UpcomingRow
@@ -1109,26 +987,6 @@ const s = StyleSheet.create({
   alertTitle:   { fontSize: 14, fontWeight: '700', color: '#fca5a5', flexShrink: 1 },
   alertMeta:    { fontSize: 12, color: '#f87171', opacity: 0.7 },
   alertChevron: { fontSize: 20, color: '#7f1d1d' },
-
-  // ── Excuse review ─────────────────────────────────────────────────────────
-  excuseCard:       { backgroundColor: '#1e293b', borderRadius: 14, borderWidth: 1, borderColor: '#334155', padding: 14, gap: 8, marginBottom: 10 },
-  excuseHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  excuseMember:     { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  excuseRole:       { fontSize: 12, color: '#64748b', marginTop: 1 },
-  excuseEventBadge: { fontSize: 11, fontWeight: '600', color: '#818cf8', backgroundColor: '#1e1b4b', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3 },
-  excuseEvent:      { fontSize: 12, color: '#64748b' },
-  excuseText:       { fontSize: 14, color: '#cbd5e1', lineHeight: 20, fontStyle: 'italic' },
-  excuseCovering:   { fontSize: 12, color: '#4ade80', fontWeight: '500' },
-  excuseActions:    { flexDirection: 'row', gap: 8, paddingTop: 4 },
-  excuseApprove:    { flex: 1, backgroundColor: '#052e16', borderRadius: 8, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#166534' },
-  excuseApproveText:{ fontSize: 13, fontWeight: '700', color: '#4ade80' },
-  excuseDeny:       { flex: 1, backgroundColor: '#1a0505', borderRadius: 8, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#7f1d1d' },
-  excuseDenyText:   { fontSize: 13, fontWeight: '700', color: '#f87171' },
-  excuseJboard:     { flex: 1, backgroundColor: '#1a0800', borderRadius: 8, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#9a3412' },
-  excuseJboardText: { fontSize: 13, fontWeight: '700', color: '#fb923c' },
-  excuseStatusBadge:{ borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  excuseStatusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
-  jboardNote:       { fontSize: 12, color: '#fb923c', fontStyle: 'italic', lineHeight: 17 },
 
   // ── Reminders: needs-attention caption (informational, not a button) ────────
   needsAttn:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 16, paddingHorizontal: 2 },
