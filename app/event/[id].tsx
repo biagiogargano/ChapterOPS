@@ -25,6 +25,7 @@ import {
   deleteUserTask,
   dueLabelOf,
   filterTasksForRole,
+  getAllTasks,
   isOverdue,
   type MockTask,
   type TaskState,
@@ -32,7 +33,6 @@ import {
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
-import { allTemplateTaskIdsForEvent } from '@/lib/eventTemplates';
 import { removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -617,7 +617,13 @@ export default function EventDetailScreen() {
     // non-primary recurrence instance, or no template applied). Local optimistic
     // delete + fire-and-forget persisted delete (no-op when unconfigured).
     function cascadeReviewTask() {
-      const ids = [rsvpReviewTaskId(ev.id), ...allTemplateTaskIdsForEvent(ev.id)];
+      // The RSVP-review task (deterministic id) + every generated template task
+      // linked to this event (scan by the 'tmpl_' prefix so custom-template tasks
+      // are caught too, without needing to know which template was applied).
+      const templateIds = getAllTasks()
+        .filter(t => t.linkedEventId === ev.id && t.id.startsWith('tmpl_'))
+        .map(t => t.id);
+      const ids = [rsvpReviewTaskId(ev.id), ...templateIds];
       for (const id of ids) {
         deleteUserTask(id);
         void removeTask(id);

@@ -31,6 +31,7 @@ import { setSupabaseEventCache } from '@/lib/eventStore';
 import { setSupabaseTaskCache } from '@/lib/mockTasks';
 import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
 import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
+import { hydrateCustomTemplates } from '@/lib/customTemplatesStore';
 import { seedTaskStates } from '@/lib/devTaskStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useIdentity } from '@/lib/identityStore';
@@ -45,6 +46,10 @@ export default function DataBootstrap({ children }: { children: ReactNode }) {
   const reqIdRef = useRef(0);
   // Tracks the org the caches currently hold. undefined = first mount (no reset).
   const prevOrgIdRef = useRef<string | undefined>(undefined);
+
+  // Custom event templates are LOCAL (per device), not org-scoped — hydrate once
+  // at startup so user-built templates survive reloads.
+  useEffect(() => { void hydrateCustomTemplates(); }, []);
 
   // Keep the data-org holder in sync with the active org so write paths target
   // the same org reads use. useLayoutEffect (not useEffect) so the holder is set

@@ -2,7 +2,7 @@ import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, type Role } from '@/lib/roles';
+import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -143,6 +143,17 @@ export default function MeScreen() {
             ))}
           </View>
         </View>
+      )}
+
+      {/* ── Manage templates (officers) ── */}
+      {isOfficer(role) && (
+        <Pressable style={s.linkCard} onPress={() => router.push('/templates' as any)}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.linkTitle}>Manage event templates</Text>
+            <Text style={s.linkSub}>Build and edit the task workflows applied to events</Text>
+          </View>
+          <Text style={s.linkChevron}>›</Text>
+        </Pressable>
       )}
 
       {/* ── Sign out ── */}
@@ -295,6 +306,12 @@ const s = StyleSheet.create({
     color: '#f1f5f9',
     fontWeight: '600',
   },
+
+  // Manage-templates link card
+  linkCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, gap: 12 },
+  linkTitle:   { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  linkSub:     { fontSize: 12, color: '#64748b', marginTop: 2 },
+  linkChevron: { fontSize: 22, color: '#475569' },
 
   // Sign out
   signOutButton: {

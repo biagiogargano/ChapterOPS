@@ -22,7 +22,8 @@ import {
 } from '@/lib/mockEvents';
 import { OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
-import { buildTasksFromTemplate, EVENT_TEMPLATE_OPTIONS, NO_TEMPLATE } from '@/lib/eventTemplates';
+import { NO_TEMPLATE } from '@/lib/eventTemplates';
+import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
 import { addGeneratedTask } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
@@ -440,6 +441,10 @@ export default function CreateEventScreen() {
   const [templateId,  setTemplateId ] = useState<string>(NO_TEMPLATE);
   const [errors,      setErrors     ] = useState<string[]>([]);
 
+  // Merged built-in + custom templates for the picker (reactive to edits).
+  useCustomTemplatesVersion();
+  const templateOptions = mergedTemplateOptions();
+
   // Reset kind when role changes to one that disallows it (create mode only —
   // never mutate the kind of an event being edited).
   useEffect(() => {
@@ -593,7 +598,7 @@ export default function CreateEventScreen() {
     // for the PRIMARY created event only (no per-recurrence fan-out), mirroring
     // the RSVP-review generation above. "None" generates nothing.
     if (templateId !== NO_TEMPLATE) {
-      buildTasksFromTemplate(templateId, {
+      buildTasksForTemplateId(templateId, {
         id:            primary.id,
         title:         primary.title,
         dateString:    primary.dateString,
@@ -728,7 +733,7 @@ export default function CreateEventScreen() {
           <View style={s.field}>
             <FieldLabel text="APPLY TEMPLATE" />
             <View style={s.recWrap}>
-              {EVENT_TEMPLATE_OPTIONS.map(opt => (
+              {templateOptions.map(opt => (
                 <Pressable
                   key={opt.id}
                   style={[s.recChip, templateId === opt.id && s.recChipOn]}
@@ -741,6 +746,9 @@ export default function CreateEventScreen() {
             {templateId !== NO_TEMPLATE && (
               <Text style={s.templateHint}>Auto-creates a set of prep tasks for this event when you create it.</Text>
             )}
+            <Pressable onPress={() => router.push('/templates' as any)}>
+              <Text style={s.manageTemplatesLink}>Manage templates →</Text>
+            </Pressable>
           </View>
         )}
 
@@ -818,6 +826,7 @@ const s = StyleSheet.create({
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   fieldLabel:    { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   templateHint:  { fontSize: 12, color: '#64748b', marginTop: 8, lineHeight: 17 },
+  manageTemplatesLink: { fontSize: 13, fontWeight: '600', color: '#818cf8', marginTop: 10 },
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
 
