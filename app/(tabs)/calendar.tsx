@@ -1,139 +1,110 @@
 import { useDevRole } from '@/lib/devRoleStore';
+import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { fetchAllEvents } from '@/lib/eventService';
 import { getAllEvents, setSupabaseEventCache } from '@/lib/eventStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import {
   AUDIENCE_LABEL,
-  DAY_LABELS,
   KIND_BG,
   KIND_COLORS,
   KIND_LABELS,
   getEventDate,
   type MockEvent,
 } from '@/lib/mockEvents';
+import {
+  DISPLAY_STATE_LABEL,
+  STATE_BG,
+  STATE_COLOR,
+  dueLabelOf,
+  filterTasksForRole,
+  type MockTask,
+} from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-// ─── Week navigation header ────────────────────────────────────────────────────
+// ─── Date helpers ───────────────────────────────────────────────────────────
 
-function WeekNavBar({
-  weekOffset,
-  onPrev,
-  onNext,
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const WK_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+function isoOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function isoFromParts(y: number, m0: number, d: number): string {
+  return `${y}-${String(m0 + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// ─── Month grid ─────────────────────────────────────────────────────────────
+
+function MonthGrid({
+  year, month, todayIso, selectedIso, eventDays, taskDays, onSelect,
 }: {
-  weekOffset: number;
-  onPrev:     () => void;
-  onNext:     () => void;
+  year:        number;
+  month:       number;
+  todayIso:    string;
+  selectedIso: string;
+  eventDays:   Set<string>;
+  taskDays:    Set<string>;
+  onSelect:    (iso: string) => void;
 }) {
-  const startDate = getEventDate(weekOffset * 7);
-  const endDate   = getEventDate(weekOffset * 7 + 6);
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay();   // 0=Sun
+  const firstOffset  = (firstWeekday + 6) % 7;              // Monday-based
 
-  function fmt(d: Date): string {
-    return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-  }
-
-  const label =
-    weekOffset === 0  ? 'This Week'  :
-    weekOffset === 1  ? 'Next Week'  :
-    weekOffset === -1 ? 'Last Week'  :
-    `${fmt(startDate)} – ${fmt(endDate)}`;
-
-  const canGoPrev = weekOffset > -4;
-  const canGoNext = weekOffset < 52;
+  const cells: (number | null)[] = Array(firstOffset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
 
   return (
-    <View style={s.weekNav}>
-      <Pressable
-        style={[s.weekNavBtn, !canGoPrev && s.weekNavBtnDisabled]}
-        onPress={onPrev}
-        disabled={!canGoPrev}
-      >
-        <Text style={[s.weekNavArrow, !canGoPrev && s.weekNavArrowDisabled]}>‹</Text>
-      </Pressable>
-
-      <Text style={s.weekNavLabel}>{label}</Text>
-
-      <Pressable
-        style={[s.weekNavBtn, !canGoNext && s.weekNavBtnDisabled]}
-        onPress={onNext}
-        disabled={!canGoNext}
-      >
-        <Text style={[s.weekNavArrow, !canGoNext && s.weekNavArrowDisabled]}>›</Text>
-      </Pressable>
+    <View style={s.grid}>
+      <View style={s.gridRow}>
+        {WK_LABELS.map(w => <Text key={w} style={s.wkHead}>{w}</Text>)}
+      </View>
+      {rows.map((row, ri) => (
+        <View key={ri} style={s.gridRow}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={ci} style={s.cell} />;
+            const iso     = isoFromParts(year, month, day);
+            const isToday = iso === todayIso;
+            const isSel   = iso === selectedIso;
+            const hasEv   = eventDays.has(iso);
+            const hasTask = taskDays.has(iso);
+            return (
+              <Pressable
+                key={ci}
+                style={[s.cell, isSel && s.cellSel, isToday && !isSel && s.cellToday]}
+                onPress={() => onSelect(iso)}
+              >
+                <Text style={[s.cellNum, isSel && s.cellNumSel, isToday && !isSel && s.cellNumToday]}>{day}</Text>
+                <View style={s.dotRow}>
+                  {hasEv   && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : '#818cf8' }]} />}
+                  {hasTask && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : '#fbbf24' }]} />}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
 
-// ─── Week strip ───────────────────────────────────────────────────────────────
-
-function WeekStrip({
-  selected,
-  weekOffset,
-  events,
-  onSelect,
-}: {
-  selected:    number | null;   // absolute dayOffset (weekOffset*7 + 0..6), or null
-  weekOffset:  number;
-  events:      MockEvent[];
-  onSelect:    (absOffset: number | null) => void;
-}) {
-  const today       = new Date();
-  const todayOffset = (today.getDay() + 6) % 7; // 0=Mon … 6=Sun (within current week)
-
-  return (
-    <View style={s.weekStrip}>
-      {DAY_LABELS.map((label, i) => {
-        const absOffset = weekOffset * 7 + i;
-        const date      = getEventDate(absOffset);
-        const isToday   = weekOffset === 0 && i === todayOffset;
-        const isSel     = selected === absOffset;
-        const hasEvent  = events.some(e => e.dayOffset === absOffset);
-
-        return (
-          <Pressable
-            key={label}
-            style={[s.dayCell, isSel && s.dayCellSelected]}
-            onPress={() => onSelect(isSel ? null : absOffset)}
-          >
-            <Text style={[s.dayLabel, isToday && s.dayLabelToday, isSel && s.dayLabelSelected]}>
-              {label}
-            </Text>
-            <Text style={[s.dayNum, isToday && s.dayNumToday, isSel && s.dayNumSelected]}>
-              {date.getDate()}
-            </Text>
-            {hasEvent && <View style={[s.dot, isSel && s.dotSelected]} />}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Event card ───────────────────────────────────────────────────────────────
+// ─── Event card ─────────────────────────────────────────────────────────────
 
 function EventCard({ event, onPress }: { event: MockEvent; onPress: () => void }) {
-  const date    = getEventDate(event.dayOffset);
-  const dayIdx  = ((event.dayOffset % 7) + 7) % 7; // 0=Mon…6=Sun, handles negatives
-  const dayStr  = DAY_LABELS[dayIdx] ?? '?';
-  const dateStr = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}`;
-  const color   = KIND_COLORS[event.kind];
-  const bg      = KIND_BG[event.kind];
-
+  const color = KIND_COLORS[event.kind];
+  const bg    = KIND_BG[event.kind];
   return (
     <Pressable style={s.card} onPress={onPress}>
-      {/* Date column */}
-      <View style={s.dateCol}>
-        <Text style={s.dateDay}>{dayStr}</Text>
-        <Text style={s.dateNum}>{dateStr}</Text>
-      </View>
-
-      {/* Accent bar */}
       <View style={[s.accent, { backgroundColor: color }]} />
-
-      {/* Content */}
       <View style={s.cardBody}>
         <View style={s.cardTop}>
           <Text style={s.cardTitle}>{event.title}</Text>
@@ -141,15 +112,31 @@ function EventCard({ event, onPress }: { event: MockEvent; onPress: () => void }
             <Text style={[s.kindText, { color }]}>{KIND_LABELS[event.kind]}</Text>
           </View>
           {event.isRecurring && (
-            <View style={s.recurringBadge}>
-              <Text style={s.recurringText}>↻</Text>
-            </View>
+            <View style={s.recurringBadge}><Text style={s.recurringText}>↻</Text></View>
           )}
         </View>
         <Text style={s.cardMeta}>{event.time} · {event.location}</Text>
-        <View style={s.audienceBadge}>
-          <Text style={s.audienceText}>{AUDIENCE_LABEL[event.audience]}</Text>
-        </View>
+        <Text style={s.audienceText}>{AUDIENCE_LABEL[event.audience]}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Task row ───────────────────────────────────────────────────────────────
+
+function TaskRow({ task, onPress }: { task: MockTask; onPress: () => void }) {
+  const state = getStoredState(task.id, task.state);
+  return (
+    <Pressable style={s.taskRow} onPress={onPress}>
+      <View style={[s.taskStripe, { backgroundColor: STATE_COLOR[state] }]} />
+      <View style={s.taskBody}>
+        <Text style={s.taskTitle} numberOfLines={1}>{task.title}</Text>
+        <Text style={s.taskMeta}>
+          {dueLabelOf(task)}{task.linkedEvent ? `  ·  ${task.linkedEvent}` : ''}
+        </Text>
+      </View>
+      <View style={[s.taskBadge, { backgroundColor: STATE_BG[state] }]}>
+        <Text style={[s.taskBadgeText, { color: STATE_COLOR[state] }]}>{DISPLAY_STATE_LABEL[state]}</Text>
       </View>
     </Pressable>
   );
@@ -163,145 +150,139 @@ export default function CalendarScreen() {
   const { role }   = useDevRole();
   const officer    = isOfficer(role);
 
-  const [weekOffset,  setWeekOffset ] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  useTaskStateVersion();   // re-render when task state changes (badges/dots)
+
+  const today    = new Date();
+  const todayIso = isoOf(today);
+
+  const [viewYear,  setViewYear ] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [selectedIso, setSelectedIso] = useState(todayIso);
 
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
   const dataOrgId = useActiveDataOrgId();
-
-  // Seed with local mock data immediately so the list is never blank,
-  // then overwrite with Supabase data on every focus (with mock fallback).
   const [events, setEvents] = useState<MockEvent[]>(() => getAllEvents());
 
-  // On an ACTUAL active-org change (not first mount), clear this screen's local
-  // event list synchronously BEFORE paint so a kept-alive tab can't render the
-  // previous org's events for a frame. The focus effect below then refetches the
-  // new org. First-mount guard (prevOrg seeded to current) avoids clearing the
-  // initial seed. Inert flag-off: dataOrgId is constant DEMO_CHAPTER_ID, so the
-  // branch never fires. Does not fetch here — focus refresh is unchanged.
+  // Clear local events synchronously on an actual org change (kept-alive tab).
   const prevOrg = useRef(dataOrgId);
   useLayoutEffect(() => {
-    if (prevOrg.current !== dataOrgId) {
-      setEvents([]);
-      prevOrg.current = dataOrgId;
-    }
+    if (prevOrg.current !== dataOrgId) { setEvents([]); prevOrg.current = dataOrgId; }
   }, [dataOrgId]);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-
       fetchAllEvents(dataOrgId).then(remote => {
         if (cancelled) return;
-
-        // Push into the shared cache so Today / Tasks / Event Detail all use the
-        // same Supabase UUID events. setSupabaseEventCache no-ops on empty input,
-        // so getAllEvents() then returns the mock fallback automatically.
         setSupabaseEventCache(remote);
         setEvents(getAllEvents());
       });
-
       return () => { cancelled = true; };
     }, [dataOrgId]),
   );
 
-  // ── "+" button in header — officers only ────────────────────────────────────
   useEffect(() => {
     navigation.setOptions({
       headerRight: officer
         ? () => (
-            <Pressable
-              style={s.createBtn}
-              onPress={() => router.push('/event/create' as any)}
-            >
+            <Pressable style={s.createBtn} onPress={() => router.push('/event/create' as any)}>
               <Text style={s.createBtnText}>+ Create</Text>
             </Pressable>
           )
         : undefined,
     });
-  }, [officer, navigation]);
+  }, [officer, navigation]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function goToWeek(delta: number) {
-    const next = weekOffset + delta;
-    setWeekOffset(next);
-    setSelectedDay(null); // deselect when changing weeks
-  }
-
-  // Events visible for the current week view
-  const weekStart = weekOffset * 7;
-  const weekEnd   = weekOffset * 7 + 6;
-  const weekEvents = events.filter(e => e.dayOffset >= weekStart && e.dayOffset <= weekEnd);
-
-  // If a day is selected, show only that day's events; otherwise show whole week
-  const filtered = selectedDay === null
-    ? weekEvents
-    : events.filter(e => e.dayOffset === selectedDay);
-
-  // Heading text for the list section
-  function listHeading(): string {
-    if (selectedDay !== null) {
-      const d       = getEventDate(selectedDay);
-      const dayIdx  = selectedDay - weekOffset * 7;  // 0–6
-      const dayName = DAY_LABELS[dayIdx] ?? '';
-      const dateStr = `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-      return `${dayName}  ·  ${dateStr}`;
+  // Map events to their real calendar date (getEventDate handles any dayOffset).
+  const eventsByDate = useMemo(() => {
+    const m = new Map<string, MockEvent[]>();
+    for (const e of events) {
+      const iso = isoOf(getEventDate(e.dayOffset));
+      (m.get(iso) ?? m.set(iso, []).get(iso)!).push(e);
     }
-    if (weekOffset === 0)  return 'This Week';
-    if (weekOffset === 1)  return 'Next Week';
-    if (weekOffset === -1) return 'Last Week';
-    const s = getEventDate(weekStart);
-    const e = getEventDate(weekEnd);
-    const fmt = (d: Date) => `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-    return `${fmt(s)} – ${fmt(e)}`;
+    return m;
+  }, [events]);
+
+  // Role-visible tasks with a due date, keyed by due day.
+  const tasksByDate = useMemo(() => {
+    const m = new Map<string, MockTask[]>();
+    for (const t of filterTasksForRole(role)) {
+      if (t.isWorkflowParent || !t.dueAt) continue;
+      const iso = t.dueAt.slice(0, 10);
+      (m.get(iso) ?? m.set(iso, []).get(iso)!).push(t);
+    }
+    return m;
+  }, [role, events]);   // `events` dep also nudges recompute on focus refresh
+
+  const eventDays = useMemo(() => new Set(eventsByDate.keys()), [eventsByDate]);
+  const taskDays  = useMemo(() => new Set(tasksByDate.keys()),  [tasksByDate]);
+
+  function goMonth(delta: number) {
+    let m = viewMonth + delta;
+    let y = viewYear;
+    if (m < 0)  { m = 11; y -= 1; }
+    if (m > 11) { m = 0;  y += 1; }
+    setViewMonth(m);
+    setViewYear(y);
   }
+  function goToday() {
+    setViewYear(today.getFullYear());
+    setViewMonth(today.getMonth());
+    setSelectedIso(todayIso);
+  }
+
+  const dayEvents = eventsByDate.get(selectedIso) ?? [];
+  const dayTasks  = tasksByDate.get(selectedIso) ?? [];
+  const selDate   = new Date(selectedIso + 'T00:00:00');
+  const selHeading = selDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <ScrollView
-      style={s.root}
-      contentContainerStyle={s.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Week navigation ‹ label › */}
-      <WeekNavBar
-        weekOffset={weekOffset}
-        onPrev={() => goToWeek(-1)}
-        onNext={() => goToWeek(+1)}
+    <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      {/* Month nav */}
+      <View style={s.nav}>
+        <Pressable style={s.navBtn} onPress={() => goMonth(-1)}><Text style={s.navArrow}>‹</Text></Pressable>
+        <Pressable onPress={goToday}><Text style={s.navLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text></Pressable>
+        <Pressable style={s.navBtn} onPress={() => goMonth(+1)}><Text style={s.navArrow}>›</Text></Pressable>
+      </View>
+
+      <MonthGrid
+        year={viewYear}
+        month={viewMonth}
+        todayIso={todayIso}
+        selectedIso={selectedIso}
+        eventDays={eventDays}
+        taskDays={taskDays}
+        onSelect={setSelectedIso}
       />
 
-      <WeekStrip
-        selected={selectedDay}
-        weekOffset={weekOffset}
-        events={events}
-        onSelect={setSelectedDay}
-      />
-
+      {/* Day detail */}
       <View style={s.listHeader}>
-        <Text style={s.listHeading}>{listHeading()}</Text>
+        <Text style={s.listHeading}>{selHeading}</Text>
         <Text style={s.listCount}>
-          {filtered.length} event{filtered.length !== 1 ? 's' : ''}
+          {dayEvents.length + dayTasks.length} item{dayEvents.length + dayTasks.length !== 1 ? 's' : ''}
         </Text>
       </View>
 
-      {filtered.length === 0 ? (
+      {dayEvents.length === 0 && dayTasks.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyText}>No events this {selectedDay !== null ? 'day' : 'week'}</Text>
+          <Text style={s.emptyText}>Nothing scheduled</Text>
           {officer && (
-            <Pressable
-              style={s.emptyCreateBtn}
-              onPress={() => router.push('/event/create' as any)}
-            >
-              <Text style={s.emptyCreateText}>+ Create one</Text>
+            <Pressable style={s.emptyCreateBtn} onPress={() => router.push('/event/create' as any)}>
+              <Text style={s.emptyCreateText}>+ Create event</Text>
             </Pressable>
           )}
         </View>
       ) : (
-        filtered.map(event => (
-          <EventCard
-            key={event.id}
-            event={event}
-            onPress={() => router.push(`/event/${event.id}` as any)}
-          />
-        ))
+        <>
+          {dayEvents.length > 0 && <Text style={s.sectionLabel}>EVENTS</Text>}
+          {dayEvents.map(ev => (
+            <EventCard key={ev.id} event={ev} onPress={() => router.push(`/event/${ev.id}` as any)} />
+          ))}
+          {dayTasks.length > 0 && <Text style={s.sectionLabel}>TASKS DUE</Text>}
+          {dayTasks.map(t => (
+            <TaskRow key={t.id} task={t} onPress={() => router.push(`/task/${t.id}` as any)} />
+          ))}
+        </>
       )}
 
       <View style={{ height: 40 }} />
@@ -315,102 +296,59 @@ const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: '#0f172a' },
   content: { paddingBottom: 24 },
 
-  // Header create button
   createBtn:     { paddingHorizontal: 8, paddingVertical: 4 },
   createBtnText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
-  // Week navigation bar
-  weekNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
-  },
-  weekNavBtn:          { padding: 8 },
-  weekNavBtnDisabled:  { opacity: 0.3 },
-  weekNavArrow:        { fontSize: 22, color: '#818cf8', fontWeight: '700', lineHeight: 26 },
-  weekNavArrowDisabled:{ color: '#475569' },
-  weekNavLabel:        { fontSize: 15, fontWeight: '700', color: '#f1f5f9', textAlign: 'center', flex: 1 },
+  // Month nav
+  nav:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  navBtn:   { padding: 8 },
+  navArrow: { fontSize: 24, color: '#818cf8', fontWeight: '700', lineHeight: 26 },
+  navLabel: { fontSize: 16, fontWeight: '700', color: '#f1f5f9' },
 
-  // Week strip
-  weekStrip: {
-    flexDirection: 'row',
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  dayCell:          { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, gap: 4 },
-  dayCellSelected:  { backgroundColor: '#6366f1' },
-  dayLabel:         { fontSize: 11, fontWeight: '600', color: '#64748b', letterSpacing: 0.3 },
-  dayLabelToday:    { color: '#6366f1' },
-  dayLabelSelected: { color: '#fff' },
-  dayNum:           { fontSize: 16, fontWeight: '700', color: '#94a3b8' },
-  dayNumToday:      { color: '#6366f1' },
-  dayNumSelected:   { color: '#fff' },
-  dot:              { width: 5, height: 5, borderRadius: 3, backgroundColor: '#6366f1' },
-  dotSelected:      { backgroundColor: '#fff' },
+  // Grid
+  grid:    { paddingHorizontal: 10, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#1e293b' },
+  gridRow: { flexDirection: 'row' },
+  wkHead:  { flex: 1, textAlign: 'center', fontSize: 10, fontWeight: '700', color: '#475569', letterSpacing: 0.2, paddingVertical: 6 },
+  cell:        { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', margin: 1, borderRadius: 8, gap: 2 },
+  cellSel:     { backgroundColor: '#6366f1' },
+  cellToday:   { backgroundColor: '#1e1b4b' },
+  cellNum:     { fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  cellNumSel:  { color: '#fff', fontWeight: '700' },
+  cellNumToday:{ color: '#a5b4fc', fontWeight: '700' },
+  dotRow:      { flexDirection: 'row', gap: 3, height: 5 },
+  dot:         { width: 5, height: 5, borderRadius: 3 },
 
-  // List header
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
-  },
-  listHeading: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },
+  // Day detail header
+  listHeader:  { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+  listHeading: { fontSize: 17, fontWeight: '700', color: '#f1f5f9', flexShrink: 1 },
   listCount:   { fontSize: 13, color: '#475569' },
+  sectionLabel:{ fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginHorizontal: 20, marginTop: 6, marginBottom: 8 },
 
-  // Empty state
-  empty:           { alignItems: 'center', paddingVertical: 48 },
+  // Empty
+  empty:           { alignItems: 'center', paddingVertical: 40 },
   emptyText:       { color: '#475569', fontSize: 15 },
   emptyCreateBtn:  { marginTop: 12, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#1e1b4b', borderRadius: 8 },
   emptyCreateText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
-  // Card
-  card: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  dateCol: {
-    width: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingLeft: 4,
-  },
-  dateDay: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.3 },
-  dateNum: { fontSize: 13, fontWeight: '600', color: '#94a3b8', marginTop: 2 },
-  accent:  {
-    width: 3, alignSelf: 'stretch',
-    marginVertical: 10, borderRadius: 2, marginRight: 12,
-  },
+  // Event card
+  card:      { flexDirection: 'row', alignItems: 'stretch', backgroundColor: '#1e293b', borderRadius: 12, marginHorizontal: 16, marginBottom: 8, overflow: 'hidden' },
+  accent:    { width: 3, alignSelf: 'stretch', marginVertical: 10, borderRadius: 2, marginRight: 12, marginLeft: 4 },
   cardBody:  { flex: 1, paddingVertical: 12, paddingRight: 14, gap: 4 },
   cardTop:   { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   cardTitle: { fontSize: 15, fontWeight: '600', color: '#f1f5f9', flexShrink: 1 },
   kindBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2 },
   kindText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   cardMeta:  { fontSize: 13, color: '#64748b' },
-  audienceBadge: { alignSelf: 'flex-start', marginTop: 2 },
-  audienceText:  { fontSize: 11, color: '#94a3b8', fontWeight: '500' },
+  audienceText: { fontSize: 11, color: '#94a3b8', fontWeight: '500' },
+  recurringBadge: { backgroundColor: '#1e1b4b', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  recurringText:  { fontSize: 11, color: '#818cf8', fontWeight: '700' },
 
-  // Recurring badge
-  recurringBadge: {
-    backgroundColor: '#1e1b4b',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  recurringText: { fontSize: 11, color: '#818cf8', fontWeight: '700' },
+  // Task row
+  taskRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 12, marginHorizontal: 16, marginBottom: 8, overflow: 'hidden' },
+  taskStripe:{ width: 4, alignSelf: 'stretch' },
+  taskBody:  { flex: 1, paddingVertical: 12, paddingLeft: 12, paddingRight: 6, gap: 3 },
+  taskTitle: { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
+  taskMeta:  { fontSize: 12, color: '#64748b' },
+  taskBadge: { borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3, marginRight: 12, flexShrink: 0 },
+  taskBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
 });
