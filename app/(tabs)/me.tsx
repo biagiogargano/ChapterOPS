@@ -132,8 +132,9 @@ export default function MeScreen() {
         </View>
       )}
 
-      {/* ── Role switcher (dev only — prevents role impersonation in real builds) ── */}
-      {__DEV__ && (
+      {/* ── Role switcher (sandbox only — hidden when auth is on so real testers
+          get their role from their authenticated position, not a manual switch) ── */}
+      {__DEV__ && !AUTH_ENABLED && (
         <View style={s.switcherCard}>
           <SectionLabel text="ROLE SWITCHER" />
           <Text style={s.switcherHint}>Switch roles to preview role-specific views</Text>
