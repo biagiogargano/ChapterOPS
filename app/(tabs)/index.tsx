@@ -499,7 +499,10 @@ function TodayTaskCard({
           </View>
         </View>
         <View style={s.taskMetaRow}>
-          <ReminderBadge reminder={reminder} />
+          {/* When urgent, the red state badge + styling already say "Overdue"/
+              "Escalated" — skip the reminder badge to avoid a duplicate signal.
+              On calm cards the reminder still adds info (Due today / Review …). */}
+          {!isUrgent && <ReminderBadge reminder={reminder} />}
           {showAssignee && (
             <>
               <Text style={s.taskAssignee}>{task.assignedTo}</Text>
@@ -524,15 +527,12 @@ function TodayTaskCard({
 
 function AlertCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
   const isEscalated = task.state === 'escalated';
-  const reminder    = useContext(ReminderCtx).get(task.id);
+  // The red alert card + ⚠️/⚡ icon already signal urgency, so no reminder badge.
   return (
     <Pressable style={s.alertCard} onPress={onPress}>
       <Text style={s.alertIcon}>{isEscalated ? '⚡' : '⚠️'}</Text>
       <View style={s.alertBody}>
-        <View style={s.alertTitleRow}>
-          <Text style={s.alertTitle} numberOfLines={1}>{task.title}</Text>
-          <ReminderBadge reminder={reminder} />
-        </View>
+        <Text style={s.alertTitle} numberOfLines={1}>{task.title}</Text>
         <Text style={s.alertMeta}>{task.assignedTo} · {dueLabelOf(task)}</Text>
       </View>
       <Text style={s.alertChevron}>›</Text>
