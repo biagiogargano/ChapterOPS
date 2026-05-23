@@ -717,22 +717,9 @@ export default function EventDetailScreen() {
         <DetailRow icon="👥" label="Who"      value={AUDIENCE_LABEL[event.audience]} />
       </View>
 
-      {/* ── Status strip (prep-task progress only; hidden when no tasks) ── */}
-      {taskOps.total > 0 && (
-        <View style={s.statusStrip}>
-          <Text style={s.statusStripText}>
-            Prep tasks: {taskOps.completed}/{taskOps.total} complete
-          </Text>
-        </View>
-      )}
-
-      {/* ── About ── */}
-      <SectionLabel text="ABOUT" />
-      <Text style={s.description}>{event.description}</Text>
-
       <View style={s.divider} />
 
-      {/* ── RSVP ── */}
+      {/* ── RSVP / attendance ── */}
       <RsvpSection
         eventId={event.id}
         role={role}
@@ -764,19 +751,24 @@ export default function EventDetailScreen() {
         </>
       )}
 
-      {/* ── Related tasks (RSVP tasks already filtered out) ── */}
+      {/* ── Related tasks + prep progress (RSVP tasks already filtered out) ── */}
       {(officer || relatedTasks.length > 0) && (
         <>
           <View style={s.divider} />
           <View style={s.relatedHeader}>
             <SectionLabel text="RELATED TASKS" />
-            {officer && (
-              <Pressable
-                onPress={() => router.push(`/task/create?eventId=${event.id}` as any)}
-              >
-                <Text style={s.addTaskText}>+ Add Task</Text>
-              </Pressable>
-            )}
+            <View style={s.relatedHeaderRight}>
+              {taskOps.total > 0 && (
+                <Text style={s.prepProgressText}>{taskOps.completed}/{taskOps.total} done</Text>
+              )}
+              {officer && (
+                <Pressable
+                  onPress={() => router.push(`/task/create?eventId=${event.id}` as any)}
+                >
+                  <Text style={s.addTaskText}>+ Add Task</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
           {relatedTasks.length === 0 ? (
             <Text style={s.noRelatedText}>No related tasks yet.</Text>
@@ -791,6 +783,11 @@ export default function EventDetailScreen() {
           )}
         </>
       )}
+
+      {/* ── About (secondary detail, kept lower) ── */}
+      <View style={s.divider} />
+      <SectionLabel text="ABOUT" />
+      <Text style={s.description}>{event.description}</Text>
 
       {/* ── Delete button — user-created events only ── */}
       {isUserCreated && (
@@ -913,22 +910,6 @@ const s = StyleSheet.create({
     color: '#f1f5f9',
   },
 
-  // Status strip (prep-task progress)
-  statusStrip: {
-    backgroundColor: '#172554',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginTop: -12,
-    marginBottom: 28,
-  },
-  statusStripText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#bfdbfe',
-    letterSpacing: 0.2,
-  },
-
   // Section label
   sectionLabel: {
     fontSize: 11,
@@ -940,7 +921,9 @@ const s = StyleSheet.create({
   },
 
   // Related tasks header row (+ Add Task)
-  relatedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  relatedHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  relatedHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  prepProgressText:   { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 12 },
   addTaskText:   { fontSize: 13, fontWeight: '600', color: '#818cf8', marginBottom: 12 },
   noRelatedText: { fontSize: 13, color: '#475569', marginBottom: 4 },
 
