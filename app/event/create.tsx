@@ -851,6 +851,7 @@ export default function CreateEventScreen() {
         hint="Auto-creates this template's prep tasks when you create the event."
         searchPlaceholder="Filter templates…"
         options={templateOptions}
+        selectedId={templateId}
         onSelect={(id) => { setTemplateId(id); setTemplatePickerOpen(false); }}
         onClose={() => setTemplatePickerOpen(false)}
       />

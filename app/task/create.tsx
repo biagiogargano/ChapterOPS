@@ -648,6 +648,7 @@ export default function CreateTaskScreen() {
         title="Link to event"
         searchPlaceholder="Filter events…"
         options={eventPickerOptions}
+        selectedId={linkedEventId ?? STANDALONE_OPTION}
         onSelect={(id) => { setLinkedEventId(id === STANDALONE_OPTION ? undefined : id); setEventPickerOpen(false); }}
         onClose={() => setEventPickerOpen(false)}
       />

@@ -20,6 +20,7 @@ export default function SearchablePicker({
   title,
   hint,
   options,
+  selectedId,
   searchPlaceholder = 'Search…',
   onSelect,
   onClose,
@@ -28,6 +29,7 @@ export default function SearchablePicker({
   title:              string;
   hint?:              string;
   options:            PickerOption[];
+  selectedId?:        string;
   searchPlaceholder?: string;
   onSelect:           (id: string) => void;
   onClose:            () => void;
@@ -64,12 +66,18 @@ export default function SearchablePicker({
             {filtered.length === 0 ? (
               <Text style={s.empty}>No matches{query.trim() ? ` for "${query.trim()}"` : ''}.</Text>
             ) : (
-              filtered.map(o => (
-                <Pressable key={o.id} style={s.row} onPress={() => onSelect(o.id)}>
-                  <Text style={s.rowLabel} numberOfLines={1}>{o.label}</Text>
-                  {o.sublabel ? <Text style={s.rowSub} numberOfLines={1}>{o.sublabel}</Text> : null}
-                </Pressable>
-              ))
+              filtered.map(o => {
+                const isSel = o.id === selectedId;
+                return (
+                  <Pressable key={o.id} style={[s.row, isSel && s.rowSel]} onPress={() => onSelect(o.id)}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.rowLabel, isSel && s.rowLabelSel]} numberOfLines={1}>{o.label}</Text>
+                      {o.sublabel ? <Text style={s.rowSub} numberOfLines={1}>{o.sublabel}</Text> : null}
+                    </View>
+                    {isSel && <Text style={s.check}>✓</Text>}
+                  </Pressable>
+                );
+              })
             )}
           </ScrollView>
 
@@ -89,9 +97,12 @@ const s = StyleSheet.create({
   hint:     { fontSize: 13, color: '#64748b', marginTop: 4 },
   search:   { backgroundColor: '#0f172a', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 14, paddingHorizontal: 12, paddingVertical: 10, marginTop: 12 },
   list:     { flexGrow: 0, marginTop: 12 },
-  row:      { paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', marginBottom: 8 },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', marginBottom: 8 },
+  rowSel:   { borderColor: '#4f46e5', backgroundColor: '#1e1b4b' },
   rowLabel: { fontSize: 15, fontWeight: '600', color: '#a5b4fc' },
+  rowLabelSel: { color: '#c7d2fe' },
   rowSub:   { fontSize: 12, color: '#64748b', marginTop: 2 },
+  check:    { fontSize: 16, color: '#a5b4fc', fontWeight: '800' },
   empty:    { fontSize: 13, color: '#475569', paddingVertical: 12, textAlign: 'center' },
   cancel:     { paddingVertical: 12, alignItems: 'center', marginTop: 2 },
   cancelText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },

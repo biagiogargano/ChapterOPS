@@ -20,7 +20,7 @@ import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 // ─── Summary bar helpers ──────────────────────────────────────────────────────
 
@@ -373,23 +373,39 @@ function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
   }
 }
 
-/** Apply the active filter + sort to a bucket's tasks (pure). */
-function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy): MockTask[] {
-  const filtered = tasks.filter(t => matchesStatus(t, filter));
+/** Apply the active search + filter + sort to a bucket's tasks (pure). */
+function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, query: string): MockTask[] {
+  const q = query.trim().toLowerCase();
+  const filtered = tasks.filter(t =>
+    matchesStatus(t, filter) &&
+    (q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q)),
+  );
   if (sortBy === 'urgency') return sortByUrgency(filtered);
   return [...filtered].sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'));
 }
 
 function FilterSortBar({
-  status, sortBy, onStatus, onSort,
+  status, sortBy, query, onStatus, onSort, onQuery,
 }: {
   status:   StatusFilter;
   sortBy:   SortBy;
+  query:    string;
   onStatus: (s: StatusFilter) => void;
   onSort:   (s: SortBy) => void;
+  onQuery:  (q: string) => void;
 }) {
   return (
     <View style={s.controls}>
+      <TextInput
+        style={s.search}
+        placeholder="Search tasks…"
+        placeholderTextColor="#475569"
+        value={query}
+        onChangeText={onQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+      />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
         {STATUS_FILTERS.map(f => (
           <Pressable key={f.id} style={[s.filterChip, status === f.id && s.filterChipOn]} onPress={() => onStatus(f.id)}>
@@ -451,11 +467,12 @@ export default function TasksScreen() {
   // responsibility grouping is preserved.
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('due');
+  const [taskQuery, setTaskQuery] = useState('');
 
-  const viewAlert    = applyView(alert,    statusFilter, sortBy);
-  const viewMine     = applyView(mine,     statusFilter, sortBy);
-  const viewReview   = applyView(review,   statusFilter, sortBy);
-  const viewReviewed = applyView(reviewed, statusFilter, sortBy);
+  const viewAlert    = applyView(alert,    statusFilter, sortBy, taskQuery);
+  const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery);
+  const viewReview   = applyView(review,   statusFilter, sortBy, taskQuery);
+  const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery);
   const hasAnyView   = viewAlert.length + viewMine.length + viewReview.length + viewReviewed.length > 0;
 
   // Officer overview metrics — CHAPTER-WIDE (not visibility-scoped) so every
@@ -524,7 +541,7 @@ export default function TasksScreen() {
 
       {/* Filter + sort controls — only when there are tasks to act on */}
       {hasAny && (
-        <FilterSortBar status={statusFilter} sortBy={sortBy} onStatus={setStatusFilter} onSort={setSortBy} />
+        <FilterSortBar status={statusFilter} sortBy={sortBy} query={taskQuery} onStatus={setStatusFilter} onSort={setSortBy} onQuery={setTaskQuery} />
       )}
 
       {!hasAny ? (
@@ -600,6 +617,7 @@ const s = StyleSheet.create({
 
   // Filter + sort controls
   controls:        { marginBottom: 16, gap: 10 },
+  search:          { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 14, paddingHorizontal: 12, paddingVertical: 9, marginHorizontal: 2 },
   filterRow:       { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
   filterChip:      { backgroundColor: '#1e293b', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
   filterChipOn:    { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
