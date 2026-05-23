@@ -40,6 +40,9 @@ function TemplateRow({
             <Pressable style={s.actionBtn} onPress={onEdit}>
               <Text style={s.actionText}>Edit</Text>
             </Pressable>
+            <Pressable style={s.actionBtn} onPress={onDuplicate}>
+              <Text style={s.actionText}>Duplicate</Text>
+            </Pressable>
             <Pressable style={[s.actionBtn, s.actionBtnDanger]} onPress={onDelete}>
               <Text style={[s.actionText, s.actionTextDanger]}>Delete</Text>
             </Pressable>

@@ -7,8 +7,9 @@ import type { EventTaskSpec, EventTaskTemplate } from '@/lib/eventTemplates';
 import { PROOF_LABEL, type ProofType } from '@/lib/mockTasks';
 import { OFFICER_ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -79,20 +80,41 @@ export default function TemplateEditScreen() {
   // underlying values still apply whether or not the section is expanded.
   const [openOptions, setOpenOptions] = useState<Set<string>>(new Set());
 
+  // Unsaved-changes tracking (ref so the beforeRemove listener reads it live).
+  const dirtyRef = useRef(false);
+  function markDirty() { dirtyRef.current = true; }
+
   useEffect(() => {
     navigation.setOptions({ title: editing ? 'Edit Template' : 'New Template' });
   }, [navigation, editing]);
 
+  // Confirm before discarding unsaved edits when leaving the editor.
+  useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', (e: any) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      Alert.alert('Discard changes?', 'Your edits to this template will be lost.', [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      ]);
+    });
+    return sub;
+  }, [navigation]);
+
   function patchSpec(i: number, patch: Partial<EventTaskSpec>) {
+    markDirty();
     setSpecs(prev => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   }
   function removeSpec(i: number) {
+    markDirty();
     setSpecs(prev => prev.filter((_, idx) => idx !== i));
   }
   function addSpec() {
+    markDirty();
     setSpecs(prev => [...prev, blankSpec()]);
   }
   function moveSpec(i: number, dir: -1 | 1) {
+    markDirty();
     setSpecs(prev => {
       const j = i + dir;
       if (j < 0 || j >= prev.length) return prev;
@@ -110,10 +132,21 @@ export default function TemplateEditScreen() {
   }
 
   const validSpecs = specs.filter(s => s.title.trim().length > 0);
-  const canSave    = name.trim().length > 0 && validSpecs.length > 0;
+  // A task that needs approval can't be reviewed by its own assignee.
+  const reviewerOk = (s: EventTaskSpec) => !s.requiresApproval || (s.reviewerRole ?? 'pro_consul') !== s.assignedRole;
+  const specsValid = validSpecs.every(reviewerOk);
+  const canSave    = name.trim().length > 0 && validSpecs.length > 0 && specsValid;
+
+  const hintText =
+    name.trim().length === 0 || validSpecs.length === 0
+      ? 'Add a template name and at least one task with a title to save.'
+      : !specsValid
+        ? 'Each task that needs approval must have a reviewer different from its assignee.'
+        : '';
 
   function handleSave() {
     if (!canSave) return;
+    dirtyRef.current = false;   // saved → don't prompt on the navigation back
     const template: EventTaskTemplate = {
       id:    params.templateId ?? newCustomTemplateId(),
       label: name.trim(),
@@ -143,7 +176,7 @@ export default function TemplateEditScreen() {
           placeholder="e.g. Philanthropy Event"
           placeholderTextColor="#475569"
           value={name}
-          onChangeText={setName}
+          onChangeText={v => { setName(v); markDirty(); }}
           autoCapitalize="words"
         />
 
@@ -169,12 +202,15 @@ export default function TemplateEditScreen() {
 
             <TextInput
               style={s.input}
-              placeholder='Task title — use {event} for the event name'
+              placeholder='Task title — type {event} to insert the event name'
               placeholderTextColor="#475569"
               value={spec.title}
               onChangeText={v => patchSpec(i, { title: v })}
               autoCapitalize="sentences"
             />
+            {spec.title.trim().length > 0 && (
+              <Text style={s.exampleLine}>e.g. “{spec.title.replace(/\{event\}/g, 'Spring Formal')}”</Text>
+            )}
             <TextInput
               style={[s.input, s.inputMultiline]}
               placeholder="Description (optional)"
@@ -230,7 +266,7 @@ export default function TemplateEditScreen() {
                 </Pressable>
                 {spec.requiresApproval && (
                   <>
-                    <Text style={s.subLabel}>Reviewed by</Text>
+                    <Text style={s.subLabel}>Needs approval from</Text>
                     <View style={s.chipWrap}>
                       {REVIEWER_ROLES.map(r => (
                         <Pressable key={r} style={[s.chip, (spec.reviewerRole ?? 'pro_consul') === r && s.chipOn]} onPress={() => patchSpec(i, { reviewerRole: r })}>
@@ -238,7 +274,10 @@ export default function TemplateEditScreen() {
                         </Pressable>
                       ))}
                     </View>
-                    <Text style={s.subLabel}>Also oversee (optional)</Text>
+                    {!reviewerOk(spec) && (
+                      <Text style={s.warnLine}>Reviewer must be different from the assignee ({ROLE_LABELS[spec.assignedRole]}).</Text>
+                    )}
+                    <Text style={s.subLabel}>Also notify (optional)</Text>
                     <View style={s.chipWrap}>
                       <Pressable style={[s.chip, !spec.supervisorRole && s.chipOn]} onPress={() => patchSpec(i, { supervisorRole: undefined })}>
                         <Text style={[s.chipText, !spec.supervisorRole && s.chipTextOn]}>None</Text>
@@ -275,8 +314,8 @@ export default function TemplateEditScreen() {
           <Text style={s.addBtnText}>+ Add task</Text>
         </Pressable>
 
-        {!canSave && (
-          <Text style={s.hint}>Add a template name and at least one task with a title to save.</Text>
+        {hintText !== '' && (
+          <Text style={s.hint}>{hintText}</Text>
         )}
         <Pressable style={[s.saveBtn, !canSave && s.saveBtnOff]} onPress={handleSave} disabled={!canSave}>
           <Text style={[s.saveBtnText, !canSave && s.saveBtnTextOff]}>{editing ? 'Save Changes' : 'Create Template'}</Text>
@@ -299,6 +338,8 @@ const s = StyleSheet.create({
     color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12,
   },
   inputMultiline: { minHeight: 56, marginTop: 8, fontSize: 14 },
+  exampleLine:    { fontSize: 12, color: '#64748b', fontStyle: 'italic', marginTop: 6 },
+  warnLine:       { fontSize: 12, color: '#fbbf24', marginTop: 8 },
 
   specCard: { backgroundColor: '#162032', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 14, marginTop: 16 },
   specHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
