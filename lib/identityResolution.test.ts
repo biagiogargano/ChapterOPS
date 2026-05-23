@@ -10,6 +10,7 @@ import {
   membershipForOrg,
   actingRoleFor,
   buildFallbackIdentity,
+  pickDefaultOrg,
   type IdentityPhase,
 } from './identityResolution';
 import { DEMO_USER, DEMO_CHAPTER } from './demoUser';
@@ -96,6 +97,42 @@ function mem(orgId: string, roles: string[]): Membership {
   check('fallback: template sigma_chi', fb.organization.template === 'sigma_chi');
   check('fallback: member mirrors DEMO_USER', fb.member.fullName === DEMO_USER.full_name && fb.member.status === 'active');
   check('fallback: one active president position', fb.positions.length === 1 && fb.positions[0].role === 'president' && fb.positions[0].isActive);
+}
+
+// ── pickDefaultOrg: deterministic default (name asc, id tie-breaker) ──────────
+{
+  // Membership with explicit org id + name (the base `org()` fixture sets name=id).
+  function memNamed(id: string, name: string): Membership {
+    return {
+      organization: { id, name, template: 'sigma_chi' },
+      member: member(id),
+      positions: [],
+    };
+  }
+
+  // Empty → '' (callers guard).
+  check('pickDefaultOrg: empty → ""', pickDefaultOrg([]) === '');
+
+  // Single → that org.
+  check('pickDefaultOrg: single → its id', pickDefaultOrg([memNamed('o1', 'Alpha')]) === 'o1');
+
+  // Name ascending wins regardless of input order.
+  const byName = [memNamed('zzz', 'Beta'), memNamed('aaa', 'Alpha')];
+  check('pickDefaultOrg: sorts by name asc (Alpha<Beta) → aaa', pickDefaultOrg(byName) === 'aaa');
+  check('pickDefaultOrg: order-independent',
+    pickDefaultOrg([memNamed('aaa', 'Alpha'), memNamed('zzz', 'Beta')]) === 'aaa');
+
+  // Case-insensitive name compare.
+  check('pickDefaultOrg: case-insensitive name (alpha<Beta) → a1',
+    pickDefaultOrg([memNamed('b1', 'Beta'), memNamed('a1', 'alpha')]) === 'a1');
+
+  // Same name → id tie-breaker (ascending).
+  const tie = [memNamed('id_b', 'Same'), memNamed('id_a', 'Same')];
+  check('pickDefaultOrg: equal names → id tie-breaker (id_a)', pickDefaultOrg(tie) === 'id_a');
+
+  // Determinism: same input set, different order → same result.
+  check('pickDefaultOrg: deterministic across orderings',
+    pickDefaultOrg(tie) === pickDefaultOrg([...tie].reverse()));
 }
 
 console.log(`\nidentityResolution.test: ${passed} passed, ${failed} failed`);

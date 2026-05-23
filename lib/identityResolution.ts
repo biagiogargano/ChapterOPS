@@ -46,6 +46,31 @@ export function selectActiveOrg(
   return { phase: 'selecting_org', activeOrgId: null };
 }
 
+/**
+ * Deterministic default org for a multi-org user with no stored preference.
+ *
+ * Returns the organization id of the membership that sorts first by
+ * organization NAME (case-insensitive, locale-aware), with organization ID as a
+ * stable tie-breaker. Determinism matters more than which org is chosen: the
+ * user can switch in one tap and the choice is then persisted, so this only
+ * decides the very-first-login default and must be the SAME across logins.
+ *
+ * Pure. INERT for now (CP planning): not wired into identityStore yet — a later
+ * step uses it in the selecting_org restore fallback. Returns '' for an empty
+ * list (callers only invoke it when memberships exist).
+ */
+export function pickDefaultOrg(memberships: Membership[]): string {
+  if (memberships.length === 0) return '';
+  const sorted = [...memberships].sort((a, b) => {
+    const byName = a.organization.name.localeCompare(b.organization.name, undefined, {
+      sensitivity: 'base',
+    });
+    if (byName !== 0) return byName;
+    return a.organization.id.localeCompare(b.organization.id);   // stable tie-breaker
+  });
+  return sorted[0].organization.id;
+}
+
 /** The membership for a given org id, or null. */
 export function membershipForOrg(
   memberships: Membership[],
