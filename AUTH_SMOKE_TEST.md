@@ -55,6 +55,14 @@ you can claim by logging in (and ideally a second org/account for isolation chec
 - [ ] Officer Overview counts (overdue / awaiting review / events need prep) reflect real data.
 - [ ] Tasks tab filters + sort work on real data.
 
+## G2. Recurring-event templates (required)
+- [ ] Create a **recurring** event **with a template** → each occurrence's Event Detail shows its **own** generated tasks.
+- [ ] Each occurrence's task due dates are **relative to that occurrence's date** (they differ across occurrences).
+- [ ] From an existing recurring occurrence, **Apply template → Entire Series** generates tasks across all occurrences ("across N events"); **This Event Only** scopes to one.
+- [ ] Re-applying the same template (series) reports **"already on the series"** — no duplicates (idempotent).
+- [ ] **Delete → Entire Series** removes generated/review tasks for **all** occurrences (no orphans); **This Event Only** removes just that occurrence's tasks.
+- [ ] Non-recurring event + template still generates exactly one set (unchanged).
+
 ## H. Custom templates (local — expected for alpha)
 - [ ] A template built in the app persists across reload (local/device).
 - [ ] Understood limitation: custom templates are **not shared** across members/devices yet (server phase).
