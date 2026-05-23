@@ -41,6 +41,10 @@ no schema). Items explicitly marked **server** need schema/RLS/auth.
 - Template **permissions** (officers-only; creator restricted to their committee/self).
 - **Audit / versioning** (who applied/replaced; which template version an event used).
 - Real **role/member-based restrictions** backed by auth/identity.
+- **Exclusive officer-role uniqueness:** prevent two members from holding the same
+  exclusive officer position in one org unless explicitly allowed. Not implemented
+  (no safe UI-only check exists yet) — belongs with positions/permissions + likely
+  a DB constraint; defer until the assignment/permissions phase.
 
 ## Recommended first safe checkpoint  ✅ DONE
 **Apply mode: Add vs Replace (single event), UI-only** — when applying a template to an
