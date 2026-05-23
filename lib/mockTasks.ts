@@ -958,6 +958,21 @@ export const STATE_LABEL: Record<TaskState, string> = {
   escalated: 'Escalated',
 };
 
+/**
+ * Member-facing status vocabulary. Collapses the internal six-state machine into
+ * four simple words for cards/lists (Today, Tasks, Event Detail related tasks).
+ * Task Detail intentionally keeps the precise STATE_LABEL so officers retain the
+ * rejected/escalated nuance where they act. Display-only — TaskState is unchanged.
+ */
+export const DISPLAY_STATE_LABEL: Record<TaskState, string> = {
+  assigned:  'To do',
+  submitted: 'In review',
+  approved:  'Done',
+  rejected:  'To do',
+  overdue:   'Overdue',
+  escalated: 'Overdue',
+};
+
 export const STATE_COLOR: Record<TaskState, string> = {
   assigned:  '#64748b',
   submitted: '#f59e0b',

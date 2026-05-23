@@ -3,9 +3,9 @@ import { getStoredState } from '@/lib/devTaskStore';
 import { getAllEvents, resolveEventId } from '@/lib/eventStore';
 import {
   PROOF_ICON,
+  DISPLAY_STATE_LABEL,
   STATE_BG,
   STATE_COLOR,
-  STATE_LABEL,
   STATE_STRIPE,
   dueLabelOf,
   getResponsibilityGroups,
@@ -100,7 +100,7 @@ function LightweightCard({
           {showBadge && (
             <View style={[s.stateBadge, { backgroundColor: stateBg }]}>
               <Text style={[s.stateText, { color: stateColor }]}>
-                {STATE_LABEL[effectiveState]}
+                {DISPLAY_STATE_LABEL[effectiveState]}
               </Text>
             </View>
           )}
@@ -150,7 +150,7 @@ function StructuredCard({
           <View style={[s.stateBadge, { backgroundColor: stateBg }]}>
             {effectiveState === 'escalated' && <Text style={s.flame}>⚡</Text>}
             <Text style={[s.stateText, { color: stateColor }]}>
-              {STATE_LABEL[effectiveState]}
+              {DISPLAY_STATE_LABEL[effectiveState]}
             </Text>
           </View>
         </View>

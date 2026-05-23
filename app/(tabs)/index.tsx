@@ -6,9 +6,9 @@ import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
 import { DAY_LABELS } from '@/lib/mockEvents';
 import {
+  DISPLAY_STATE_LABEL,
   STATE_BG,
   STATE_COLOR,
-  STATE_LABEL,
   STATE_STRIPE,
   dueLabelOf,
   getResponsibilityGroups,
@@ -456,7 +456,7 @@ function TodayTaskCard({
           <View style={[s.taskStateBadge, { backgroundColor: stateBg }]}>
             {state === 'escalated' && <Text style={s.flame}>⚡</Text>}
             <Text style={[s.taskStateText, { color: stateColor }]}>
-              {STATE_LABEL[state]}
+              {DISPLAY_STATE_LABEL[state]}
             </Text>
           </View>
         </View>
