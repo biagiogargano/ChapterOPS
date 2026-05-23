@@ -849,6 +849,10 @@ export default function TaskDetailScreen() {
   const isReviewerOnly = isReviewer && !isAssignee;
 
   const showProofSubmit = task.type === 'structured' && task.requiresProof && isAssignee;
+  // Approval-required tasks WITHOUT a proof requirement still need a submit path —
+  // otherwise the assignee can't move it into review. Reuses the existing
+  // 'submitted' state (no state-machine change).
+  const showApprovalSubmit = task.type === 'structured' && !!task.requiresApproval && !task.requiresProof && isAssignee;
   const showProofReview = isReviewerOnly && taskState === 'submitted';
   const showEscalation  = !!(task.escalationChain && task.escalationChain.length > 1);
   const showWorkflow    = !!task.isWorkflowParent;
@@ -969,6 +973,30 @@ export default function TaskDetailScreen() {
               setProofContent={setProofContent}
               onSubmit={() => setTaskState('submitted')}
             />
+          </>
+        )}
+
+        {/* ── Submit for review (approval without proof, assignee only) ── */}
+        {showApprovalSubmit && (
+          <>
+            <Divider />
+            <SLabel text="YOUR ACTION" />
+            {taskState === 'approved' ? (
+              <View style={s.actionDone}>
+                <Text style={s.actionDoneText}>✓  Approved</Text>
+              </View>
+            ) : taskState === 'submitted' ? (
+              <StatusChip icon="⏳" text="Submitted — awaiting review" color="#fbbf24" bg="#1c1407" />
+            ) : (
+              <View style={s.proofInputBlock}>
+                {taskState === 'rejected' && (
+                  <StatusChip icon="✗" text="Rejected — resubmit when ready" color="#fca5a5" bg="#1a0505" />
+                )}
+                <Pressable style={s.submitBtn} onPress={() => setTaskState('submitted')}>
+                  <Text style={s.submitBtnText}>Submit for Review</Text>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
 
