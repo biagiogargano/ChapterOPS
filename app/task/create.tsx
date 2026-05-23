@@ -297,6 +297,14 @@ export default function CreateTaskScreen() {
   const [description,  setDescription ] = useState(existing?.description ?? '');
   const [errors,       setErrors      ] = useState<string[]>([]);
 
+  // UI-only collapse state (presentation only; no effect on what gets submitted).
+  // Event picker is collapsed by default; advanced options open only when an
+  // edited task already uses them (so nothing configured is hidden on edit).
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => editing && (!!existing?.requiresProof || !!existing?.requiresApproval || prefillDue.includeTime),
+  );
+
   const events = useMemo(() => getAllEvents(), []);
 
   // Launched from Event Detail ("+ Add Task") → the linked event is fixed to that
@@ -306,6 +314,11 @@ export default function CreateTaskScreen() {
   const lockedEventTitle = lockedToEvent
     ? (events.find(e => e.id === params.eventId)?.title ?? 'this event')
     : '';
+
+  // Current selection label for the collapsed standalone event picker.
+  const selectedEventTitle = linkedEventId
+    ? (events.find(e => e.id === linkedEventId)?.title ?? 'Selected event')
+    : 'None — standalone task';
 
   // Reviewer options = leadership roles, excluding the assignee (a task can't
   // review itself). Recompute + reset when assignee changes (skip while locked).
@@ -487,24 +500,34 @@ export default function CreateTaskScreen() {
               <Text style={s.lockedEventTitle} numberOfLines={1}>{lockedEventTitle}</Text>
             </View>
           ) : (
-            <View style={s.eventList}>
-              <Pressable
-                style={[s.eventRow, !linkedEventId && s.eventRowOn]}
-                onPress={() => setLinkedEventId(undefined)}
-              >
-                <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
+            <View>
+              {/* Collapsed summary row — shows current choice; tap to change. */}
+              <Pressable style={s.eventSelectRow} onPress={() => setEventPickerOpen(o => !o)}>
+                <Text style={s.eventSelectValue} numberOfLines={1}>{selectedEventTitle}</Text>
+                <Text style={s.eventSelectChevron}>{eventPickerOpen ? '▴' : '▾'}</Text>
               </Pressable>
-              {events.map(e => {
-                const on   = linkedEventId === e.id;
-                const date = getEventDate(e.dayOffset);
-                const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
-                return (
-                  <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => setLinkedEventId(e.id)}>
-                    <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
-                    <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
+
+              {eventPickerOpen && (
+                <View style={[s.eventList, { marginTop: 8 }]}>
+                  <Pressable
+                    style={[s.eventRow, !linkedEventId && s.eventRowOn]}
+                    onPress={() => { setLinkedEventId(undefined); setEventPickerOpen(false); }}
+                  >
+                    <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
                   </Pressable>
-                );
-              })}
+                  {events.map(e => {
+                    const on   = linkedEventId === e.id;
+                    const date = getEventDate(e.dayOffset);
+                    const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
+                    return (
+                      <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => { setLinkedEventId(e.id); setEventPickerOpen(false); }}>
+                        <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
+                        <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -522,71 +545,6 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Optional time */}
-        <View style={s.field}>
-          <Pressable style={s.toggleRow} onPress={() => setIncludeTime(v => !v)}>
-            <View style={[s.toggleBox, includeTime && s.toggleBoxOn]}>
-              {includeTime && <Text style={s.toggleCheck}>✓</Text>}
-            </View>
-            <Text style={s.toggleLabel}>Add a specific due time</Text>
-          </Pressable>
-          {includeTime && (
-            <View style={{ marginTop: 12 }}>
-              <TimePicker hour={hour} minute={minute} ampm={ampm} onHour={setHour} onMinute={setMinute} onAmpm={setAmpm} />
-            </View>
-          )}
-        </View>
-
-        {/* Requires proof */}
-        <View style={[s.field, reviewLocked && s.lockedField]}>
-          <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
-            <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
-              {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
-            </View>
-            <Text style={s.toggleLabel}>Requires proof of completion</Text>
-          </Pressable>
-          {requiresProof && (
-            <View style={[s.chipWrap, { marginTop: 12 }]}>
-              {PROOF_OPTIONS.map(({ value, label }) => {
-                const on = proofType === value;
-                return (
-                  <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
-                    <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
-
-        {/* Requires approval */}
-        <View style={[s.field, reviewLocked && s.lockedField]}>
-          <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresApproval(v => !v)}>
-            <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
-              {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
-            </View>
-            <Text style={s.toggleLabel}>Requires approval</Text>
-          </Pressable>
-          {requiresApproval && (
-            <>
-              <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
-              {errors.includes('Choose a reviewer different from the assignee.') && (
-                <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
-              )}
-              <View style={s.chipWrap}>
-                {reviewerOptions.map(r => {
-                  const on = reviewerRole === r;
-                  return (
-                    <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
-                      <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          )}
-        </View>
-
         {/* Description */}
         <View style={s.field}>
           <FieldLabel text="DESCRIPTION" />
@@ -600,6 +558,84 @@ export default function CreateTaskScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
+        </View>
+
+        {/* Advanced options (time / proof / approval) — collapsed by default to
+            keep the common path short. Same controls, just grouped lower. */}
+        <View style={s.field}>
+          <Pressable style={s.advancedHeader} onPress={() => setAdvancedOpen(o => !o)}>
+            <Text style={s.advancedHeaderText}>ADVANCED OPTIONS</Text>
+            <Text style={s.advancedChevron}>{advancedOpen ? '▴' : '▾'}</Text>
+          </Pressable>
+
+          {advancedOpen && (
+            <View style={{ marginTop: 16 }}>
+              {/* Optional time */}
+              <View style={s.field}>
+                <Pressable style={s.toggleRow} onPress={() => setIncludeTime(v => !v)}>
+                  <View style={[s.toggleBox, includeTime && s.toggleBoxOn]}>
+                    {includeTime && <Text style={s.toggleCheck}>✓</Text>}
+                  </View>
+                  <Text style={s.toggleLabel}>Add a specific due time</Text>
+                </Pressable>
+                {includeTime && (
+                  <View style={{ marginTop: 12 }}>
+                    <TimePicker hour={hour} minute={minute} ampm={ampm} onHour={setHour} onMinute={setMinute} onAmpm={setAmpm} />
+                  </View>
+                )}
+              </View>
+
+              {/* Requires proof */}
+              <View style={[s.field, reviewLocked && s.lockedField]}>
+                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
+                  <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
+                    {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
+                  </View>
+                  <Text style={s.toggleLabel}>Requires proof of completion</Text>
+                </Pressable>
+                {requiresProof && (
+                  <View style={[s.chipWrap, { marginTop: 12 }]}>
+                    {PROOF_OPTIONS.map(({ value, label }) => {
+                      const on = proofType === value;
+                      return (
+                        <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
+                          <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Requires approval */}
+              <View style={[s.field, reviewLocked && s.lockedField]}>
+                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresApproval(v => !v)}>
+                  <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
+                    {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
+                  </View>
+                  <Text style={s.toggleLabel}>Requires approval</Text>
+                </Pressable>
+                {requiresApproval && (
+                  <>
+                    <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
+                    {errors.includes('Choose a reviewer different from the assignee.') && (
+                      <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
+                    )}
+                    <View style={s.chipWrap}>
+                      {reviewerOptions.map(r => {
+                        const on = reviewerRole === r;
+                        return (
+                          <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
+                            <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Submit */}
@@ -670,6 +706,16 @@ const s = StyleSheet.create({
   lockedEventRow:   { backgroundColor: '#1e1b4b', borderWidth: 1, borderColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
   lockedEventLabel: { fontSize: 10, fontWeight: '700', color: '#6366f1', letterSpacing: 0.6 },
   lockedEventTitle: { fontSize: 14, fontWeight: '600', color: '#a5b4fc' },
+
+  // Collapsed standalone event selector (summary row + chevron)
+  eventSelectRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  eventSelectValue:   { flex: 1, fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  eventSelectChevron: { fontSize: 13, color: '#64748b', marginLeft: 8 },
+
+  // Advanced options disclosure header
+  advancedHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  advancedHeaderText: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
+  advancedChevron:    { fontSize: 13, color: '#64748b' },
 
   // Toggle
   toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
