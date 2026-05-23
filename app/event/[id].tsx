@@ -1,7 +1,7 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { fetchEventById, removeEvent, removeEventSeries } from '@/lib/eventService';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
-import { canManageEvent, findEventById, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
+import { canManageEvent, findEventById, getAllEvents, deleteEvent, deleteEventSeries, isUserCreatedEvent } from '@/lib/eventStore';
 import {
   AUDIENCE_LABEL,
   KIND_BG,
@@ -650,20 +650,19 @@ export default function EventDetailScreen() {
   function handleDelete() {
     if (!event) return;
     const ev = event;
-    // Cascade-delete the generated tasks tied to this event: the RSVP-review task
-    // plus any event-template tasks. All ids are deterministic, so deleting them
-    // is a harmless no-op when this event never had them (optional events, a
-    // non-primary recurrence instance, or no template applied). Local optimistic
-    // delete + fire-and-forget persisted delete (no-op when unconfigured).
-    function cascadeReviewTask() {
-      // The RSVP-review task (deterministic id) + every generated template task
-      // linked to this event (scan by the 'tmpl_' prefix so custom-template tasks
-      // are caught too, without needing to know which template was applied).
+    // Cascade-delete the generated tasks tied to the given event id(s): each
+    // event's RSVP-review task (deterministic id) plus every generated template
+    // task linked to it (scanned by the 'tmpl_' prefix so custom-template tasks
+    // are caught too, without needing to know which template was applied). All ids
+    // are deterministic, so this is a harmless no-op for events that never had
+    // them. Local optimistic delete + fire-and-forget persisted delete.
+    function cascadeTasksForEventIds(eventIds: string[]) {
+      const idSet = new Set(eventIds);
       const templateIds = getAllTasks()
-        .filter(t => t.linkedEventId === ev.id && t.id.startsWith('tmpl_'))
+        .filter(t => !!t.linkedEventId && idSet.has(t.linkedEventId) && t.id.startsWith('tmpl_'))
         .map(t => t.id);
-      const ids = [rsvpReviewTaskId(ev.id), ...templateIds];
-      for (const id of ids) {
+      const reviewIds = eventIds.map(id => rsvpReviewTaskId(id));
+      for (const id of [...reviewIds, ...templateIds]) {
         deleteUserTask(id);
         void removeTask(id);
       }
@@ -693,7 +692,7 @@ export default function EventDetailScreen() {
               notifyCancelled();
               deleteEvent(ev.id);
               void removeEvent(ev.id);
-              cascadeReviewTask();
+              cascadeTasksForEventIds([ev.id]);   // only this occurrence's tasks
               router.back();
             },
           },
@@ -701,10 +700,15 @@ export default function EventDetailScreen() {
             text: 'Entire Series',
             style: 'destructive',
             onPress: () => {
+              // Gather all occurrence ids BEFORE deleting the series, so we can
+              // cascade generated/review tasks linked to every occurrence.
+              const seriesIds = getAllEvents()
+                .filter(e => e.seriesId === ev.seriesId)
+                .map(e => e.id);
               notifyCancelled();
               deleteEventSeries(ev.seriesId!);
               void removeEventSeries(ev.seriesId!);
-              cascadeReviewTask();
+              cascadeTasksForEventIds(seriesIds.length > 0 ? seriesIds : [ev.id]);
               router.back();
             },
           },
@@ -720,7 +724,7 @@ export default function EventDetailScreen() {
             notifyCancelled();
             deleteEvent(ev.id);
             void removeEvent(ev.id);
-            cascadeReviewTask();
+            cascadeTasksForEventIds([ev.id]);
             router.back();
           },
         },

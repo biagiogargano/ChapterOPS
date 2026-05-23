@@ -606,18 +606,23 @@ export default function CreateEventScreen() {
       if (reviewTask) void insertTask(reviewTask);
     }
 
-    // Apply an event-task template (deterministic + idempotent). Create-only and
-    // for the PRIMARY created event only (no per-recurrence fan-out), mirroring
-    // the RSVP-review generation above. "None" generates nothing.
+    // Apply an event-task template (deterministic + idempotent). Create-only.
+    // Fan out over EVERY created occurrence so each instance gets its own linked
+    // tasks with due dates relative to that occurrence's date. Task ids are
+    // deterministic per event id (tmpl_<templateId>_<eventId>_<key>), so there are
+    // no collisions across occurrences. Non-recurring → `created` has one element,
+    // so this behaves exactly as before. "None" generates nothing.
     if (templateId !== NO_TEMPLATE) {
-      buildTasksForTemplateId(templateId, {
-        id:            primary.id,
-        title:         primary.title,
-        dateString:    primary.dateString,
-        createdByRole: role,
-      }).forEach(t => {
-        const added = addGeneratedTask(t);
-        if (added) void insertTask(added);
+      created.forEach(ev => {
+        buildTasksForTemplateId(templateId, {
+          id:            ev.id,
+          title:         ev.title,
+          dateString:    ev.dateString,
+          createdByRole: role,
+        }).forEach(t => {
+          const added = addGeneratedTask(t);
+          if (added) void insertTask(added);
+        });
       });
     }
 
