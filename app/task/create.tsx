@@ -12,6 +12,7 @@ import {
   type ProofType,
 } from '@/lib/mockTasks';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -100,6 +101,9 @@ function buildTaskEditNotice(
   }
   return { summary, severity, audience: Array.from(audience) };
 }
+
+// Sentinel option id meaning "not linked to any event" in the event picker.
+const STANDALONE_OPTION = '__standalone__';
 
 const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
   { value: 'text',       label: 'Text' },
@@ -301,21 +305,24 @@ export default function CreateTaskScreen() {
   // Event picker is collapsed by default; advanced options open only when an
   // edited task already uses them (so nothing configured is hidden on edit).
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
-  const [eventQuery, setEventQuery] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(
     () => editing && (!!existing?.requiresProof || !!existing?.requiresApproval || prefillDue.includeTime),
   );
 
   const events = useMemo(() => getAllEvents(), []);
 
-  // Event picker list: soonest first, then filtered by the typed query. Keeps the
-  // expanded list scannable as the number of events grows (client-side only).
-  const filteredEvents = useMemo(() => {
-    const q = eventQuery.trim().toLowerCase();
-    return [...events]
+  // Picker options (soonest first) + a "standalone" sentinel. The searchable
+  // picker handles filtering as the list grows.
+  const eventPickerOptions = useMemo(() => [
+    { id: STANDALONE_OPTION, label: 'None — standalone task' },
+    ...[...events]
       .sort((a, b) => a.dayOffset - b.dayOffset)
-      .filter(e => q === '' || e.title.toLowerCase().includes(q));
-  }, [events, eventQuery]);
+      .map(e => ({
+        id:       e.id,
+        label:    e.title,
+        sublabel: `${getEventDate(e.dayOffset).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`,
+      })),
+  ], [events]);
 
   // Launched from Event Detail ("+ Add Task") → the linked event is fixed to that
   // event; show a read-only summary instead of the full picker. Editing an
@@ -510,49 +517,10 @@ export default function CreateTaskScreen() {
               <Text style={s.lockedEventTitle} numberOfLines={1}>{lockedEventTitle}</Text>
             </View>
           ) : (
-            <View>
-              {/* Collapsed summary row — shows current choice; tap to change. */}
-              <Pressable style={s.eventSelectRow} onPress={() => setEventPickerOpen(o => !o)}>
-                <Text style={s.eventSelectValue} numberOfLines={1}>{selectedEventTitle}</Text>
-                <Text style={s.eventSelectChevron}>{eventPickerOpen ? '▴' : '▾'}</Text>
-              </Pressable>
-
-              {eventPickerOpen && (
-                <View style={[s.eventList, { marginTop: 8 }]}>
-                  <TextInput
-                    style={[s.textInput, { marginBottom: 2 }]}
-                    placeholder="Filter events…"
-                    placeholderTextColor="#475569"
-                    value={eventQuery}
-                    onChangeText={setEventQuery}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="search"
-                  />
-                  <Pressable
-                    style={[s.eventRow, !linkedEventId && s.eventRowOn]}
-                    onPress={() => { setLinkedEventId(undefined); setEventPickerOpen(false); }}
-                  >
-                    <Text style={[s.eventRowTitle, !linkedEventId && s.eventRowTitleOn]}>None — standalone task</Text>
-                  </Pressable>
-                  {filteredEvents.length === 0 ? (
-                    <Text style={s.eventRowSub}>No events match "{eventQuery.trim()}".</Text>
-                  ) : (
-                    filteredEvents.map(e => {
-                      const on   = linkedEventId === e.id;
-                      const date = getEventDate(e.dayOffset);
-                      const sub  = `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`;
-                      return (
-                        <Pressable key={e.id} style={[s.eventRow, on && s.eventRowOn]} onPress={() => { setLinkedEventId(e.id); setEventPickerOpen(false); }}>
-                          <Text style={[s.eventRowTitle, on && s.eventRowTitleOn]} numberOfLines={1}>{e.title}</Text>
-                          <Text style={s.eventRowSub} numberOfLines={1}>{sub}</Text>
-                        </Pressable>
-                      );
-                    })
-                  )}
-                </View>
-              )}
-            </View>
+            <Pressable style={s.eventSelectRow} onPress={() => setEventPickerOpen(true)}>
+              <Text style={s.eventSelectValue} numberOfLines={1}>{selectedEventTitle}</Text>
+              <Text style={s.eventSelectChevron}>▾</Text>
+            </Pressable>
           )}
         </View>
 
@@ -674,6 +642,15 @@ export default function CreateTaskScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <SearchablePicker
+        visible={eventPickerOpen}
+        title="Link to event"
+        searchPlaceholder="Filter events…"
+        options={eventPickerOptions}
+        onSelect={(id) => { setLinkedEventId(id === STANDALONE_OPTION ? undefined : id); setEventPickerOpen(false); }}
+        onClose={() => setEventPickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
