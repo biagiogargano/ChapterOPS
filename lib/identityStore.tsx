@@ -35,6 +35,7 @@ import {
   membershipForOrg,
   actingRoleFor,
   buildFallbackMembership,
+  pickDefaultOrg,
   type IdentityPhase,
 } from './identityResolution';
 import type { Role } from './roles';
@@ -243,26 +244,43 @@ export function IdentityProvider({
     });
   }, [auth.user?.id]);
 
-  // Restore a multi-org user's last selected org after restart. Runs only when
+  // Resolve a multi-org user out of 'selecting_org' after restart. Runs only when
   // resolution lands in 'selecting_org' (>1 membership, none chosen) and an
-  // authenticated user is present. Reads the per-user stored preference; if it's
-  // still a valid membership, re-selects it via the existing setActiveOrg path
-  // (which also re-persists). A stale/invalid stored id is ignored and cleaned
-  // up, leaving the user in 'selecting_org'. The cancelled guard prevents a slow
-  // read from applying after an account switch. Inert flag-off: fallback never
-  // reaches 'selecting_org' and auth.user is null.
+  // authenticated user is present.
+  //
+  // Precedence:
+  //   1. A VALID stored per-user preference wins → re-select it via setActiveOrg
+  //      (which also re-persists).
+  //   2. A stale/invalid stored id is cleaned up, then we fall through to (3).
+  //   3. No valid stored preference → pick a DETERMINISTIC default org
+  //      (pickDefaultOrg: name asc, id tie-breaker) and select it via setActiveOrg
+  //      (which persists it as the new preference). This replaces the previous
+  //      "stay on the onboarding hub" behavior for first-time multi-org users.
+  //   4. If there is no valid default (empty memberships — shouldn't occur in
+  //      'selecting_org'), behavior is unchanged (stay in 'selecting_org').
+  //
+  // No preference is written except through setActiveOrg (its existing behavior).
+  // The cancelled guard prevents a slow read from applying after an account
+  // switch. Inert flag-off: the fallback identity never reaches 'selecting_org'
+  // and auth.user is null.
   useEffect(() => {
     if (phase !== 'selecting_org') return;
     const uid = auth.user?.id;
     if (!uid) return;
     let cancelled = false;
     void getPreferredOrg(uid).then(stored => {
-      if (cancelled || !stored) return;
-      if (memberships.some(m => m.organization.id === stored)) {
+      if (cancelled) return;
+      // 1. Valid stored preference wins.
+      if (stored && memberships.some(m => m.organization.id === stored)) {
         setActiveOrg(stored);
-      } else {
-        void clearPreferredOrg(uid);   // stale-key housekeeping
+        return;
       }
+      // 2. Stale stored id → housekeeping.
+      if (stored) void clearPreferredOrg(uid);
+      // 3. No valid stored preference → deterministic default (persists via setActiveOrg).
+      const def = pickDefaultOrg(memberships);
+      if (def) setActiveOrg(def);
+      // 4. No valid default → leave in 'selecting_org' (unchanged).
     });
     return () => { cancelled = true; };
   }, [phase, auth.user?.id, memberships, setActiveOrg]);
