@@ -488,10 +488,16 @@ export default function EventDetailScreen() {
     return () => { cancelled = true; };
   }, [id, dataOrgId]);
 
-  // Recompute related tasks on focus so a task deleted/unlinked elsewhere (e.g.
-  // from Task Detail) disappears from this list immediately when we return.
+  // On focus: recompute related tasks AND re-read the event from the store so an
+  // edit made elsewhere (Event Create/Edit updates the cache, then router.back()s
+  // here) shows immediately. Guarded so a UUID event not yet in the local cache
+  // isn't blanked — the fetchEventById effect above still handles that case.
   const [, _bumpFocus] = useState(0);
-  useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
+  useFocusEffect(useCallback(() => {
+    _bumpFocus(n => n + 1);
+    const fresh = findEventById(id ?? '');
+    if (fresh) setEvent(fresh);
+  }, [id]));
 
   // All related tasks visible to this role. Match by linkedEventId when present
   // (robust to a title edit), else by title (legacy/seed tasks).

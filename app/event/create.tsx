@@ -513,7 +513,9 @@ export default function CreateEventScreen() {
           void updateEvent(updated);   // persist editable fields (incl. date)
           emitEditNotice(true);
         }
-        router.replace(`/event/${existing!.id}` as any);
+        // Pop back to the Event Detail already in the stack (it re-reads the
+        // updated event on focus) — avoids pushing a duplicate detail screen.
+        router.back();
       }
 
       function applySeries() {
@@ -524,7 +526,8 @@ export default function CreateEventScreen() {
           time: input.time, location: input.location, description: input.description,
         });
         emitEditNotice(false);                       // date excluded for series
-        router.replace(`/event/${existing!.id}` as any);
+        // Pop back to the existing Event Detail (refreshes on focus) — no duplicate.
+        router.back();
       }
 
       // Recurring → ask the edit scope; otherwise edit the single event.
