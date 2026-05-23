@@ -11,7 +11,7 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  president:         'President',
+  president:         'Consul',
   pro_consul:        'Pro Consul',
   annotator:         'Annotator',
   risk_manager:      'Risk Manager',
