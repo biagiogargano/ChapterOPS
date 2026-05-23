@@ -581,58 +581,74 @@ export default function EventDetailScreen() {
       return added;
     };
 
-    // Replace this event's existing template tasks. Tasks already submitted or
-    // approved are PROTECTED (kept); only not-yet-acted-on ones are removed.
-    const doReplace = (e: typeof ev, existingTmpl: MockTask[]) => {
-      const PROTECTED = new Set<string>(['submitted', 'approved']);
+    const PROTECTED = new Set<string>(['submitted', 'approved']);
+    // Existing template tasks linked to any of the given event ids.
+    const tmplTasksFor = (ids: Set<string>): MockTask[] =>
+      getAllTasks().filter(t => !!t.linkedEventId && ids.has(t.linkedEventId) && t.id.startsWith('tmpl_'));
+
+    // Replace across a set of target events: remove not-yet-acted-on template
+    // tasks (submitted/approved are kept), then regenerate for each target.
+    const performReplace = (targets: (typeof ev)[], existingTmpl: MockTask[]) => {
       const removable = existingTmpl.filter(t => !PROTECTED.has(getStoredState(t.id, t.state)));
-      const kept      = existingTmpl.filter(t =>  PROTECTED.has(getStoredState(t.id, t.state)));
-      const perform = () => {
-        removable.forEach(t => { deleteUserTask(t.id); void removeTask(t.id); });
+      const keptCount = existingTmpl.length - removable.length;
+      removable.forEach(t => { deleteUserTask(t.id); void removeTask(t.id); });
+      const snapshot = new Set(getAllTasks().map(t => t.id));   // post-deletion
+      let added = 0;
+      targets.forEach(e => {
         const newTasks = buildTasksForTemplateId(templateId, inputFor(e));
-        // Un-tombstone the ids we're about to (re)generate so a same-template replace works.
-        clearGeneratedTombstones(newTasks.map(t => t.id));
-        const existingIds = new Set(getAllTasks().map(t => t.id));
-        let added = 0;
-        newTasks.forEach(t => { const a = addGeneratedTask(t); if (a && !existingIds.has(t.id)) { added++; void insertTask(a); } });
-        _bumpFocus(n => n + 1);
-        const keptMsg = kept.length > 0 ? ` ${kept.length} in-review/done task${kept.length === 1 ? '' : 's'} kept.` : '';
-        Alert.alert('Template replaced', `Removed ${removable.length}, added ${added}.${keptMsg}`);
-      };
-      if (kept.length > 0) {
-        Alert.alert(
-          'Some tasks will be kept',
-          `${kept.length} task${kept.length === 1 ? '' : 's'} in review or done will be kept; ${removable.length} will be replaced. Continue?`,
-          [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', style: 'destructive', onPress: perform }],
-        );
+        clearGeneratedTombstones(newTasks.map(t => t.id));       // allow same-template regen
+        newTasks.forEach(t => { const a = addGeneratedTask(t); if (a && !snapshot.has(t.id)) { added++; void insertTask(a); } });
+      });
+      _bumpFocus(n => n + 1);
+      const keptMsg = keptCount > 0 ? ` ${keptCount} in-review/done kept.` : '';
+      const scope   = targets.length > 1 ? ` across ${targets.length} events` : '';
+      Alert.alert('Template replaced', `Removed ${removable.length}, added ${added}${scope}.${keptMsg}`);
+    };
+
+    // Replace flow with confirmation. Series replace ALWAYS confirms (explicit);
+    // single-event confirms only when in-progress/done tasks would be kept.
+    const replaceFlow = (targets: (typeof ev)[], alwaysConfirm: boolean) => {
+      const existingTmpl   = tmplTasksFor(new Set(targets.map(t => t.id)));
+      const removableCount = existingTmpl.filter(t => !PROTECTED.has(getStoredState(t.id, t.state))).length;
+      const keptCount      = existingTmpl.length - removableCount;
+      if (keptCount > 0 || alwaysConfirm) {
+        const parts: string[] = [];
+        if (targets.length > 1) parts.push(`This affects ${targets.length} events in the series.`);
+        parts.push(keptCount > 0
+          ? `${keptCount} in-review/done task${keptCount === 1 ? '' : 's'} will be kept; ${removableCount} will be replaced.`
+          : `${removableCount} existing template task${removableCount === 1 ? '' : 's'} will be replaced.`);
+        Alert.alert('Replace template tasks?', parts.join(' '), [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Replace', style: 'destructive', onPress: () => performReplace(targets, existingTmpl) },
+        ]);
       } else {
-        perform();
+        performReplace(targets, existingTmpl);
       }
     };
 
-    // Single-event apply: prompt Add vs Replace only when it already has template tasks.
-    const applySingle = (e: typeof ev) => {
-      const existingTmpl = getAllTasks().filter(
-        t => !!t.linkedEventId && t.linkedEventId === e.id && t.id.startsWith('tmpl_'),
-      );
-      if (existingTmpl.length === 0) {
-        const n = generateAdd([e]);
-        Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
+    // Apply to a set of events: direct add if none have template tasks yet; else
+    // prompt Add on top vs Replace. `alwaysConfirmReplace` is true for a series.
+    const applyTo = (targets: (typeof ev)[], alwaysConfirmReplace: boolean) => {
+      const existing = tmplTasksFor(new Set(targets.map(t => t.id)));
+      const scope = targets.length > 1 ? ` across ${targets.length} events` : ' to this event';
+      if (existing.length === 0) {
+        const n = generateAdd(targets);
+        Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'}${scope}.` : 'Those tasks are already present.');
         return;
       }
       Alert.alert(
-        'Event already has template tasks',
-        'Add this template on top of the existing tasks, or replace the existing template tasks?',
+        'Already has template tasks',
+        `Add this template on top of the existing tasks, or replace the existing template tasks${targets.length > 1 ? ' across the series' : ''}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Add on top',
             onPress: () => {
-              const n = generateAdd([e]);
-              Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'}.` : 'Those tasks are already on this event.');
+              const n = generateAdd(targets);
+              Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'}${scope}.` : 'Those tasks are already present.');
             },
           },
-          { text: 'Replace', style: 'destructive', onPress: () => doReplace(e, existingTmpl) },
+          { text: 'Replace', style: 'destructive', onPress: () => replaceFlow(targets, alwaysConfirmReplace) },
         ],
       );
     };
@@ -641,24 +657,17 @@ export default function EventDetailScreen() {
       ? getAllEvents().filter(e => e.seriesId === ev.seriesId)
       : [];
 
-    // Recurring series → choose scope. Entire-series stays add-only for now
-    // (single-event Add/Replace is this checkpoint's scope).
+    // Recurring series → choose scope first, then Add vs Replace within that scope.
     if (occurrences.length > 1) {
       Alert.alert('Apply template', `"${ev.title}" is part of a recurring series.`, [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'This Event Only', onPress: () => applySingle(ev) },
-        {
-          text: 'Entire Series',
-          onPress: () => {
-            const n = generateAdd(occurrences);
-            Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} across ${occurrences.length} events.` : 'Those tasks are already on the series.');
-          },
-        },
+        { text: 'This Event Only', onPress: () => applyTo([ev], false) },
+        { text: 'Entire Series',   onPress: () => applyTo(occurrences, true) },
       ]);
       return;
     }
 
-    applySingle(ev);
+    applyTo([ev], false);
   }
 
   useEffect(() => {
