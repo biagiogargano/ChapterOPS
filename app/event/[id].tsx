@@ -22,6 +22,7 @@ import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
+  addGeneratedTask,
   deleteUserTask,
   dueLabelOf,
   filterTasksForRole,
@@ -33,7 +34,9 @@ import {
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
-import { removeTask } from '@/lib/taskService';
+import { NO_TEMPLATE } from '@/lib/eventTemplates';
+import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import { insertTask, removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -45,6 +48,7 @@ function isUUID(s: string): boolean { return UUID_RE.test(s); }
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -536,11 +540,37 @@ export default function EventDetailScreen() {
   // Re-render when any task interaction state changes so the prep-progress strip
   // and the per-task badges stay in sync with the Task Detail state machine.
   useTaskStateVersion();
+  useCustomTemplatesVersion();   // picker reflects newly-built custom templates
   // Prep-task progress (completed = approved). RSVP summary intentionally omitted.
   const taskOps = summarizeEventOps(
     [],
     relatedTasks.map(t => ({ state: getStoredState(t.id, t.state) })),
   ).tasks;
+
+  // Apply-template-to-existing-event picker (officer action).
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const templateChoices = mergedTemplateOptions().filter(o => o.id !== NO_TEMPLATE);
+
+  function applyTemplateToEvent(templateId: string) {
+    setTemplatePickerOpen(false);
+    if (!event) return;
+    const d  = getEventDate(event.dayOffset);
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const tasks = buildTasksForTemplateId(templateId, {
+      id:            event.id,
+      title:         event.title,
+      dateString:    ds,
+      createdByRole: role,
+    });
+    let added = 0;
+    // Deterministic ids make this idempotent — re-applying skips existing tasks.
+    tasks.forEach(t => { const a = addGeneratedTask(t); if (a) { added++; void insertTask(a); } });
+    _bumpFocus(n => n + 1);   // recompute the related-task list now
+    Alert.alert(
+      'Template applied',
+      added > 0 ? `Added ${added} task${added === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.',
+    );
+  }
 
   useEffect(() => {
     if (!event) return;
@@ -776,11 +806,14 @@ export default function EventDetailScreen() {
                 <Text style={s.prepProgressText}>{taskOps.completed}/{taskOps.total} done</Text>
               )}
               {officer && (
-                <Pressable
-                  onPress={() => router.push(`/task/create?eventId=${event.id}` as any)}
-                >
-                  <Text style={s.addTaskText}>+ Add Task</Text>
-                </Pressable>
+                <>
+                  <Pressable onPress={() => setTemplatePickerOpen(true)}>
+                    <Text style={s.addTaskText}>Apply template</Text>
+                  </Pressable>
+                  <Pressable onPress={() => router.push(`/task/create?eventId=${event.id}` as any)}>
+                    <Text style={s.addTaskText}>+ Add Task</Text>
+                  </Pressable>
+                </>
               )}
             </View>
           </View>
@@ -817,6 +850,29 @@ export default function EventDetailScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+
+    {/* ── Apply-template picker (officer) ── */}
+    <Modal
+      visible={templatePickerOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setTemplatePickerOpen(false)}
+    >
+      <Pressable style={s.modalBackdrop} onPress={() => setTemplatePickerOpen(false)}>
+        <Pressable style={s.modalCard} onPress={() => {}}>
+          <Text style={s.modalTitle}>Apply a template</Text>
+          <Text style={s.modalHint}>Adds the template's prep tasks to this event.</Text>
+          {templateChoices.map(opt => (
+            <Pressable key={opt.id} style={s.modalRow} onPress={() => applyTemplateToEvent(opt.id)}>
+              <Text style={s.modalRowText}>{opt.label}</Text>
+            </Pressable>
+          ))}
+          <Pressable style={s.modalCancel} onPress={() => setTemplatePickerOpen(false)}>
+            <Text style={s.modalCancelText}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -935,6 +991,16 @@ const s = StyleSheet.create({
   },
 
   // Related tasks header row (+ Add Task)
+  // Apply-template picker modal
+  modalBackdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 28 },
+  modalCard:       { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#334155' },
+  modalTitle:      { fontSize: 16, fontWeight: '800', color: '#f8fafc' },
+  modalHint:       { fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 12 },
+  modalRow:        { paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', marginBottom: 8 },
+  modalRowText:    { fontSize: 15, fontWeight: '600', color: '#a5b4fc' },
+  modalCancel:     { paddingVertical: 12, alignItems: 'center', marginTop: 2 },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
+
   relatedHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   relatedHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   prepProgressText:   { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 12 },
