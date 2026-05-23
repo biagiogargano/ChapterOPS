@@ -554,27 +554,61 @@ export default function EventDetailScreen() {
   function applyTemplateToEvent(templateId: string) {
     setTemplatePickerOpen(false);
     if (!event) return;
-    const d  = getEventDate(event.dayOffset);
-    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const tasks = buildTasksForTemplateId(templateId, {
-      id:            event.id,
-      title:         event.title,
-      dateString:    ds,
-      createdByRole: role,
-    });
-    // addGeneratedTask returns the EXISTING task (truthy) when the id is already
-    // present, so count "new" by comparing against a pre-apply id snapshot.
-    const existingIds = new Set(getAllTasks().map(t => t.id));
-    let added = 0;
-    tasks.forEach(t => {
-      const a = addGeneratedTask(t);
-      if (a && !existingIds.has(t.id)) { added++; void insertTask(a); }
-    });
-    _bumpFocus(n => n + 1);   // recompute the related-task list now
-    Alert.alert(
-      'Template applied',
-      added > 0 ? `Added ${added} task${added === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.',
-    );
+    const ev = event;
+
+    // That occurrence's ISO date, for due-date math relative to it.
+    const dsFor = (e: typeof ev) => {
+      const d = getEventDate(e.dayOffset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    // Generate the template's tasks for each target event; count only NEW ones
+    // (addGeneratedTask returns the existing task when already present → idempotent).
+    const generate = (targets: (typeof ev)[]): number => {
+      const existingIds = new Set(getAllTasks().map(t => t.id));
+      let added = 0;
+      targets.forEach(e => {
+        buildTasksForTemplateId(templateId, {
+          id:            e.id,
+          title:         e.title,
+          dateString:    dsFor(e),
+          createdByRole: role,
+        }).forEach(t => {
+          const a = addGeneratedTask(t);
+          if (a && !existingIds.has(t.id)) { added++; void insertTask(a); }
+        });
+      });
+      _bumpFocus(n => n + 1);   // recompute the related-task list now
+      return added;
+    };
+
+    const occurrences = (ev.isRecurring && ev.seriesId)
+      ? getAllEvents().filter(e => e.seriesId === ev.seriesId)
+      : [];
+
+    // Recurring series → let the officer choose scope (mirrors edit/delete).
+    if (occurrences.length > 1) {
+      Alert.alert('Apply template', `"${ev.title}" is part of a recurring series.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'This Event Only',
+          onPress: () => {
+            const n = generate([ev]);
+            Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
+          },
+        },
+        {
+          text: 'Entire Series',
+          onPress: () => {
+            const n = generate(occurrences);
+            Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} across ${occurrences.length} events.` : 'Those tasks are already on the series.');
+          },
+        },
+      ]);
+      return;
+    }
+
+    const n = generate([ev]);
+    Alert.alert('Template applied', n > 0 ? `Added ${n} task${n === 1 ? '' : 's'} to this event.` : 'Those tasks are already on this event.');
   }
 
   useEffect(() => {
