@@ -271,7 +271,7 @@ function taskBadgeFor(state: TaskState, overdue: boolean): { label: string; colo
   if (state === 'submitted')                         return { label: 'In review', color: '#fbbf24', bg: '#1c1407' };
   if (overdue || state === 'overdue' || state === 'escalated')
                                                      return { label: 'Overdue',   color: '#f87171', bg: '#1a0505' };
-  return { label: 'Open', color: '#94a3b8', bg: '#1e293b' };   // assigned / rejected
+  return { label: 'To do', color: '#94a3b8', bg: '#1e293b' };   // assigned / rejected
 }
 
 function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
