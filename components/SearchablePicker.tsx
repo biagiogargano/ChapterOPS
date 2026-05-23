@@ -24,6 +24,7 @@ export default function SearchablePicker({
   searchPlaceholder = 'Search…',
   onSelect,
   onClose,
+  onDismiss,
 }: {
   visible:            boolean;
   title:              string;
@@ -33,6 +34,7 @@ export default function SearchablePicker({
   searchPlaceholder?: string;
   onSelect:           (id: string) => void;
   onClose:            () => void;
+  onDismiss?:         () => void;   // iOS: fires after the modal finishes dismissing
 }) {
   const [query, setQuery] = useState('');
   // Reset the filter each time the picker opens.
@@ -42,7 +44,7 @@ export default function SearchablePicker({
   const filtered = q === '' ? options : options.filter(o => o.label.toLowerCase().includes(q));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} onDismiss={onDismiss}>
       <Pressable style={s.backdrop} onPress={onClose}>
         {/* Inner press swallows taps so they don't close the modal. */}
         <Pressable style={s.card} onPress={() => {}}>
