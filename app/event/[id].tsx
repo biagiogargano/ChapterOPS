@@ -520,9 +520,13 @@ export default function EventDetailScreen() {
     if (fresh) setEvent(fresh);
   }, [id]));
 
-  // All related tasks visible to this role. Match by linkedEventId when present
-  // (robust to a title edit), else by title (legacy/seed tasks).
-  const allRelatedTasks = filterTasksForRole(role).filter(t => {
+  // Related tasks for this event. Officers see ALL of the event's tasks (chapter-
+  // wide) so an applied template's generated tasks — which may be assigned to
+  // other officers and thus role-hidden — are fully visible here and the prep
+  // progress matches the Officer Overview. Non-officers stay role-scoped.
+  // Match by linkedEventId when present (robust to a title edit), else by title.
+  const taskSource = isOfficer(role) ? getAllTasks() : filterTasksForRole(role);
+  const allRelatedTasks = taskSource.filter(t => {
     if (t.isWorkflowParent) return false;
     return t.linkedEventId ? t.linkedEventId === event?.id : t.linkedEvent === event?.title;
   });
