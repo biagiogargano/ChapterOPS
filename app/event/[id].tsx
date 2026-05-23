@@ -562,9 +562,14 @@ export default function EventDetailScreen() {
       dateString:    ds,
       createdByRole: role,
     });
+    // addGeneratedTask returns the EXISTING task (truthy) when the id is already
+    // present, so count "new" by comparing against a pre-apply id snapshot.
+    const existingIds = new Set(getAllTasks().map(t => t.id));
     let added = 0;
-    // Deterministic ids make this idempotent — re-applying skips existing tasks.
-    tasks.forEach(t => { const a = addGeneratedTask(t); if (a) { added++; void insertTask(a); } });
+    tasks.forEach(t => {
+      const a = addGeneratedTask(t);
+      if (a && !existingIds.has(t.id)) { added++; void insertTask(a); }
+    });
     _bumpFocus(n => n + 1);   // recompute the related-task list now
     Alert.alert(
       'Template applied',
