@@ -1,13 +1,15 @@
 /**
- * SearchablePicker — a reusable modal list with a filter box.
+ * SearchablePicker — a reusable single-select list with a filter box.
  *
- * For choosing one option from a list that may grow long (templates, events,
- * later assignees). Pure presentation: the parent owns the data and the
- * selection handler. Dark-themed to match the app.
+ * Rendered as an in-tree **absolute overlay** (not a native Modal): on iOS a
+ * native Modal presenting over a long ScrollView resets the underlying scroll
+ * offset, so we avoid Modal entirely. The overlay fills its parent screen and
+ * paints on top; the parent's scroll position is untouched. Pure presentation —
+ * the parent owns the data and selection handler.
  */
 
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export interface PickerOption {
   id:        string;
@@ -24,7 +26,6 @@ export default function SearchablePicker({
   searchPlaceholder = 'Search…',
   onSelect,
   onClose,
-  onDismiss,
 }: {
   visible:            boolean;
   title:              string;
@@ -34,66 +35,65 @@ export default function SearchablePicker({
   searchPlaceholder?: string;
   onSelect:           (id: string) => void;
   onClose:            () => void;
-  onDismiss?:         () => void;   // iOS: fires after the modal finishes dismissing
 }) {
   const [query, setQuery] = useState('');
   // Reset the filter each time the picker opens.
   useEffect(() => { if (visible) setQuery(''); }, [visible]);
 
+  if (!visible) return null;
+
   const q = query.trim().toLowerCase();
   const filtered = q === '' ? options : options.filter(o => o.label.toLowerCase().includes(q));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} onDismiss={onDismiss}>
-      <Pressable style={s.backdrop} onPress={onClose}>
-        {/* Inner press swallows taps so they don't close the modal. */}
-        <Pressable style={s.card} onPress={() => {}}>
-          <Text style={s.title}>{title}</Text>
-          {hint ? <Text style={s.hint}>{hint}</Text> : null}
+    <Pressable style={s.overlay} onPress={onClose}>
+      {/* Inner press swallows taps so they don't close the overlay. */}
+      <Pressable style={s.card} onPress={() => {}}>
+        <Text style={s.title}>{title}</Text>
+        {hint ? <Text style={s.hint}>{hint}</Text> : null}
 
-          {options.length > 6 && (
-            <TextInput
-              style={s.search}
-              placeholder={searchPlaceholder}
-              placeholderTextColor="#475569"
-              value={query}
-              onChangeText={setQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
+        {options.length > 6 && (
+          <TextInput
+            style={s.search}
+            placeholder={searchPlaceholder}
+            placeholderTextColor="#475569"
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+        )}
+
+        <ScrollView style={s.list} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {filtered.length === 0 ? (
+            <Text style={s.empty}>No matches{query.trim() ? ` for "${query.trim()}"` : ''}.</Text>
+          ) : (
+            filtered.map(o => {
+              const isSel = o.id === selectedId;
+              return (
+                <Pressable key={o.id} style={[s.row, isSel && s.rowSel]} onPress={() => onSelect(o.id)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.rowLabel, isSel && s.rowLabelSel]} numberOfLines={1}>{o.label}</Text>
+                    {o.sublabel ? <Text style={s.rowSub} numberOfLines={1}>{o.sublabel}</Text> : null}
+                  </View>
+                  {isSel && <Text style={s.check}>✓</Text>}
+                </Pressable>
+              );
+            })
           )}
+        </ScrollView>
 
-          <ScrollView style={s.list} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {filtered.length === 0 ? (
-              <Text style={s.empty}>No matches{query.trim() ? ` for "${query.trim()}"` : ''}.</Text>
-            ) : (
-              filtered.map(o => {
-                const isSel = o.id === selectedId;
-                return (
-                  <Pressable key={o.id} style={[s.row, isSel && s.rowSel]} onPress={() => onSelect(o.id)}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.rowLabel, isSel && s.rowLabelSel]} numberOfLines={1}>{o.label}</Text>
-                      {o.sublabel ? <Text style={s.rowSub} numberOfLines={1}>{o.sublabel}</Text> : null}
-                    </View>
-                    {isSel && <Text style={s.check}>✓</Text>}
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-
-          <Pressable style={s.cancel} onPress={onClose}>
-            <Text style={s.cancelText}>Cancel</Text>
-          </Pressable>
+        <Pressable style={s.cancel} onPress={onClose}>
+          <Text style={s.cancelText}>Cancel</Text>
         </Pressable>
       </Pressable>
-    </Modal>
+    </Pressable>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 28 },
+  overlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 28, zIndex: 1000, elevation: 1000 },
   card:     { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#334155', maxHeight: '70%' },
   title:    { fontSize: 16, fontWeight: '800', color: '#f8fafc' },
   hint:     { fontSize: 13, color: '#64748b', marginTop: 4 },

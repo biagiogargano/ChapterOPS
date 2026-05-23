@@ -29,7 +29,7 @@ import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -454,13 +454,6 @@ export default function CreateEventScreen() {
   const templateOptions = mergedTemplateOptions();
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const selectedTemplateLabel = templateOptions.find(o => o.id === templateId)?.label ?? 'None';
-
-  // iOS resets a long ScrollView's offset when a Modal dismisses. Capture the
-  // scroll position when the template picker opens and restore it after dismiss.
-  const scrollRef    = useRef<ScrollView>(null);
-  const scrollY      = useRef(0);
-  const savedScrollY = useRef(0);
-  function openTemplatePicker() { savedScrollY.current = scrollY.current; setTemplatePickerOpen(true); }
   // Specs of the selected template, for the preview (read-only; same data the
   // generator uses, so the preview can't drift from what gets created).
   const previewSpecs = templateId !== NO_TEMPLATE
@@ -649,9 +642,6 @@ export default function CreateEventScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
       <ScrollView
-        ref={scrollRef}
-        onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }}
-        scrollEventThrottle={16}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -765,7 +755,7 @@ export default function CreateEventScreen() {
         {!editing && (
           <View style={s.field}>
             <FieldLabel text="APPLY TEMPLATE" />
-            <Pressable style={s.templateSelectRow} onPress={openTemplatePicker}>
+            <Pressable style={s.templateSelectRow} onPress={() => setTemplatePickerOpen(true)}>
               <Text style={s.templateSelectValue} numberOfLines={1}>{selectedTemplateLabel}</Text>
               <Text style={s.templateSelectChevron}>▾</Text>
             </Pressable>
@@ -867,7 +857,6 @@ export default function CreateEventScreen() {
         selectedId={templateId}
         onSelect={(id) => { setTemplateId(id); setTemplatePickerOpen(false); }}
         onClose={() => setTemplatePickerOpen(false)}
-        onDismiss={() => scrollRef.current?.scrollTo({ y: savedScrollY.current, animated: false })}
       />
     </KeyboardAvoidingView>
   );
