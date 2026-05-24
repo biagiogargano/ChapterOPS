@@ -67,6 +67,13 @@ const GROUPS: Group[] = [
       { title: 'Points & leaderboard', sub: 'Participation points and rankings', route: '/points' },
     ],
   },
+  {
+    label: 'APP SHELL',
+    items: [
+      { title: 'Pinned tab',  sub: 'Customizable quick-access shortcuts (role-gated)', route: '/pinned' },
+      { title: 'First-time experience ✨', sub: 'Empty chapter → guided first event', route: '/first-run' },
+    ],
+  },
 ];
 
 export default function PrototypesHub() {
