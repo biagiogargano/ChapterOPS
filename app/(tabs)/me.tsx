@@ -172,6 +172,13 @@ export default function MeScreen() {
             </View>
             <Text style={s.linkChevron}>›</Text>
           </Pressable>
+          <Pressable style={s.linkCard} onPress={() => router.push('/tutorial' as any)}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.linkTitle}>Welcome walkthrough (prototype)</Text>
+              <Text style={s.linkSub}>First-use intro to the app's main surfaces</Text>
+            </View>
+            <Text style={s.linkChevron}>›</Text>
+          </Pressable>
           <Pressable style={s.linkCard} onPress={() => router.push('/report/weekly' as any)}>
             <View style={{ flex: 1 }}>
               <Text style={s.linkTitle}>Weekly report (prototype)</Text>
