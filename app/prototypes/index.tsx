@@ -16,6 +16,7 @@ const GROUPS: Group[] = [
     label: 'ONBOARDING & SETUP',
     items: [
       { title: 'First-time experience ✨', sub: 'Empty chapter → guided → create your first event', route: '/first-run' },
+      { title: 'Org type / templates',  sub: 'Pick org type → see default roles/events/report',     route: '/setup/org-type' },
       { title: 'Org setup wizard',      sub: 'Guided first-run: name, owner, structure, invites', route: '/setup' },
       { title: 'Invite people',         sub: 'Add name/email/position to your roster',              route: '/setup/invite-people' },
       { title: 'Invite link + join form', sub: 'Share a link; configure join questions (owner)',     route: '/setup/invite-link' },

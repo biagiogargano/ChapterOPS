@@ -77,6 +77,9 @@ export default function SetupWizardScreen() {
             <Text style={s.q}>What’s your organization called?</Text>
             <TextInput style={s.input} placeholder="e.g. Sigma Chi — Beta Chapter" placeholderTextColor="#475569" value={orgName} onChangeText={setOrgName} autoFocus />
             <Text style={s.help}>You can change this later. That’s the only thing you must do — everything after is optional.</Text>
+            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/org-type' as any)}>
+              <Text style={s.previewText}>Choose your org type for smart defaults ›</Text>
+            </Pressable>
           </View>
         )}
 
