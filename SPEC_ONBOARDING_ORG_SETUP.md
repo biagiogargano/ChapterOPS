@@ -28,6 +28,20 @@ Offer a ready-made tier structure the org can rename/trim — never force it:
 Labels are org-customizable (CEO vs President vs Consul). An org can start minimal
 (just owner + members) and grow.
 
+### 2a. Build the tree by ASKING, not a grid (preferred)
+Rather than drop a big org-chart grid in the owner's face, **build the hierarchy
+through questions**, top-down:
+1. "What's **your** role called?" → the root (owner).
+2. "**Who reports to** [role]? What are they called?" → add one or more child roles.
+3. Repeat the same question for each child, walking **down the chain** until a role
+   has no reports or is marked **General members** (a leaf bucket).
+4. Options along the way: add **General members** as a catch-all, mark "no one
+   reports to them," and (full version) "this role **also reports to** X" so a role
+   can have a second manager / roles can cross-link — without ever showing a graph
+   editor.
+This produces the same tree the Leadership prototype renders, but assembled by
+answering simple questions. The grid/graph is only a *result*, never the input.
+
 ## 3. Invite system (the core mechanic)
 - **Owner invites** people into top roles (e.g. "be our VP").
 - **Anyone with a role/committee can invite** people **to their own committee**.
