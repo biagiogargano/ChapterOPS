@@ -38,6 +38,7 @@ import { rsvpReviewTaskId } from '@/lib/generatedTasks';
 import { NO_TEMPLATE } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
 import SearchablePicker from '@/components/SearchablePicker';
+import { deriveEventDuties } from '@/lib/eventDuties/deriveEventDuties';
 import { insertTask, removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -898,15 +899,36 @@ export default function EventDetailScreen() {
         requiresCovering={rsvpNeedsCovering}
       />
 
-      {/* ── Take attendance (preview, dev only — feature-branch tie-in) ── */}
-      {__DEV__ && officer && (
-        <Pressable
-          style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: '#1e293b', borderRadius: 8, paddingVertical: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: '#334155' }}
-          onPress={() => router.push('/checkin' as any)}
-        >
-          <Text style={{ color: '#818cf8', fontSize: 13, fontWeight: '600' }}>✓ Take attendance (preview)</Text>
-        </Pressable>
-      )}
+      {/* ── Duties this event generates (preview, dev only — feature-branch tie-in) ── */}
+      {__DEV__ && (() => {
+        const duties = deriveEventDuties(event);
+        if (duties.length === 0) return null;
+        return (
+          <View style={{ marginTop: 18 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 10 }}>
+              THIS EVENT GENERATES (PREVIEW)
+            </Text>
+            {duties.map(d => {
+              const ownerLabel = d.owner === 'all' ? 'All members' : ROLE_LABELS[d.owner];
+              const tappable = !!d.route;
+              return (
+                <Pressable
+                  key={d.id}
+                  onPress={() => d.route && router.push(d.route as any)}
+                  disabled={!tappable}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1e293b', borderRadius: 10, padding: 12, marginBottom: 8 }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#f1f5f9' }}>{d.label}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{ownerLabel} · {d.timing}</Text>
+                  </View>
+                  {tappable && <Text style={{ color: '#818cf8', fontSize: 18 }}>›</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+        );
+      })()}
 
       {/* ── Your Date (member submission — any role, when event collects names) ── */}
       {event.requiresDateNames && (
