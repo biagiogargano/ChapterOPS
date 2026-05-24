@@ -27,6 +27,7 @@ const GROUPS: Group[] = [
       { title: 'Leadership tree',  sub: 'Who reports to whom · who can delegate down', route: '/leadership' },
       { title: 'Delegate a task',  sub: 'Reassign down the tree (tree-driven rules)',  route: '/delegate' },
       { title: 'My committee',     sub: "Your group's members, events, and tasks",     route: '/committee' },
+      { title: 'Members roster',   sub: 'Browse/search people · add a member',         route: '/roster' },
     ],
   },
   {
@@ -42,6 +43,13 @@ const GROUPS: Group[] = [
     label: 'EVENTS',
     items: [
       { title: 'RSVP settings',  sub: 'Required RSVP on optional events (decoupled)', route: '/rsvp-optional' },
+    ],
+  },
+  {
+    label: 'COMMUNICATION',
+    items: [
+      { title: 'Announcements', sub: 'Chapter-wide notices feed + post',  route: '/announcements' },
+      { title: 'Quick poll',    sub: 'Lightweight chapter vote with tallies', route: '/poll' },
     ],
   },
 ];
