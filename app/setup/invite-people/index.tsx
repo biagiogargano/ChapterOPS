@@ -34,11 +34,11 @@ export default function InvitePeopleScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock invites, nothing sent</Text></View>
 
-        <Text style={s.heading}>Invite your people first</Text>
-        <Text style={s.sub}>Add the people who'll be in your org — name, email, and what their position is called. Then you'll place them into your leadership tree.</Text>
+        <Text style={s.heading}>Add people manually</Text>
+        <Text style={s.sub}>The fallback for a few known people — name, email, and position. For most orgs it's easier to share the invite link and let people join themselves.</Text>
 
         <Pressable style={s.linkBanner} onPress={() => router.push('/setup/invite-link' as any)}>
-          <Text style={s.linkBannerText}>Big group? Share an invite link instead ›</Text>
+          <Text style={s.linkBannerText}>← Recommended: share an invite link instead</Text>
         </Pressable>
 
         <View style={s.form}>

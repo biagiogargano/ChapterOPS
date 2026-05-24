@@ -56,7 +56,7 @@ export default function OrgTypeScreen() {
         <Text style={s.pValue}>{t.defaultReport ? `Yes — ${t.reportName}` : 'None by default'}</Text>
       </View>
 
-      <Pressable style={s.primary} onPress={() => router.push('/setup/invite-people' as any)}>
+      <Pressable style={s.primary} onPress={() => router.push('/setup/invite-link' as any)}>
         <Text style={s.primaryText}>Use {t.label} defaults ›</Text>
       </Pressable>
       <Text style={s.footNote}>

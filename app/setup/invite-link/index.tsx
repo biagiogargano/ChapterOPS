@@ -23,8 +23,8 @@ export default function InviteLinkScreen() {
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock link, nothing saved</Text></View>
 
-      <Text style={s.heading}>Invite by link</Text>
-      <Text style={s.sub}>Share one link — people join themselves and answer the questions you choose. Best for larger groups.</Text>
+      <Text style={s.heading}>Add your people</Text>
+      <Text style={s.sub}>The easy way: share one link. People join themselves and answer the questions you choose — no typing everyone in by hand. Works for any size org.</Text>
 
       <View style={s.linkCard}>
         <Text style={s.linkLabel}>YOUR JOIN LINK</Text>
@@ -56,7 +56,15 @@ export default function InviteLinkScreen() {
         <Text style={s.previewText}>Preview the join form ›</Text>
       </Pressable>
 
-      <Text style={s.footNote}>People who join land in your roster, ready to place in the leadership tree. Real links + collected answers come with the auth/schema phase.</Text>
+      <Pressable style={s.primary} onPress={() => router.push('/setup/tree' as any)}>
+        <Text style={s.primaryText}>Done — build my tree as people join ›</Text>
+      </Pressable>
+
+      <Pressable style={s.secondary} onPress={() => router.push('/setup/invite-people' as any)}>
+        <Text style={s.secondaryText}>Prefer to add a few people by hand? Add manually</Text>
+      </Pressable>
+
+      <Text style={s.footNote}>Sharing the link is the easy path for any size org — people self-onboard into your roster. Real links + collected answers come with the auth/schema phase.</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -89,6 +97,11 @@ const s = StyleSheet.create({
 
   preview:     { marginTop: 14, alignItems: 'center', paddingVertical: 12 },
   previewText: { color: '#60a5fa', fontSize: 15, fontWeight: '700' },
+
+  primary:      { backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 14, alignItems: 'center', marginTop: 6 },
+  primaryText:  { color: '#60a5fa', fontSize: 15, fontWeight: '700' },
+  secondary:    { alignItems: 'center', paddingVertical: 12, marginTop: 2 },
+  secondaryText:{ color: '#64748b', fontSize: 13, fontWeight: '600' },
 
   footNote: { fontSize: 12, color: '#475569', marginTop: 8, lineHeight: 18 },
 });
