@@ -8,12 +8,25 @@
  * into phase-2 / the alpha.
  */
 
-/** Tier-1 (MVP) prompt types Biagio confirmed for the weekly officer report. */
+/**
+ * Prompt types. Tier-1 (MVP, confirmed by Biagio) = goal / current_value /
+ * short_text / long_text. Tier-2 (prototype-only, here to explore the builder) =
+ * single_select / multi_select / percentage.
+ */
 export type QuestionType =
   | 'goal'           // free-text status / goal statement
-  | 'current_value'  // numeric progress (optional target reserved for Tier-2)
+  | 'current_value'  // numeric progress (optional target)
   | 'short_text'     // one-line open answer
-  | 'long_text';     // multi-line open answer
+  | 'long_text'      // multi-line open answer
+  | 'single_select'  // pick exactly one option (Tier-2)
+  | 'multi_select'   // pick any number of options (Tier-2)
+  | 'percentage';    // 0–100 numeric (Tier-2)
+
+/** An option for a select-style prompt. */
+export interface QuestionOption {
+  id:    string;
+  label: string;
+}
 
 /** A single prompt on a questionnaire. */
 export interface QuestionDef {
@@ -25,6 +38,8 @@ export interface QuestionDef {
   /** current_value only: optional target + unit for display. */
   target?:  number;
   unit?:    string;
+  /** single_select / multi_select only: the choices. */
+  options?: QuestionOption[];
   /** Placeholder/help shown in the input. */
   hint?:    string;
 }
@@ -46,8 +61,9 @@ export interface QuestionnaireDef {
 export interface Answer {
   questionId: string;
   noUpdate?:  boolean;
-  text?:      string;
-  value?:     number | null;
+  text?:      string;          // goal / short_text / long_text
+  value?:     number | null;   // current_value / percentage
+  selected?:  string[];        // single_select (len 1) / multi_select option ids
 }
 
 /** Living answers, keyed by questionId — one continuously-editable set. */
@@ -77,7 +93,12 @@ export function hasSubstantiveUpdate(
   return questions.some(q => {
     const a = answers[q.id];
     if (!a || a.noUpdate) return false;
-    if (q.type === 'current_value') return typeof a.value === 'number';
+    if (q.type === 'current_value' || q.type === 'percentage') {
+      return typeof a.value === 'number';
+    }
+    if (q.type === 'single_select' || q.type === 'multi_select') {
+      return (a.selected?.length ?? 0) > 0;
+    }
     return !!a.text && a.text.trim().length > 0;
   });
 }
