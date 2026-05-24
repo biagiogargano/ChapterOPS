@@ -434,10 +434,12 @@ function QuickActionCard({ task, role }: { task: MockTask; role: Role }) {
 function TodayTaskCard({
   task,
   showAssignee,
+  reviewTag,
   onPress,
 }: {
   task:         MockTask;
   showAssignee: boolean;
+  reviewTag?:   boolean;   // true when this is something I need to review
   onPress:      () => void;
 }) {
   // Use the LIVE state so an approved/submitted task is clearly marked here, not
@@ -455,6 +457,7 @@ function TodayTaskCard({
       <View style={[s.taskStripe, { backgroundColor: stripe }]} />
       <View style={s.taskBody}>
         <View style={s.taskTitleRow}>
+          {reviewTag && <View style={s.reviewPill}><Text style={s.reviewPillText}>REVIEW</Text></View>}
           <Text style={s.taskTitle} numberOfLines={2}>{task.title}</Text>
           <View style={[s.taskStateBadge, { backgroundColor: stateBg }]}>
             {state === 'escalated' && <Text style={s.flame}>⚡</Text>}
@@ -488,22 +491,8 @@ function TodayTaskCard({
   );
 }
 
-// ─── Alert card ───────────────────────────────────────────────────────────────
-
-function AlertCard({ task, onPress }: { task: MockTask; onPress: () => void }) {
-  const isEscalated = task.state === 'escalated';
-  // The red alert card + ⚠️/⚡ icon already signal urgency, so no reminder badge.
-  return (
-    <Pressable style={s.alertCard} onPress={onPress}>
-      <Text style={s.alertIcon}>{isEscalated ? '⚡' : '⚠️'}</Text>
-      <View style={s.alertBody}>
-        <Text style={s.alertTitle} numberOfLines={1}>{task.title}</Text>
-        <Text style={s.alertMeta}>{task.assignedTo} · {dueLabelOf(task)}</Text>
-      </View>
-      <Text style={s.alertChevron}>›</Text>
-    </Pressable>
-  );
-}
+// (AlertCard removed — "chapter alerts" is observation, not a Today section.
+// Overdue tasks below you live on the Tasks tab; review items show as tasks.)
 
 // ─── Event card — taps navigate to event detail ──────────────────────────────
 
@@ -604,10 +593,9 @@ export default function TodayScreen() {
   useTaskStateVersion();
   const reminders    = deriveReminders(role);
   const reminderById = new Map(reminders.map(r => [r.entityId, r]));
-  const topSeverity  = reminders[0]?.severity ?? 'low';
 
   // Live state (devTaskStore) so review routing reflects in-session changes.
-  const { mine, review, alert } = getResponsibilityGroups(
+  const { mine, review } = getResponsibilityGroups(
     role,
     t => getStoredState(t.id, t.state),
   );
@@ -689,14 +677,9 @@ export default function TodayScreen() {
     );
   }
 
-  const hasUrgentContent = urgentMine.length > 0 || review.length > 0 || alert.length > 0;
-
-  // Whether the active role branch renders <AllClearRow/> (the officer branch
-  // also requires an empty week). Used to suppress the redundant "No events
-  // scheduled today" placeholder when we've already said the user is caught up.
-  const showAllClear = roleGroup === 'officer'
-    ? (!hasUrgentContent && weekMine.length === 0)
-    : !hasUrgentContent;
+  // Today's tasks = my urgent (today/overdue) tasks PLUS anything I need to
+  // review — review folds in as a labeled task, not a separate section.
+  const todaysTaskCount = urgentMine.length + review.length;
 
   return (
     <ReminderCtx.Provider value={reminderById}>
@@ -726,117 +709,22 @@ export default function TodayScreen() {
           {orgName} · {ROLE_LABELS[role].toUpperCase()}
         </Text>
 
-        {/* ── Needs Attention summary — informational caption (NOT a button).
-            Count only; the items themselves are in the sections below. ── */}
-        {reminders.length > 0 && (
-          <View style={s.needsAttn}>
-            <View style={[s.needsAttnDot, { backgroundColor: REMINDER_BADGE[topSeverity].color }]} />
-            <Text style={s.needsAttnText}>
-              {reminders.length} {reminders.length === 1 ? 'item needs' : 'items need'} your attention
-            </Text>
+        {/* ── TODAY'S TASKS — one section for everyone. My urgent tasks plus
+            anything I need to review (shown as a task with a REVIEW label). No
+            per-role section sprawl, no separate review/approval/alert queues. ── */}
+        {todaysTaskCount > 0 ? (
+          <View style={s.section}>
+            <SLabel text="TODAY'S TASKS" count={todaysTaskCount} />
+            {urgentMine.map(renderMineTask)}
+            {review.map(t => (
+              <TodayTaskCard key={t.id} task={t} showAssignee reviewTag onPress={() => navTask(t)} />
+            ))}
           </View>
+        ) : (
+          <AllClearRow />
         )}
 
-        {/* ── BROTHER ── */}
-        {roleGroup === 'brother' && (
-          <>
-            {urgentMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="MY TASKS" count={urgentMine.length} />
-                {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {!hasUrgentContent && <AllClearRow />}
-          </>
-        )}
-
-        {/* ── OFFICER ── */}
-        {roleGroup === 'officer' && (
-          <>
-            {urgentMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="MY TASKS" count={urgentMine.length} />
-                {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {!hasUrgentContent && weekMine.length === 0 && <AllClearRow />}
-          </>
-        )}
-
-        {/* ── ANNOTATOR ── */}
-        {roleGroup === 'annotator' && (
-          <>
-            {urgentMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="MY TASKS" count={urgentMine.length} />
-                {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {alert.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="CHAPTER ALERTS" count={alert.length} urgent />
-                {alert.map(t => <AlertCard key={t.id} task={t} onPress={() => navTask(t)} />)}
-              </View>
-            )}
-            {!hasUrgentContent && <AllClearRow />}
-          </>
-        )}
-
-        {/* ── LEADERSHIP (pro_consul) ── */}
-        {roleGroup === 'leadership' && (
-          <>
-            {alert.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="CHAPTER ALERTS" count={alert.length} urgent />
-                {alert.map(t => <AlertCard key={t.id} task={t} onPress={() => navTask(t)} />)}
-              </View>
-            )}
-            {urgentMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="MY TASKS" count={urgentMine.length} />
-                {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {review.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="NEEDS MY REVIEW" count={review.length} />
-                {review.map(t => (
-                  <TodayTaskCard key={t.id} task={t} showAssignee onPress={() => navTask(t)} />
-                ))}
-              </View>
-            )}
-            {!hasUrgentContent && <AllClearRow />}
-          </>
-        )}
-
-        {/* ── PRESIDENT ── */}
-        {roleGroup === 'president' && (
-          <>
-            {urgentMine.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="MY TASKS" count={urgentMine.length} />
-                {urgentMine.map(renderMineTask)}
-              </View>
-            )}
-            {review.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="NEEDS FINAL APPROVAL" count={review.length} />
-                {review.map(t => (
-                  <TodayTaskCard key={t.id} task={t} showAssignee onPress={() => navTask(t)} />
-                ))}
-              </View>
-            )}
-            {alert.length > 0 && (
-              <View style={s.section}>
-                <SLabel text="CHAPTER ALERTS" count={alert.length} urgent />
-                {alert.map(t => <AlertCard key={t.id} task={t} onPress={() => navTask(t)} />)}
-              </View>
-            )}
-            {!hasUrgentContent && <AllClearRow />}
-          </>
-        )}
-
-        {/* ── TODAY'S EVENTS (all roles) ── */}
+        {/* ── TODAY'S EVENTS ── */}
         <Divider />
         <View style={s.section}>
           <View style={s.sectionHeaderRow}>
@@ -851,13 +739,9 @@ export default function TodayScreen() {
             )}
           </View>
           {todayEvents.length === 0 ? (
-            // Suppress this placeholder when AllClearRow already told the user
-            // they're caught up — avoids two stacked empty-state messages.
-            showAllClear ? null : (
-              <View style={s.noEvents}>
-                <Text style={s.noEventsText}>No events scheduled today</Text>
-              </View>
-            )
+            <View style={s.noEvents}>
+              <Text style={s.noEventsText}>No events scheduled today</Text>
+            </View>
           ) : (
             todayEvents.map(ev => (
               <EventCard
@@ -993,6 +877,8 @@ const s = StyleSheet.create({
   taskStateBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0 },
   flame:          { fontSize: 10, lineHeight: 14 },
   taskStateText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  reviewPill:     { backgroundColor: '#1e1b4b', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#4f46e5', flexShrink: 0 },
+  reviewPillText: { fontSize: 9, fontWeight: '800', color: '#a5b4fc', letterSpacing: 0.4 },
   taskMetaRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   taskAssignee:   { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
   dot:            { fontSize: 11, color: '#334155' },
