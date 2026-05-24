@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import SearchablePicker from '@/components/SearchablePicker';
 
 // ─── Summary bar helpers ──────────────────────────────────────────────────────
 
@@ -298,46 +299,23 @@ function SectionHeader({
   );
 }
 
-// ─── Officer overview (read-only chapter glance) ──────────────────────────────
+// ─── View toggle ("what am I looking at") ─────────────────────────────────────
+// Replaces the redundant Chapter Overview + role/summary bars with one clear
+// segmented control. Officers also get "To review".
 
-function OverviewStat({ label, value, color }: { label: string; value: number; color: string }) {
-  const dim = value === 0;
-  return (
-    <View style={s.statTile}>
-      <Text style={[s.statValue, { color: dim ? '#475569' : color }]}>{value}</Text>
-      <Text style={s.statLabel}>{label}</Text>
-    </View>
-  );
-}
+type ViewMode = 'mine' | 'review' | 'all';
 
-/**
- * Read-only officer glance: overdue (within this officer's visibility), tasks
- * awaiting my review, and upcoming events with incomplete prep. Pure aggregation
- * of existing stores — no new data. The first two summarize sections already on
- * this tab; "events need prep" is off-tab, so its tile deep-links to the soonest
- * such event.
- */
-function OfficerOverview({
-  overdueCount,
-  reviewCount,
-  prepCount,
-  onPrepPress,
-}: {
-  overdueCount: number;
-  reviewCount:  number;
-  prepCount:    number;
-  onPrepPress:  () => void;
-}) {
+function ViewToggle({ mode, officer, onChange }: { mode: ViewMode; officer: boolean; onChange: (m: ViewMode) => void }) {
+  const opts: { id: ViewMode; label: string }[] = officer
+    ? [{ id: 'mine', label: 'Mine' }, { id: 'review', label: 'To review' }, { id: 'all', label: 'All' }]
+    : [{ id: 'mine', label: 'Mine' }, { id: 'all', label: 'All' }];
   return (
-    <View style={s.overview}>
-      <Text style={s.overviewTitle}>CHAPTER OVERVIEW</Text>
-      <View style={s.overviewRow}>
-        <OverviewStat label="Overdue"            value={overdueCount} color="#f87171" />
-        <OverviewStat label="Awaiting my review" value={reviewCount}  color="#fbbf24" />
-        <Pressable style={{ flex: 1 }} onPress={prepCount > 0 ? onPrepPress : undefined}>
-          <OverviewStat label="Events need prep" value={prepCount} color="#818cf8" />
+    <View style={s.toggle}>
+      {opts.map(o => (
+        <Pressable key={o.id} style={[s.toggleBtn, mode === o.id && s.toggleBtnOn]} onPress={() => onChange(o.id)}>
+          <Text style={[s.toggleText, mode === o.id && s.toggleTextOn]}>{o.label}</Text>
         </Pressable>
-      </View>
+      ))}
     </View>
   );
 }
@@ -385,15 +363,17 @@ function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, quer
 }
 
 function FilterSortBar({
-  status, sortBy, query, onStatus, onSort, onQuery,
+  status, sortBy, query, onOpenStatus, onOpenSort, onQuery,
 }: {
-  status:   StatusFilter;
-  sortBy:   SortBy;
-  query:    string;
-  onStatus: (s: StatusFilter) => void;
-  onSort:   (s: SortBy) => void;
-  onQuery:  (q: string) => void;
+  status:       StatusFilter;
+  sortBy:       SortBy;
+  query:        string;
+  onOpenStatus: () => void;
+  onOpenSort:   () => void;
+  onQuery:      (q: string) => void;
 }) {
+  const statusLabel = STATUS_FILTERS.find(f => f.id === status)?.label ?? 'All';
+  const sortLabel   = SORTS.find(o => o.id === sortBy)?.label ?? 'Due date';
   return (
     <View style={s.controls}>
       <TextInput
@@ -406,20 +386,15 @@ function FilterSortBar({
         autoCorrect={false}
         returnKeyType="search"
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
-        {STATUS_FILTERS.map(f => (
-          <Pressable key={f.id} style={[s.filterChip, status === f.id && s.filterChipOn]} onPress={() => onStatus(f.id)}>
-            <Text style={[s.filterChipText, status === f.id && s.filterChipTextOn]}>{f.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <View style={s.sortRow}>
-        <Text style={s.sortLabel}>Sort:</Text>
-        {SORTS.map(o => (
-          <Pressable key={o.id} style={[s.sortChip, sortBy === o.id && s.sortChipOn]} onPress={() => onSort(o.id)}>
-            <Text style={[s.sortChipText, sortBy === o.id && s.sortChipTextOn]}>{o.label}</Text>
-          </Pressable>
-        ))}
+      <View style={s.dropRow}>
+        <Pressable style={s.dropBtn} onPress={onOpenStatus}>
+          <Text style={s.dropBtnLabel}>Status</Text>
+          <Text style={s.dropBtnValue}>{statusLabel}  ▾</Text>
+        </Pressable>
+        <Pressable style={s.dropBtn} onPress={onOpenSort}>
+          <Text style={s.dropBtnLabel}>Sort</Text>
+          <Text style={s.dropBtnValue}>{sortLabel}  ▾</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -463,30 +438,37 @@ export default function TasksScreen() {
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
-  // Filter + sort (session-only). Applied within each existing bucket so the
-  // responsibility grouping is preserved.
+  // View toggle + filter/sort (session-only). The toggle picks which buckets show;
+  // filter/sort/search apply within them. Dropdown pickers replace the chip rows.
+  const [viewMode, setViewMode] = useState<ViewMode>('mine');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('due');
   const [taskQuery, setTaskQuery] = useState('');
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+  const [sortPickerOpen, setSortPickerOpen] = useState(false);
 
   const viewAlert    = applyView(alert,    statusFilter, sortBy, taskQuery);
   const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery);
   const viewReview   = applyView(review,   statusFilter, sortBy, taskQuery);
   const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery);
-  const hasAnyView   = viewAlert.length + viewMine.length + viewReview.length + viewReviewed.length > 0;
 
-  // Officer overview metrics — CHAPTER-WIDE (not visibility-scoped) so every
-  // officer sees the same glance. Read-only aggregation of existing stores.
-  const allTasks = officer ? getAllTasks().filter(t => !t.isWorkflowParent) : [];
-  const overdueCount = allTasks.filter(t => {
-    const st = getStoredState(t.id, t.state);
-    return isOverdue(t.dueAt, st) || st === 'escalated';
-  }).length;
-  // Events that have linked prep tasks not all approved yet (soonest first).
+  // Which sections this view shows.
+  const showAlerts   = viewMode === 'all';
+  const showMine     = viewMode === 'mine' || viewMode === 'all';
+  const showReview   = (viewMode === 'review' || viewMode === 'all') && officer;
+  const showReviewed = viewMode === 'all';
+  const shownCount =
+    (showAlerts ? viewAlert.length : 0) +
+    (showMine ? viewMine.length : 0) +
+    (showReview ? viewReview.length : 0) +
+    (showReviewed ? viewReviewed.length : 0);
+
+  // The one unique bit from the old Chapter Overview: upcoming events with
+  // incomplete prep (a compact link, not a 3-tile glance). Soonest first.
   const eventsNeedingPrep = officer
     ? getAllEvents()
         .filter(ev => {
-          const related = allTasks.filter(t => t.linkedEventId === ev.id && t.lightweightKind !== 'rsvp');
+          const related = getAllTasks().filter(t => !t.isWorkflowParent && t.linkedEventId === ev.id && t.lightweightKind !== 'rsvp');
           if (related.length === 0) return false;
           const done = related.filter(t => getStoredState(t.id, t.state) === 'approved').length;
           return done < related.length;
@@ -515,93 +497,111 @@ export default function TasksScreen() {
   }
 
   return (
-    <ScrollView
-      style={s.root}
-      contentContainerStyle={s.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Role indicator */}
-      <View style={s.roleBar}>
-        <View style={s.roleDot} />
-        <Text style={s.roleBarText}>Filtered for {roleLabel}</Text>
-      </View>
+    <View style={s.root}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* What am I looking at — one clear toggle (replaces role/summary/overview) */}
+        {hasAny && <ViewToggle mode={viewMode} officer={officer} onChange={setViewMode} />}
 
-      {/* Officer overview — read-only chapter glance (officer roles only) */}
-      {officer && (
-        <OfficerOverview
-          overdueCount={overdueCount}
-          reviewCount={review.length}
-          prepCount={eventsNeedingPrep.length}
-          onPrepPress={() => router.push(`/event/${eventsNeedingPrep[0].id}` as any)}
-        />
-      )}
+        {/* The one unique bit kept from the old overview: events needing prep */}
+        {officer && eventsNeedingPrep.length > 0 && (
+          <Pressable style={s.prepLink} onPress={() => router.push(`/event/${eventsNeedingPrep[0].id}` as any)}>
+            <Text style={s.prepText}>
+              ⚑ {eventsNeedingPrep.length} {eventsNeedingPrep.length === 1 ? 'event needs' : 'events need'} prep ›
+            </Text>
+          </Pressable>
+        )}
 
-      {/* Summary bar — only shown when there are personal tasks */}
-      {mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
+        {/* Summary chips — only in "Mine" and when you have personal tasks */}
+        {viewMode === 'mine' && mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
 
-      {/* Filter + sort controls — only when there are tasks to act on */}
-      {hasAny && (
-        <FilterSortBar status={statusFilter} sortBy={sortBy} query={taskQuery} onStatus={setStatusFilter} onSort={setSortBy} onQuery={setTaskQuery} />
-      )}
+        {/* Search + dropdown filters */}
+        {hasAny && (
+          <FilterSortBar
+            status={statusFilter}
+            sortBy={sortBy}
+            query={taskQuery}
+            onOpenStatus={() => setStatusPickerOpen(true)}
+            onOpenSort={() => setSortPickerOpen(true)}
+            onQuery={setTaskQuery}
+          />
+        )}
 
-      {!hasAny ? (
-        <View style={s.emptyFull}>
-          <Text style={s.emptyIcon}>✓</Text>
-          <Text style={s.emptyTitle}>All clear</Text>
-          <Text style={s.emptyText}>No tasks assigned to {roleLabel}</Text>
-        </View>
-      ) : !hasAnyView ? (
-        <View style={s.emptyFull}>
-          <Text style={s.emptyTitle}>No matches</Text>
-          <Text style={s.emptyText}>No tasks match this filter.</Text>
-        </View>
-      ) : (
-        <>
-          {/* Chapter Alerts — overdue/escalated tasks not mine */}
-          {viewAlert.length > 0 && (
-            <View style={s.section}>
-              <SectionHeader label="CHAPTER ALERTS" count={viewAlert.length} urgent />
-              {viewAlert.map(t => (
-                <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
-              ))}
-            </View>
-          )}
+        {!hasAny ? (
+          <View style={s.emptyFull}>
+            <Text style={s.emptyIcon}>✓</Text>
+            <Text style={s.emptyTitle}>All clear</Text>
+            <Text style={s.emptyText}>No tasks assigned to {roleLabel}</Text>
+          </View>
+        ) : shownCount === 0 ? (
+          <View style={s.emptyFull}>
+            <Text style={s.emptyTitle}>Nothing here</Text>
+            <Text style={s.emptyText}>No tasks match this view + filter.</Text>
+          </View>
+        ) : (
+          <>
+            {showAlerts && viewAlert.length > 0 && (
+              <View style={s.section}>
+                <SectionHeader label="CHAPTER ALERTS" count={viewAlert.length} urgent />
+                {viewAlert.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
+                ))}
+              </View>
+            )}
 
-          {/* My Tasks — personal responsibility */}
-          {viewMine.length > 0 && (
-            <View style={s.section}>
-              <SectionHeader label="MY TASKS" count={viewMine.length} />
-              {viewMine.map(t => (
-                <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
-              ))}
-            </View>
-          )}
+            {showMine && viewMine.length > 0 && (
+              <View style={s.section}>
+                <SectionHeader label="MY TASKS" count={viewMine.length} />
+                {viewMine.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
+                ))}
+              </View>
+            )}
 
-          {/* Needs My Review — submitted, awaiting my approval */}
-          {viewReview.length > 0 && (
-            <View style={s.section}>
-              <SectionHeader label="NEEDS MY REVIEW" count={viewReview.length} />
-              {viewReview.map(t => (
-                <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
-              ))}
-            </View>
-          )}
+            {showReview && viewReview.length > 0 && (
+              <View style={s.section}>
+                <SectionHeader label="NEEDS MY REVIEW" count={viewReview.length} />
+                {viewReview.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
+                ))}
+              </View>
+            )}
 
-          {/* Recently Reviewed — tasks I already approved/rejected (kept visible
-              so reviewed/rejected items don't vanish after reload) */}
-          {viewReviewed.length > 0 && (
-            <View style={s.section}>
-              <SectionHeader label="RECENTLY REVIEWED" count={viewReviewed.length} />
-              {viewReviewed.map(t => (
-                <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
-              ))}
-            </View>
-          )}
-        </>
-      )}
+            {showReviewed && viewReviewed.length > 0 && (
+              <View style={s.section}>
+                <SectionHeader label="RECENTLY REVIEWED" count={viewReviewed.length} />
+                {viewReviewed.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
+                ))}
+              </View>
+            )}
+          </>
+        )}
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Dropdown pickers (in-tree overlays) */}
+      <SearchablePicker
+        visible={statusPickerOpen}
+        title="Filter by status"
+        options={STATUS_FILTERS.map(f => ({ id: f.id, label: f.label }))}
+        selectedId={statusFilter}
+        onSelect={(id) => { setStatusFilter(id as StatusFilter); setStatusPickerOpen(false); }}
+        onClose={() => setStatusPickerOpen(false)}
+      />
+      <SearchablePicker
+        visible={sortPickerOpen}
+        title="Sort by"
+        options={SORTS.map(o => ({ id: o.id, label: o.label }))}
+        selectedId={sortBy}
+        onSelect={(id) => { setSortBy(id as SortBy); setSortPickerOpen(false); }}
+        onClose={() => setSortPickerOpen(false)}
+      />
+    </View>
   );
 }
 
@@ -615,28 +615,24 @@ const s = StyleSheet.create({
   createHdrBtn:  { paddingHorizontal: 12, paddingVertical: 4 },
   createHdrText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
-  // Filter + sort controls
+  // View toggle (segmented)
+  toggle:      { flexDirection: 'row', backgroundColor: '#1e293b', borderRadius: 10, padding: 3, marginBottom: 14 },
+  toggleBtn:   { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  toggleBtnOn: { backgroundColor: '#1e1b4b', borderWidth: 1, borderColor: '#4f46e5' },
+  toggleText:  { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  toggleTextOn:{ color: '#a5b4fc', fontWeight: '700' },
+
+  // Filter + sort controls (search + dropdown buttons)
   controls:        { marginBottom: 16, gap: 10 },
   search:          { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 14, paddingHorizontal: 12, paddingVertical: 9, marginHorizontal: 2 },
-  filterRow:       { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
-  filterChip:      { backgroundColor: '#1e293b', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
-  filterChipOn:    { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  filterChipText:  { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
-  filterChipTextOn:{ color: '#a5b4fc' },
-  sortRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  sortLabel:       { fontSize: 11, fontWeight: '600', color: '#64748b' },
-  sortChip:        { backgroundColor: '#1e293b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#334155' },
-  sortChipOn:      { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  sortChipText:    { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
-  sortChipTextOn:  { color: '#a5b4fc' },
+  dropRow:         { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
+  dropBtn:         { flex: 1, backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingHorizontal: 12, paddingVertical: 8 },
+  dropBtnLabel:    { fontSize: 10, fontWeight: '700', color: '#64748b', letterSpacing: 0.6 },
+  dropBtnValue:    { fontSize: 13, fontWeight: '600', color: '#cbd5e1', marginTop: 2 },
 
-  // Officer overview
-  overview:      { marginBottom: 16 },
-  overviewTitle: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 4 },
-  overviewRow:   { flexDirection: 'row', gap: 8 },
-  statTile:      { flex: 1, backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', gap: 3 },
-  statValue:     { fontSize: 22, fontWeight: '800' },
-  statLabel:     { fontSize: 10, fontWeight: '600', color: '#64748b', textAlign: 'center', letterSpacing: 0.2 },
+  // Events-need-prep link (kept from old overview)
+  prepLink: { backgroundColor: '#1e1b4b', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 14, borderWidth: 1, borderColor: '#312e81' },
+  prepText: { fontSize: 13, fontWeight: '600', color: '#a5b4fc' },
 
   // Role bar
   roleBar: {
