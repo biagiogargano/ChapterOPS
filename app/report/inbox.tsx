@@ -19,9 +19,9 @@ import {
   useMockReportVersion,
 } from '@/lib/questionnaire/mockReport';
 import type { ReportSnapshot } from '@/lib/questionnaire/types';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // Officers expected to file a weekly report (demo roster). The report's owner
 // role (pro_consul) is the "you" row, driven by the live store.
@@ -46,6 +46,7 @@ function summarize(snap: ReportSnapshot): { goal: string; status: string } {
 
 export default function ReportInboxScreen() {
   const navigation = useNavigation();
+  const router     = useRouter();
   useMockReportVersion();
 
   const cycleId = currentCycleId();
@@ -79,15 +80,19 @@ export default function ReportInboxScreen() {
         <View style={s.emptyRow}><Text style={s.emptyText}>No reports submitted yet</Text></View>
       ) : (
         submitted.map(r => (
-          <View key={r.role} style={[s.card, s.cardSubmitted]}>
+          <Pressable
+            key={r.role}
+            style={[s.card, s.cardSubmitted]}
+            onPress={() => r.you ? router.push('/report/detail' as any) : Alert.alert(ROLE_LABELS[r.role], `Goal: ${r.summary!.goal}\nStatus: ${r.summary!.status}\n\n(Demo summary — full detail view is wired for your own report.)`)}
+          >
             <View style={s.stripe} />
             <View style={s.cardBody}>
               <Text style={s.role}>{ROLE_LABELS[r.role]}{r.you ? '  · you' : ''}</Text>
               <Text style={s.goal} numberOfLines={1}>{r.summary!.goal}</Text>
               <Text style={s.statusLine}>Status: {r.summary!.status}</Text>
             </View>
-            <View style={s.badgeOk}><Text style={s.badgeOkText}>Submitted</Text></View>
-          </View>
+            <View style={s.badgeOk}><Text style={s.badgeOkText}>Submitted ›</Text></View>
+          </Pressable>
         ))
       )}
 

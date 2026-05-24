@@ -98,7 +98,27 @@ instead of code constants.
 - Beware **owner lockout** (owner accidentally removes their own Manage rights) —
   the model needs an un-removable owner safeguard.
 
-## 7. Open questions
+## 6a. Questions for Biagio (answer before we build the simple version)
+1. **Owner identity:** always the top role (President/Consul), a specific person,
+   or a transferable "org owner" flag independent of role?
+2. **Which simple model:** 3 tiers (Member/Officer/Admin), plain-English toggles
+   ("Officers can create events"), or something else?
+3. **Granularity:** per-feature enough, or ever per-item ("this one event") sharing?
+4. **Access levels:** View/Edit enough, or also a Manage (edit + grant) level?
+5. **Defaults out of the box** for a brand-new org (so it's usable pre-tuning)?
+6. **Who can change permissions:** owner only, or delegable to top execs?
+7. **Committee scoping:** lead auto-edits their committee's items; members view
+   their committee only?
+8. **Officer baseline:** "officer" = baseline powers, or strictly per-role?
+9. **View-but-not-edit / hidden:** what should members see-not-edit (agenda?) and
+   what's hidden entirely (other committees' internal tasks?)?
+10. **Owner-only surfaces:** which are locked to owner (permissions, roster,
+    ownership transfer)?
+11. **Role-level first, person-level later** — confirm order?
+12. **One-off exceptions** ("this brother can edit events") needed, or
+    role/committee-based enough?
+
+## 7. Open questions (model-level)
 1. **Owner identity:** is "owner" always the Consul/President position, a specific
    member, or a transferable "org owner" flag independent of role?
 2. **Granularity:** is per-**resource** view/edit enough for v1, or do we need
