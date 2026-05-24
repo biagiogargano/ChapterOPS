@@ -1,85 +1,99 @@
 /**
- * app/roster/index.tsx — member roster prototype.
- * PROTOTYPE ONLY. Browse/search the org's people, see role + committee, and
- * (mock) add a member. Part of "build out your org with people." Static + local
- * state, nothing saved. Dev-only; not in phase-2 / the alpha.
+ * app/roster/index.tsx — roster + positions editor (core area, mock-backed).
+ * UI-first. Browse/search members, change a member's position (role), add/remove.
+ * Reads/writes the shared mockRoster store so changes are reflected app-wide this
+ * session. No schema/RLS/auth yet — real persistence comes in the schema phase.
  */
 
+import {
+  ASSIGNABLE_ROLES,
+  addMember,
+  getMembers,
+  removeMember,
+  roleLabel,
+  setMemberRole,
+  useRosterVersion,
+} from '@/lib/roster/mockRoster';
+import { isOfficer, type Role } from '@/lib/roles';
 import { useNavigation } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-
-interface Member { name: string; role: string; committee?: string }
-
-const SEED: Member[] = [
-  { name: 'Peter Gargano', role: 'Consul' },
-  { name: 'Marcus Lee',    role: 'Pro Consul' },
-  { name: 'Alex Rivera',   role: 'Social Chair',      committee: 'Social' },
-  { name: 'Jordan Pike',   role: 'Risk Manager',      committee: 'Risk' },
-  { name: 'Sam Diaz',      role: 'Recruitment Chair', committee: 'Recruitment' },
-  { name: 'Chris Long',    role: 'Annotator' },
-  { name: 'Tyler Banks',   role: 'Brother' },
-  { name: 'Devin Cole',    role: 'Brother' },
-  { name: 'Omar Haddad',   role: 'Brother' },
-];
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function RosterScreen() {
   const navigation = useNavigation();
-  const [members, setMembers] = useState<Member[]>(SEED);
-  const [query, setQuery]     = useState('');
-  const [draft, setDraft]     = useState('');
+  useRosterVersion();
+  const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState('');
 
-  useEffect(() => { navigation.setOptions({ title: 'Members' }); }, [navigation]);
+  useEffect(() => { navigation.setOptions({ title: 'Members & positions' }); }, [navigation]);
 
+  const members = getMembers();
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return members;
-    return members.filter(m => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q));
+    return members.filter(m => m.name.toLowerCase().includes(q) || roleLabel(m.role).toLowerCase().includes(q));
   }, [members, query]);
 
-  function addMember() {
-    const n = draft.trim();
-    if (!n) return;
-    setMembers(prev => [...prev, { name: n, role: 'Brother' }]);
-    setDraft('');
+  const officers = filtered.filter(m => isOfficer(m.role));
+  const brothers = filtered.filter(m => !isOfficer(m.role));
+
+  function changeRole(id: string, name: string) {
+    Alert.alert(
+      `Position for ${name}`,
+      'Assign a position',
+      [
+        ...ASSIGNABLE_ROLES.map(r => ({ text: roleLabel(r), onPress: () => setMemberRole(id, r) })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
   }
 
-  const officers = filtered.filter(m => m.role !== 'Brother');
-  const brothers = filtered.filter(m => m.role === 'Brother');
+  function confirmRemove(id: string, name: string) {
+    Alert.alert('Remove member', `Remove ${name} from the roster?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeMember(id) },
+    ]);
+  }
 
-  function Row({ m }: { m: Member }) {
+  function Row({ id, name, role }: { id: string; name: string; role: Role }) {
     return (
       <View style={s.row}>
-        <View style={s.avatar}><Text style={s.avatarText}>{m.name.split(' ').map(p => p[0]).join('').slice(0, 2)}</Text></View>
+        <View style={s.avatar}><Text style={s.avatarText}>{name.split(' ').map(p => p[0]).join('').slice(0, 2)}</Text></View>
         <View style={s.body}>
-          <Text style={s.name}>{m.name}</Text>
-          <Text style={s.role}>{m.role}{m.committee ? ` · ${m.committee} committee` : ''}</Text>
+          <Text style={s.name}>{name}</Text>
+          <Pressable onPress={() => changeRole(id, name)}>
+            <Text style={s.roleBtn}>{roleLabel(role)}  ▾</Text>
+          </Pressable>
         </View>
+        <Pressable onPress={() => confirmRemove(id, name)} hitSlop={8}><Text style={s.remove}>✕</Text></Pressable>
       </View>
     );
   }
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · sample roster, nothing saved</Text></View>
+      <View style={s.protoBadge}><Text style={s.protoText}>UI PREVIEW · positions editable, not yet saved</Text></View>
 
-      <Text style={s.heading}>Members</Text>
-      <Text style={s.sub}>{members.length} people</Text>
+      <Text style={s.heading}>Members & positions</Text>
+      <Text style={s.sub}>{members.length} people · tap a position to reassign</Text>
 
-      <TextInput style={s.search} placeholder="Search name or role…" placeholderTextColor="#475569" value={query} onChangeText={setQuery} />
+      <TextInput style={s.search} placeholder="Search name or position…" placeholderTextColor="#475569" value={query} onChangeText={setQuery} />
 
       {officers.length > 0 && <Text style={s.sectionLabel}>OFFICERS</Text>}
-      {officers.map((m, i) => <Row key={`o${i}`} m={m} />)}
+      {officers.map(m => <Row key={m.id} id={m.id} name={m.name} role={m.role} />)}
 
       {brothers.length > 0 && <Text style={[s.sectionLabel, { marginTop: 18 }]}>MEMBERS</Text>}
-      {brothers.map((m, i) => <Row key={`b${i}`} m={m} />)}
+      {brothers.map(m => <Row key={m.id} id={m.id} name={m.name} role={m.role} />)}
 
       <View style={s.addRow}>
-        <TextInput style={[s.search, { flex: 1, marginBottom: 0 }]} placeholder="Add a member by name…" placeholderTextColor="#475569" value={draft} onChangeText={setDraft} onSubmitEditing={addMember} />
-        <Pressable style={s.addBtn} onPress={addMember}><Text style={s.addBtnText}>Add</Text></Pressable>
+        <TextInput style={[s.search, { flex: 1, marginBottom: 0 }]} placeholder="Add a member by name…" placeholderTextColor="#475569" value={draft} onChangeText={setDraft} onSubmitEditing={() => { addMember(draft); setDraft(''); }} />
+        <Pressable style={s.addBtn} onPress={() => { addMember(draft); setDraft(''); }}><Text style={s.addBtnText}>Add</Text></Pressable>
       </View>
 
-      <Text style={s.footNote}>Real roster comes from members the owner/leaders invite (auth/schema phase).</Text>
+      <Text style={s.footNote}>
+        Changes persist this session only. Real positions are backed by the
+        members/positions tables in the schema phase (owner/officer-gated).
+      </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -104,7 +118,8 @@ const s = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   body:       { flex: 1 },
   name:       { fontSize: 15, fontWeight: '600', color: '#f1f5f9' },
-  role:       { fontSize: 12, color: '#64748b', marginTop: 1 },
+  roleBtn:    { fontSize: 12, color: '#818cf8', fontWeight: '600', marginTop: 3 },
+  remove:     { fontSize: 16, color: '#475569', paddingHorizontal: 6 },
 
   addRow:     { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 10 },
   addBtn:     { backgroundColor: '#1e3a5f', borderRadius: 10, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 11, paddingHorizontal: 16 },

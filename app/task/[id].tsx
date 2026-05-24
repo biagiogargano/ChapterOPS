@@ -29,7 +29,7 @@ import {
   type RsvpEntry,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { ROLE_LABELS, type Role } from '@/lib/roles';
+import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -899,6 +899,16 @@ export default function TaskDetailScreen() {
         {/* ── Title ── */}
         <Text style={s.title}>{task.title}</Text>
         <View style={[s.accentBar, { backgroundColor: isRsvpTask ? '#6366f1' : stripeColor }]} />
+
+        {/* ── Delegate (preview, dev only — feature-branch tie-in) ── */}
+        {__DEV__ && isOfficer(role) && (
+          <Pressable
+            style={{ alignSelf: 'flex-start', marginBottom: 12, backgroundColor: '#1e293b', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' }}
+            onPress={() => router.push('/delegate' as any)}
+          >
+            <Text style={{ color: '#818cf8', fontSize: 13, fontWeight: '600' }}>↪ Delegate this task (preview)</Text>
+          </Pressable>
+        )}
 
         {/* ── Assignee callout (reviewer view) ── */}
         {isReviewerOnly && (

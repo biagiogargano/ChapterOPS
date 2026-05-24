@@ -898,6 +898,16 @@ export default function EventDetailScreen() {
         requiresCovering={rsvpNeedsCovering}
       />
 
+      {/* ── Take attendance (preview, dev only — feature-branch tie-in) ── */}
+      {__DEV__ && officer && (
+        <Pressable
+          style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: '#1e293b', borderRadius: 8, paddingVertical: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: '#334155' }}
+          onPress={() => router.push('/checkin' as any)}
+        >
+          <Text style={{ color: '#818cf8', fontSize: 13, fontWeight: '600' }}>✓ Take attendance (preview)</Text>
+        </Pressable>
+      )}
+
       {/* ── Your Date (member submission — any role, when event collects names) ── */}
       {event.requiresDateNames && (
         <>

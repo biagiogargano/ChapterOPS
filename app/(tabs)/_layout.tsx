@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Calendar, CheckSquare, Home, User } from 'lucide-react-native';
+import { Calendar, CheckSquare, Home, Settings, User } from 'lucide-react-native';
 import { useRouteTarget } from '@/lib/useRouteTarget';
 import { hrefForTarget } from '@/lib/routeTarget';
 import Splash from '../../components/auth/Splash';
@@ -26,6 +26,7 @@ export default function TabLayout() {
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: ({ color, size }) => <Calendar    color={color} size={size} /> }} />
       <Tabs.Screen name="tasks"    options={{ title: 'Tasks',    tabBarIcon: ({ color, size }) => <CheckSquare color={color} size={size} /> }} />
       <Tabs.Screen name="me"       options={{ title: 'Me',       tabBarIcon: ({ color, size }) => <User        color={color} size={size} /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Settings    color={color} size={size} /> }} />
     </Tabs>
   );
 }
