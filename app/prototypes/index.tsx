@@ -18,6 +18,8 @@ const GROUPS: Group[] = [
       { title: 'First-time experience ✨', sub: 'Empty chapter → guided → create your first event', route: '/first-run' },
       { title: 'Org setup wizard',      sub: 'Guided first-run: name, owner, structure, invites', route: '/setup' },
       { title: 'Invite people',         sub: 'Add name/email/position to your roster',              route: '/setup/invite-people' },
+      { title: 'Invite link + join form', sub: 'Share a link; configure join questions (owner)',     route: '/setup/invite-link' },
+      { title: 'Join via link (joiner)',  sub: 'The self-join form people fill out',                 route: '/join' },
       { title: 'Build org tree',        sub: 'Place invited people into the hierarchy',             route: '/setup/tree' },
       { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',   route: '/invite' },
       { title: 'Welcome walkthrough',   sub: 'First-use intro to the main surfaces',                 route: '/tutorial' },

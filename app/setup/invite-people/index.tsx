@@ -37,6 +37,10 @@ export default function InvitePeopleScreen() {
         <Text style={s.heading}>Invite your people first</Text>
         <Text style={s.sub}>Add the people who'll be in your org — name, email, and what their position is called. Then you'll place them into your leadership tree.</Text>
 
+        <Pressable style={s.linkBanner} onPress={() => router.push('/setup/invite-link' as any)}>
+          <Text style={s.linkBannerText}>Big group? Share an invite link instead ›</Text>
+        </Pressable>
+
         <View style={s.form}>
           <TextInput style={s.input} placeholder="Name" placeholderTextColor="#475569" value={name} onChangeText={setName} />
           <TextInput style={s.input} placeholder="Email" placeholderTextColor="#475569" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
@@ -78,6 +82,9 @@ const s = StyleSheet.create({
 
   heading: { fontSize: 24, fontWeight: '800', color: '#f8fafc' },
   sub:     { fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 18, lineHeight: 18 },
+
+  linkBanner:     { backgroundColor: '#1e1b4b', borderRadius: 10, padding: 12, marginBottom: 18, borderWidth: 1, borderColor: '#4f46e5' },
+  linkBannerText: { color: '#a5b4fc', fontSize: 13, fontWeight: '700', textAlign: 'center' },
 
   form:  { gap: 10, marginBottom: 20 },
   input: { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
