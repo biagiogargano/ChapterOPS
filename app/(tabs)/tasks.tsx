@@ -124,12 +124,14 @@ function StructuredCard({
   effectiveState,
   showAssignee,
   reviewerLabel,
+  reviewTag,
   onPress,
 }: {
   task:           MockTask;
   effectiveState: TaskState;
   showAssignee:   boolean;   // true for review/alert — shows who submitted
   reviewerLabel?: string;    // truthy for mine — shows who will review my work
+  reviewTag?:     boolean;   // true when this is something I need to review
   onPress:        () => void;
 }) {
   const isUrgent   = isOverdue(task.dueAt, effectiveState) || effectiveState === 'escalated';
@@ -149,6 +151,7 @@ function StructuredCard({
       <View style={s.cardBody}>
         {/* Title + state badge */}
         <View style={s.titleRow}>
+          {reviewTag && <View style={s.reviewPill}><Text style={s.reviewPillText}>REVIEW</Text></View>}
           <Text style={s.cardTitle} numberOfLines={2}>{task.title}</Text>
           <View style={[s.stateBadge, { backgroundColor: stateBg }]}>
             {effectiveState === 'escalated' && <Text style={s.flame}>⚡</Text>}
@@ -243,11 +246,13 @@ function TaskCard({
   task,
   role,
   showAssignee,
+  reviewTag,
   onPress,
 }: {
   task:         MockTask;
   role:         string;
   showAssignee: boolean;
+  reviewTag?:   boolean;
   onPress:      () => void;
 }) {
   // RSVP tasks always use rsvpStore — bypass devTaskStore
@@ -273,6 +278,7 @@ function TaskCard({
       effectiveState={effectiveState}
       showAssignee={showAssignee}
       reviewerLabel={reviewerLabel}
+      reviewTag={reviewTag}
       onPress={onPress}
     />
   );
@@ -299,26 +305,8 @@ function SectionHeader({
   );
 }
 
-// ─── View toggle ("what am I looking at") ─────────────────────────────────────
-// Replaces the redundant Chapter Overview + role/summary bars with one clear
-// segmented control. Officers also get "To review".
-
-type ViewMode = 'mine' | 'review' | 'all';
-
-function ViewToggle({ mode, officer, onChange }: { mode: ViewMode; officer: boolean; onChange: (m: ViewMode) => void }) {
-  const opts: { id: ViewMode; label: string }[] = officer
-    ? [{ id: 'mine', label: 'Mine' }, { id: 'review', label: 'To review' }, { id: 'all', label: 'All' }]
-    : [{ id: 'mine', label: 'Mine' }, { id: 'all', label: 'All' }];
-  return (
-    <View style={s.toggle}>
-      {opts.map(o => (
-        <Pressable key={o.id} style={[s.toggleBtn, mode === o.id && s.toggleBtnOn]} onPress={() => onChange(o.id)}>
-          <Text style={[s.toggleText, mode === o.id && s.toggleTextOn]}>{o.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
+// (Review is no longer a separate bucket/toggle — review items appear inline in
+// "My tasks" with a REVIEW label. The Tasks tab is simply your list.)
 
 // ─── Filter + sort ────────────────────────────────────────────────────────────
 
@@ -438,9 +426,8 @@ export default function TasksScreen() {
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 
-  // View toggle + filter/sort (session-only). The toggle picks which buckets show;
-  // filter/sort/search apply within them. Dropdown pickers replace the chip rows.
-  const [viewMode, setViewMode] = useState<ViewMode>('mine');
+  // Filter/sort/search (session-only). No view toggle — the tab is just your list.
+  // Review items fold into "My tasks" with a REVIEW label (not a separate bucket).
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('due');
   const [taskQuery, setTaskQuery] = useState('');
@@ -452,16 +439,8 @@ export default function TasksScreen() {
   const viewReview   = applyView(review,   statusFilter, sortBy, taskQuery);
   const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery);
 
-  // Which sections this view shows.
-  const showAlerts   = viewMode === 'all';
-  const showMine     = viewMode === 'mine' || viewMode === 'all';
-  const showReview   = (viewMode === 'review' || viewMode === 'all') && officer;
-  const showReviewed = viewMode === 'all';
-  const shownCount =
-    (showAlerts ? viewAlert.length : 0) +
-    (showMine ? viewMine.length : 0) +
-    (showReview ? viewReview.length : 0) +
-    (showReviewed ? viewReviewed.length : 0);
+  const myCount    = viewMine.length + viewReview.length;   // mine + things to review
+  const shownCount = myCount + viewAlert.length + viewReviewed.length;
 
   // The one unique bit from the old Chapter Overview: upcoming events with
   // incomplete prep (a compact link, not a 3-tile glance). Soonest first.
@@ -503,9 +482,6 @@ export default function TasksScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* What am I looking at — one clear toggle (replaces role/summary/overview) */}
-        {hasAny && <ViewToggle mode={viewMode} officer={officer} onChange={setViewMode} />}
-
         {/* The one unique bit kept from the old overview: events needing prep */}
         {officer && eventsNeedingPrep.length > 0 && (
           <Pressable style={s.prepLink} onPress={() => router.push(`/event/${eventsNeedingPrep[0].id}` as any)}>
@@ -515,8 +491,8 @@ export default function TasksScreen() {
           </Pressable>
         )}
 
-        {/* Summary chips — only in "Mine" and when you have personal tasks */}
-        {viewMode === 'mine' && mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
+        {/* Summary chips for your personal tasks */}
+        {mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
 
         {/* Search + dropdown filters */}
         {hasAny && (
@@ -539,38 +515,36 @@ export default function TasksScreen() {
         ) : shownCount === 0 ? (
           <View style={s.emptyFull}>
             <Text style={s.emptyTitle}>Nothing here</Text>
-            <Text style={s.emptyText}>No tasks match this view + filter.</Text>
+            <Text style={s.emptyText}>No tasks match this filter.</Text>
           </View>
         ) : (
           <>
-            {showAlerts && viewAlert.length > 0 && (
+            {/* My tasks — your own work PLUS things to review (labeled REVIEW),
+                one list, no separate review bucket. */}
+            {myCount > 0 && (
               <View style={s.section}>
-                <SectionHeader label="CHAPTER ALERTS" count={viewAlert.length} urgent />
+                <SectionHeader label="MY TASKS" count={myCount} />
+                {viewMine.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
+                ))}
+                {viewReview.map(t => (
+                  <TaskCard key={t.id} task={t} role={role} showAssignee reviewTag onPress={() => nav(t)} />
+                ))}
+              </View>
+            )}
+
+            {/* Observing below you — overdue chapter tasks that aren't yours
+                (leadership can see what's happening under them). */}
+            {viewAlert.length > 0 && (
+              <View style={s.section}>
+                <SectionHeader label="BELOW YOU · OVERDUE" count={viewAlert.length} urgent />
                 {viewAlert.map(t => (
                   <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
                 ))}
               </View>
             )}
 
-            {showMine && viewMine.length > 0 && (
-              <View style={s.section}>
-                <SectionHeader label="MY TASKS" count={viewMine.length} />
-                {viewMine.map(t => (
-                  <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
-                ))}
-              </View>
-            )}
-
-            {showReview && viewReview.length > 0 && (
-              <View style={s.section}>
-                <SectionHeader label="NEEDS MY REVIEW" count={viewReview.length} />
-                {viewReview.map(t => (
-                  <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
-                ))}
-              </View>
-            )}
-
-            {showReviewed && viewReviewed.length > 0 && (
+            {viewReviewed.length > 0 && (
               <View style={s.section}>
                 <SectionHeader label="RECENTLY REVIEWED" count={viewReviewed.length} />
                 {viewReviewed.map(t => (
@@ -615,12 +589,9 @@ const s = StyleSheet.create({
   createHdrBtn:  { paddingHorizontal: 12, paddingVertical: 4 },
   createHdrText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
-  // View toggle (segmented)
-  toggle:      { flexDirection: 'row', backgroundColor: '#1e293b', borderRadius: 10, padding: 3, marginBottom: 14 },
-  toggleBtn:   { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  toggleBtnOn: { backgroundColor: '#1e1b4b', borderWidth: 1, borderColor: '#4f46e5' },
-  toggleText:  { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
-  toggleTextOn:{ color: '#a5b4fc', fontWeight: '700' },
+  // REVIEW pill (on cards that are something you need to review)
+  reviewPill:     { backgroundColor: '#1e1b4b', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#4f46e5', flexShrink: 0 },
+  reviewPillText: { fontSize: 9, fontWeight: '800', color: '#a5b4fc', letterSpacing: 0.4 },
 
   // Filter + sort controls (search + dropdown buttons)
   controls:        { marginBottom: 16, gap: 10 },
