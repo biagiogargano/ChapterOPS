@@ -30,8 +30,9 @@ import {
   type RsvpStatus,
 } from '@/lib/rsvpStore';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -751,6 +752,11 @@ export default function TaskDetailScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
   const { role }   = useDevRole();
+
+  // Re-read on focus so an edit (made on the create/edit screen, then back()) is
+  // reflected here without leaving a duplicate detail in the nav stack.
+  const [, _bumpFocus] = useState(0);
+  useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
   const task = findTaskById(id ?? '');
 

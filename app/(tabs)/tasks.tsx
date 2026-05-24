@@ -1,6 +1,9 @@
 import { useDevRole } from '@/lib/devRoleStore';
-import { getStoredState } from '@/lib/devTaskStore';
-import { getAllEvents, resolveEventId } from '@/lib/eventStore';
+import { getStoredState, refreshTaskStates } from '@/lib/devTaskStore';
+import { fetchAllEvents } from '@/lib/eventService';
+import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
+import { getAllEvents, resolveEventId, setSupabaseEventCache } from '@/lib/eventStore';
 import {
   PROOF_ICON,
   DISPLAY_STATE_LABEL,
@@ -11,16 +14,18 @@ import {
   getAllTasks,
   getResponsibilityGroups,
   isOverdue,
+  setSupabaseTaskCache,
   sortByUrgency,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
-import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
+import { getRsvpEntry, refreshRsvpsFromSupabase, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
+import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 // ─── Summary bar helpers ──────────────────────────────────────────────────────
 
@@ -441,6 +446,29 @@ export default function TasksScreen() {
   const [, _bumpFocus] = useState(0);
   useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
+  // Manual pull-to-refresh — server-wins refetch (events, tasks, task states,
+  // RSVPs, notices) so same-org cross-device changes appear. Mirrors Today.
+  const dataOrgId = useActiveDataOrgId();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [remoteEvents, remoteTasks, remoteStates] = await Promise.all([
+        fetchAllEvents(dataOrgId),
+        fetchAllTasks(dataOrgId),
+        fetchTaskStates(dataOrgId),
+      ]);
+      setSupabaseEventCache(remoteEvents);
+      setSupabaseTaskCache(remoteTasks);
+      refreshTaskStates(remoteStates);
+      await Promise.all(getAllEvents().map(ev => refreshRsvpsFromSupabase(ev.id)));
+      await hydrateUpdateNotices(dataOrgId);
+      _bumpFocus(n => n + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dataOrgId]);
+
   // Officer-only "+ Create" task button in the tab header.
   useEffect(() => {
     navigation.setOptions({
@@ -519,6 +547,9 @@ export default function TasksScreen() {
       style={s.root}
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#818cf8" colors={['#818cf8']} />
+      }
     >
       {/* Role indicator */}
       <View style={s.roleBar}>

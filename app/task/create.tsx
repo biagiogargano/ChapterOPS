@@ -441,7 +441,10 @@ export default function CreateTaskScreen() {
           });
         }
       }
-      router.replace(`/task/${existing.id}` as any);
+      // Return to the SAME task-detail screen already in the stack (it re-reads on
+      // focus), instead of replacing into a fresh one — which left a duplicate
+      // detail underneath and forced a double back-tap to exit.
+      router.back();
     } else {
       const task = addUserTask(input);
       void insertTask(task);
