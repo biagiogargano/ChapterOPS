@@ -899,14 +899,14 @@ export default function EventDetailScreen() {
         requiresCovering={rsvpNeedsCovering}
       />
 
-      {/* ── Duties this event generates (preview, dev only — feature-branch tie-in) ── */}
-      {__DEV__ && (() => {
+      {/* ── Tasks this event creates (officers) — events own their tasks ── */}
+      {officer && (() => {
         const duties = deriveEventDuties(event);
         if (duties.length === 0) return null;
         return (
           <View style={{ marginTop: 18 }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 10 }}>
-              THIS EVENT GENERATES (PREVIEW)
+              TASKS THIS EVENT CREATES
             </Text>
             {duties.map(d => {
               const ownerLabel = d.owner === 'all' ? 'All members' : ROLE_LABELS[d.owner];
