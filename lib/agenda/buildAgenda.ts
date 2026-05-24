@@ -17,15 +17,17 @@ export interface AgendaItem {
   id:    string;
   title: string;
   meta:  string;
-  /** Where tapping should route ('event' → /event/:id, 'task' → /task/:id). */
-  kind:  'event' | 'task';
+  /** 'event'/'task' route on tap; 'note' is read-only info (no nav). */
+  kind:  'event' | 'task' | 'note';
 }
 
 export interface Agenda {
-  oldBusiness: AgendaItem[];   // past-week events
-  newBusiness: AgendaItem[];   // upcoming events (this week)
-  brotherWide: AgendaItem[];   // chapter-wide tasks
-  unresolved:  AgendaItem[];   // still-open / overdue tasks
+  oldBusiness:   AgendaItem[];   // past-week events
+  newBusiness:   AgendaItem[];   // upcoming events (this week)
+  brotherWide:   AgendaItem[];   // chapter-wide tasks
+  announcements: AgendaItem[];   // officer-report announcements (from #6)
+  helpNeeded:    AgendaItem[];   // officer-report "need help?" items (from #6)
+  unresolved:    AgendaItem[];   // still-open / overdue tasks
 }
 
 const OPEN_STATES: TaskState[] = ['assigned', 'rejected', 'overdue', 'escalated'];
@@ -37,10 +39,14 @@ export interface BuildAgendaInput {
   stateOf:     (t: MockTask) => TaskState;
   /** Offset of today within the Mon-based week (0=Mon … 6=Sun). */
   todayOffset: number;
+  /** Officer-report announcements (from submitted reports — #6). */
+  announcements?: { source: string; text: string }[];
+  /** Officer-report "need help?" items (from submitted reports — #6). */
+  helpNeeded?:    { source: string; text: string }[];
 }
 
 /** Compute the meeting agenda sections from current events + tasks. */
-export function buildAgenda({ events, tasks, stateOf, todayOffset }: BuildAgendaInput): Agenda {
+export function buildAgenda({ events, tasks, stateOf, todayOffset, announcements = [], helpNeeded = [] }: BuildAgendaInput): Agenda {
   const realTasks = tasks.filter(t => !t.isWorkflowParent);
 
   const eventItem = (e: MockEvent): AgendaItem => ({
@@ -70,7 +76,13 @@ export function buildAgenda({ events, tasks, stateOf, todayOffset }: BuildAgenda
     .filter(t => OPEN_STATES.includes(stateOf(t)))
     .map(taskItem);
 
-  return { oldBusiness, newBusiness, brotherWide, unresolved };
+  const noteItem = (prefix: string) => (n: { source: string; text: string }, i: number): AgendaItem => ({
+    id: `${prefix}_${i}`, title: n.text, meta: n.source, kind: 'note',
+  });
+  const announceItems = announcements.map(noteItem('ann'));
+  const helpItems     = helpNeeded.map(noteItem('help'));
+
+  return { oldBusiness, newBusiness, brotherWide, announcements: announceItems, helpNeeded: helpItems, unresolved };
 }
 
 /** True when an agenda has nothing in any section. */
@@ -79,6 +91,8 @@ export function isAgendaEmpty(a: Agenda): boolean {
     a.oldBusiness.length === 0 &&
     a.newBusiness.length === 0 &&
     a.brotherWide.length === 0 &&
+    a.announcements.length === 0 &&
+    a.helpNeeded.length === 0 &&
     a.unresolved.length === 0
   );
 }

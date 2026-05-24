@@ -12,6 +12,7 @@ import { buildAgenda, isAgendaEmpty, type AgendaItem } from '@/lib/agenda/buildA
 import { getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { WEEKLY_OFFICER_REPORT, currentCycleId, getSnapshots, useMockReportVersion } from '@/lib/questionnaire/mockReport';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -42,8 +43,26 @@ export default function AgendaScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
   useTaskStateVersion();   // recompute when task states change
+  useMockReportVersion();  // pull report-derived sections live
 
   useEffect(() => { navigation.setOptions({ title: 'Meeting Agenda' }); }, [navigation]);
+
+  // Officer-report announcements + help-needed, from this cycle's submitted report.
+  const snap = getSnapshots().find(sn => sn.cycleId === currentCycleId());
+  const announcements: { source: string; text: string }[] = [];
+  const helpNeeded:    { source: string; text: string }[] = [];
+  if (snap) {
+    const who = WEEKLY_OFFICER_REPORT.title;
+    const ann = snap.answers['announce'];
+    if (ann && !ann.noUpdate && ann.text?.trim()) announcements.push({ source: who, text: ann.text.trim() });
+    const help = snap.answers['help'];
+    if (help && !help.noUpdate && help.text?.trim()) helpNeeded.push({ source: who, text: help.text.trim() });
+    const support = snap.answers['support'];
+    if (support && !support.noUpdate && (support.selected?.length ?? 0) > 0) {
+      const labels = support.selected!.map(id => WEEKLY_OFFICER_REPORT.questions.find(q => q.id === 'support')?.options?.find(o => o.id === id)?.label ?? id);
+      helpNeeded.push({ source: who, text: `Support needed: ${labels.join(', ')}` });
+    }
+  }
 
   const todayOffset = (new Date().getDay() + 6) % 7;
   const agenda = buildAgenda({
@@ -51,9 +70,12 @@ export default function AgendaScreen() {
     tasks:       getAllTasks(),
     stateOf:     (t) => getStoredState(t.id, t.state),
     todayOffset,
+    announcements,
+    helpNeeded,
   });
 
   function open(i: AgendaItem) {
+    if (i.kind === 'note') return;
     router.push(`/${i.kind}/${i.id}` as any);
   }
 
@@ -71,13 +93,15 @@ export default function AgendaScreen() {
           <Section label="OLD BUSINESS"          items={agenda.oldBusiness} onItem={open} />
           <Section label="NEW BUSINESS"          items={agenda.newBusiness} onItem={open} />
           <Section label="BROTHER-WIDE TASKS"    items={agenda.brotherWide} onItem={open} />
+          <Section label="OFFICER ANNOUNCEMENTS" items={agenda.announcements} onItem={open} />
+          <Section label="HELP NEEDED"           items={agenda.helpNeeded} onItem={open} />
           <Section label="UNRESOLVED ACTION ITEMS" items={agenda.unresolved} onItem={open} />
         </>
       )}
 
       <Text style={s.footNote}>
-        Officer-report announcements and help-needed items will appear here once the
-        questionnaire/report system (#6) exists.
+        Announcements & help-needed are pulled from this week's submitted officer
+        report — submit one in the Weekly report prototype to see them populate here.
       </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
