@@ -52,38 +52,55 @@ Build in tiers so an MVP can ship before the long tail:
 ## 4. Workflow / state model (the hard part)
 
 The existing task state machine is **submit → approve/reject** (a reviewer gate).
-Questionnaire tasks need a **different** lifecycle. **Decisions locked (Biagio):**
+Questionnaire tasks need a **different** lifecycle. The model is a **living
+("rolling") report** that is snapshotted once per cycle. **Decisions locked
+(Biagio):**
 
 ```
-not_started → in_progress (answers edited freely; always editable within the
-                           open window; each save overwrites — latest edit wins)
-            → submitted   (final submit; notifies the annotator to look over;
-                           NOT an approval gate)
-window close → locked      (window closes → no further edits)
+per recurrence cycle (e.g. a week):
+  in_progress  (living answers edited freely within the open window;
+                latest edit wins — no separate draft copy)
+  → final submit (FIRST submit this cycle): snapshot the current answers as
+                  THIS cycle's report + fire notifications. Cycle is now done.
+  → post-submit edits do NOT change this cycle's snapshot; they carry forward
+    as the starting draft for the NEXT cycle's submission.
+window close without a submit → missed/overdue report (see below)
 ```
 
 Locked design decisions:
-- **Always editable within the window.** No lock-on-submit. The responder can keep
-  revising right up until the window closes. The stored answers **always reflect
-  the most recent edit** (latest-write-wins; no separate draft vs final copy that
-  can diverge).
-- **Limited submission window.** Open + close timestamps, driven by the recurrence
-  cadence (e.g. opens Monday, closes Sunday night). After close → **locked**, no
-  edits.
-- **No reviewer / no approval gate.** Submission is **self-submit**. It does
-  **not** enter the submit→approve machine. Instead, **final submit fires a
-  notification to the Annotator** ("X submitted their weekly report") so the
-  Annotator can review/compile — informational, not a blocking sign-off.
-- **"Something must change" rule.** A submission must contain **at least one real
-  update**. Individual prompts may legitimately be "No update," but a questionnaire
-  has enough prompts that an **all-"No update" / fully-empty submission is not a
-  valid submission** — block or warn on final submit until at least one prompt has
-  substantive content. (Exact UX — hard block vs warn — is a §10 open item.)
+- **Living, always-editable answers.** There's one continuously-editable answer
+  set per responder; the stored answers always reflect the **most recent edit**
+  (latest-write-wins, no draft/final divergence).
+- **Per-cycle snapshot on first submit.** Each recurrence cycle has its own
+  submission window. The **first** final submit in a cycle **snapshots** the
+  current answers as that cycle's official report and fires notifications. That
+  cycle is then considered submitted.
+- **Edits after submit roll forward.** Continuing to edit after you've submitted
+  for the week does **not** alter the already-submitted snapshot — those edits
+  become part of **next** cycle's submission. (Answer to §10 Q2.)
+- **Limited submission window**, driven by the recurrence cadence (e.g. opens
+  Monday, closes Sunday night).
+- **No reviewer / no approval gate.** Self-submit; does **not** enter the
+  submit→approve machine.
+- **Submit confirmation + notification recipients.** After the last question, a
+  **confirmation screen** tells the responder that the **Annotator, Pro Consul,
+  and Consul** will be notified. On final submit, those three roles are notified
+  ("X submitted their weekly report") — informational, not a blocking sign-off.
+  Only the **first** submit per cycle notifies (no re-notify on later edits).
+- **Missed report on window close.** If the window closes and a responder never
+  submitted, it's flagged as a **missed/overdue report**, and the **Annotator and
+  Pro Consul** are notified of who's missing. (Answer to §10 Q3.)
+- **"Something must change" rule.** Individual prompts may legitimately be "No
+  update," but a report has enough prompts that something should change — an
+  all-"No update" / empty submission should not be a valid submission. (Exact
+  enforcement — hard block vs warn, and whether the "No update" shortcut counts as
+  substantive — is still §10 Q1.)
 
 > Decision to preserve: **do not modify the existing submit→approve state machine.**
 > Questionnaire tasks get their own parallel lifecycle so the current alpha flows
-> are untouched. The only cross-system touch point is an outbound **notification to
-> the Annotator** on submit (reuses the existing notice/notification surface).
+> are untouched. The only cross-system touch point is the outbound **notifications
+> to Annotator / Pro Consul / Consul** on submit (and to Annotator / Pro Consul on
+> a missed report) — reusing the existing notice/notification surface.
 
 ## 5. Data model (DESIGN ONLY — do not create yet)
 
@@ -93,13 +110,16 @@ Sketch for the future schema phase. **Not** to be built in planning.
   (see §3), prompt, required flag, options (for select types), config (min/max,
   interval for time-slot, target for value-vs-target). Likely attached to a
   template or a task kind.
-- **response** — keyed to **(task instance + responder)**; holds per-question
-  answers + status (in_progress / submitted / locked) + open/close window +
-  submitted_at + last_edited_at. A **single mutable answer set per responder**
-  (latest-write-wins — no separate draft vs final copy); `submitted_at` marks the
-  point the Annotator notification fired, but answers can still change until the
-  window closes. Today tasks only store proof text/state, so this is a genuine new
-  table/shape.
+- **living answer set** — one continuously-editable set of answers per responder
+  (latest-write-wins). This is what the responder sees/edits at any time and what
+  carries forward between cycles.
+- **submission snapshot** — keyed to **(recurrence cycle + responder)**; a frozen
+  copy of the living answers taken at first final-submit, plus submitted_at and the
+  cycle window. This is the official "report for that week" and never changes once
+  taken (post-submit edits live on the living set, not here). A cycle with no
+  snapshot by window-close = a **missed report**.
+- Today tasks only store proof text/state, so the living-set + per-cycle-snapshot
+  shape is a genuine new table/structure.
 - **answer** — per-question value; shape varies by type (text, number, selected
   option id(s), date/time, slot, file ref).
 
@@ -142,21 +162,30 @@ response row, exactly like prep tasks generate per occurrence today.
 
 ## 10. Open questions for Biagio
 
-**Resolved (folded into §4):** editability (always editable within the window),
-window (limited, recurrence-driven), latest-edit-wins, no reviewer/approval but
-notify the Annotator on submit, and the "something must change" rule.
+**Resolved (folded into §4 / §5):**
+- Living, always-editable answers; latest edit wins.
+- Limited, recurrence-driven submission window.
+- Per-cycle snapshot on **first** submit; later edits roll into the next cycle.
+- **No approval gate.** On submit, notify **Annotator + Pro Consul + Consul**; a
+  confirmation screen after the last question names those recipients.
+- **Q2:** notify on **first submit only**; further edits are part of next week's
+  submission.
+- **Q3:** missed reports are flagged on window-close and notify **Annotator + Pro
+  Consul**.
 
 **Still open (answer before the schema phase):**
 1. **"Something must change" enforcement:** **hard block** the final submit until
-   ≥1 prompt has real content, or **warn but allow**? And what counts as
-   "substantive" — any non-empty field, or specifically not the "No update"
-   shortcut?
-2. **Edit-after-submit notifications:** if someone submits, then edits again before
-   the window closes, does the Annotator get **re-notified**, or only on the first
-   submit?
-3. **Window close behavior for non-submitters:** if the window closes and an
-   officer never submitted, is that a **missed/overdue report** (and does the
-   Annotator get notified of who's missing)?
-4. **Tier-1 question types** — is the §3 Tier-1 list the right MVP cut?
-5. **Authoring:** who creates questionnaires — officers per committee, or a fixed
-   chapter-wide set to start?
+   ≥1 prompt has real content, or **warn but allow**? And does the "No update"
+   shortcut count as substantive, or must it be a genuine free-form/value answer?
+4. **Question types for the MVP** — *(clarifying what this means)*: a questionnaire
+   is built from typed prompts — e.g. a free-text box, a number, a single-choice
+   pick-one, a multi-select checklist, a "No update" toggle. The "Tier-1" list in
+   §3 is the **smallest set of prompt types** needed to build the weekly officer
+   report first, leaving fancier types (percentage, date/time pickers, generated
+   time-slot picker, polls, file upload) for later. **Question:** is that minimal
+   set enough to author your weekly report, or is there a prompt type you know
+   you'll need on day one?
+5. **Who authors the questionnaires** — *(clarifying what this means)*: someone has
+   to define the actual questions on the weekly report. **Question:** should each
+   officer/committee write their **own** report questions, or should there be
+   **one standard chapter-wide report** (same questions for everyone) to start?
