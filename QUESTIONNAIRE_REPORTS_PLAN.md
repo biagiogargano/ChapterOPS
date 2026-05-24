@@ -35,15 +35,21 @@ updates, meeting prep, and (further out) class/assignment/quiz-style flows.
 
 ## 3. Question / response types (eventual full set)
 
-Build in tiers so an MVP can ship before the long tail:
+Build in tiers so an MVP can ship before the long tail.
 
-**Tier 1 (MVP — covers the weekly officer report):**
-- short text · long text · number · single-select (multiple choice) ·
-  multi-select (checkbox) · a **"No update"** shortcut
+**Tier 1 (MVP — the prompt types Biagio confirmed he needs for the weekly report):**
+- **Goal** — a free-text status/goal statement.
+- **Current value** — a numeric field for progress (pairs naturally with an
+  optional target value; target is Tier-2 but the type is reserved here).
+- **"No update" shortcut** — a per-prompt toggle marking "nothing changed."
+- **Open-ended text boxes** — short text + long text for the open questions
+  ("need help?", announcements, "what else are you working on?").
+
+(`Save` is the action that persists the living answers — not a prompt type.)
 
 **Tier 2:**
-- percentage · **current value vs target value** (paired numeric) · date picker ·
-  time picker
+- percentage · **current value vs target value** (paired numeric) · single-select
+  (multiple choice) · multi-select (checkbox) · date picker · time picker
 
 **Tier 3:**
 - **generated time-slot picker** (from start/end + interval — reusable for
@@ -109,7 +115,12 @@ Sketch for the future schema phase. **Not** to be built in planning.
 - **questionnaire definition** — ordered list of questions, each with: id, type
   (see §3), prompt, required flag, options (for select types), config (min/max,
   interval for time-slot, target for value-vs-target). Likely attached to a
-  template or a task kind.
+  template or a task kind. **Authoring (locked):** questionnaires are **per
+  officer/committee** (each role has its own report questions, not one shared
+  chapter-wide form), and the **Annotator can edit any of them** — the Annotator is
+  the curator/editor of report questions across roles. (An officer editing their
+  own set is a likely secondary permission to confirm in the schema/permissions
+  phase.)
 - **living answer set** — one continuously-editable set of answers per responder
   (latest-write-wins). This is what the responder sees/edits at any time and what
   carries forward between cycles.
@@ -172,20 +183,15 @@ response row, exactly like prep tasks generate per occurrence today.
   submission.
 - **Q3:** missed reports are flagged on window-close and notify **Annotator + Pro
   Consul**.
+- **Q4 (MVP prompt types):** goal (text), current value (number), "No update"
+  shortcut, and short/long open-ended text boxes — see §3 Tier-1.
+- **Q5 (authoring):** per officer/committee question sets; the **Annotator can
+  edit them** — see §5.
 
 **Still open (answer before the schema phase):**
 1. **"Something must change" enforcement:** **hard block** the final submit until
    ≥1 prompt has real content, or **warn but allow**? And does the "No update"
    shortcut count as substantive, or must it be a genuine free-form/value answer?
-4. **Question types for the MVP** — *(clarifying what this means)*: a questionnaire
-   is built from typed prompts — e.g. a free-text box, a number, a single-choice
-   pick-one, a multi-select checklist, a "No update" toggle. The "Tier-1" list in
-   §3 is the **smallest set of prompt types** needed to build the weekly officer
-   report first, leaving fancier types (percentage, date/time pickers, generated
-   time-slot picker, polls, file upload) for later. **Question:** is that minimal
-   set enough to author your weekly report, or is there a prompt type you know
-   you'll need on day one?
-5. **Who authors the questionnaires** — *(clarifying what this means)*: someone has
-   to define the actual questions on the weekly report. **Question:** should each
-   officer/committee write their **own** report questions, or should there be
-   **one standard chapter-wide report** (same questions for everyone) to start?
+   *(Proposed default unless you say otherwise: **warn but allow**, and "No update"
+   does NOT count as substantive — so an all-"No update" report warns before
+   submitting.)*
