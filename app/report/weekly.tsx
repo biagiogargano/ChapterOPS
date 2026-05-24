@@ -49,19 +49,19 @@ export default function WeeklyReportScreen() {
     if (res.ok) {
       Alert.alert(
         'Report submitted',
-        `Your ${def.title} for ${cycleId} was submitted.\n\nNotified: ${recipientLabels}.\n\nYou can keep editing — further changes roll into next week’s report.`,
+        `Your ${def.title} for ${cycleId} was submitted and locked.\n\nNotified: ${recipientLabels}.`,
       );
     } else if (res.reason === 'already_submitted') {
-      Alert.alert('Already submitted', 'This week’s report is already in. Edits now count toward next week.');
+      Alert.alert('Already submitted', 'This cycle’s report is already in and locked.');
     } else {
       Alert.alert('Nothing to submit', 'Add at least one real update — an all “No update” report can’t be submitted.');
     }
   }
 
   function onPressSubmit() {
-    if (submitted) { doSubmit(); return; }       // will show "already submitted"
+    if (submitted) return;                        // locked — no-op
     if (!canSubmit) {
-      // "Something must change" — warn but allow the user to go back and edit.
+      // "Something must change" — WARN, not a hard block (per v1 direction).
       Alert.alert(
         'Nothing has changed',
         'Every prompt is empty or marked “No update.” Add at least one real update before submitting.',
@@ -69,10 +69,10 @@ export default function WeeklyReportScreen() {
       );
       return;
     }
-    // Confirmation naming the recipients (per the spec’s end-of-report warning).
+    // Confirmation naming the recipients; submitting LOCKS the response (v1).
     Alert.alert(
       'Submit weekly report?',
-      `On submit, the following will be notified:\n\n${recipientLabels}\n\nAnswers reflect your latest edits.`,
+      `On submit, the following will be notified:\n\n${recipientLabels}\n\nYour answers will be locked for this cycle.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Submit', style: 'default', onPress: doSubmit },
@@ -97,13 +97,13 @@ export default function WeeklyReportScreen() {
         {submitted && (
           <View style={s.submittedBanner}>
             <Text style={s.submittedText}>
-              ✓ Submitted for {cycleId}. Edits below now count toward next week.
+              ✓ Submitted &amp; locked for {cycleId}. Your next report opens next cycle.
             </Text>
           </View>
         )}
 
         <View style={s.questions}>
-          {def.questions.map(q => <QuestionCard key={q.id} q={q} />)}
+          {def.questions.map(q => <QuestionCard key={q.id} q={q} locked={submitted} />)}
         </View>
 
         <Pressable

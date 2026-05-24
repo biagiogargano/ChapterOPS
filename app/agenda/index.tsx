@@ -57,11 +57,6 @@ export default function AgendaScreen() {
     if (ann && !ann.noUpdate && ann.text?.trim()) announcements.push({ source: who, text: ann.text.trim() });
     const help = snap.answers['help'];
     if (help && !help.noUpdate && help.text?.trim()) helpNeeded.push({ source: who, text: help.text.trim() });
-    const support = snap.answers['support'];
-    if (support && !support.noUpdate && (support.selected?.length ?? 0) > 0) {
-      const labels = support.selected!.map(id => WEEKLY_OFFICER_REPORT.questions.find(q => q.id === 'support')?.options?.find(o => o.id === id)?.label ?? id);
-      helpNeeded.push({ source: who, text: `Support needed: ${labels.join(', ')}` });
-    }
   }
 
   const todayOffset = (new Date().getDay() + 6) % 7;

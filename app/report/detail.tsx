@@ -18,20 +18,14 @@ import { useNavigation } from 'expo-router';
 import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-/** Human-readable rendering of one answer for a given question. */
+/** Human-readable rendering of one answer for a given question (v1 types). */
 function formatAnswer(q: QuestionDef, a: Answer | undefined): { text: string; muted: boolean } {
   if (!a || a.noUpdate) return { text: 'No update', muted: true };
-  if (q.type === 'current_value') {
-    return a.value != null
-      ? { text: `${a.value}${q.unit ? ' ' + q.unit : ''}${q.target != null ? `  (target ${q.target})` : ''}`, muted: false }
-      : { text: '—', muted: true };
-  }
-  if (q.type === 'percentage') {
-    return a.value != null ? { text: `${a.value}%`, muted: false } : { text: '—', muted: true };
-  }
-  if (q.type === 'single_select' || q.type === 'multi_select') {
-    const labels = (a.selected ?? []).map(id => q.options?.find(o => o.id === id)?.label ?? id);
-    return labels.length ? { text: labels.join(', '), muted: false } : { text: '—', muted: true };
+  if (q.type === 'number') {
+    if (a.value == null) return { text: '—', muted: true };
+    const unit   = q.config?.unit ? ' ' + q.config.unit : '';
+    const target = q.config?.target != null ? `  (target ${q.config.target})` : '';
+    return { text: `${a.value}${unit}${target}`, muted: false };
   }
   return a.text?.trim() ? { text: a.text.trim(), muted: false } : { text: '—', muted: true };
 }

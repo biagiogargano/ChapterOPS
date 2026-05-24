@@ -29,19 +29,21 @@ const EXPECTED_OFFICERS: Role[] = ['pro_consul', 'social_chair', 'risk_manager',
 
 // Static demo submissions for the OTHER officers, so the inbox shows a realistic
 // mix of submitted + missing without needing real multi-user data.
-const DEMO_OTHERS: Record<string, { goal: string; status: string } | null> = {
-  social_chair:      { goal: 'Lock the formal venue', status: 'On track' },
+const DEMO_OTHERS: Record<string, { goal: string; progress: string } | null> = {
+  social_chair:      { goal: 'Lock the formal venue', progress: '—' },
   risk_manager:      null,                                   // missing
-  recruitment_chair: { goal: 'Finish rush roster',    status: 'At risk' },
+  recruitment_chair: { goal: 'Finish rush roster',    progress: '9 members' },
 };
 
-/** Pull a short summary (goal + status label) out of a submitted snapshot. */
-function summarize(snap: ReportSnapshot): { goal: string; status: string } {
+/** Pull a short summary (goal + progress) out of a submitted snapshot (v1 fields). */
+function summarize(snap: ReportSnapshot): { goal: string; progress: string } {
   const goal = snap.answers['goal']?.text?.trim() || '(no goal)';
-  const statusId = snap.answers['status']?.selected?.[0];
-  const statusOpt = WEEKLY_OFFICER_REPORT.questions
-    .find(q => q.id === 'status')?.options?.find(o => o.id === statusId);
-  return { goal, status: statusOpt?.label ?? '—' };
+  const pa = snap.answers['progress'];
+  const pq = WEEKLY_OFFICER_REPORT.questions.find(q => q.id === 'progress');
+  const progress = pa && !pa.noUpdate && pa.value != null
+    ? `${pa.value}${pq?.config?.unit ? ' ' + pq.config.unit : ''}`
+    : '—';
+  return { goal, progress };
 }
 
 export default function ReportInboxScreen() {
@@ -83,13 +85,13 @@ export default function ReportInboxScreen() {
           <Pressable
             key={r.role}
             style={[s.card, s.cardSubmitted]}
-            onPress={() => r.you ? router.push('/report/detail' as any) : Alert.alert(ROLE_LABELS[r.role], `Goal: ${r.summary!.goal}\nStatus: ${r.summary!.status}\n\n(Demo summary — full detail view is wired for your own report.)`)}
+            onPress={() => r.you ? router.push('/report/detail' as any) : Alert.alert(ROLE_LABELS[r.role], `Goal: ${r.summary!.goal}\nProgress: ${r.summary!.progress}\n\n(Demo summary — full detail view is wired for your own report.)`)}
           >
             <View style={s.stripe} />
             <View style={s.cardBody}>
               <Text style={s.role}>{ROLE_LABELS[r.role]}{r.you ? '  · you' : ''}</Text>
               <Text style={s.goal} numberOfLines={1}>{r.summary!.goal}</Text>
-              <Text style={s.statusLine}>Status: {r.summary!.status}</Text>
+              <Text style={s.statusLine}>Progress: {r.summary!.progress}</Text>
             </View>
             <View style={s.badgeOk}><Text style={s.badgeOkText}>Submitted ›</Text></View>
           </Pressable>

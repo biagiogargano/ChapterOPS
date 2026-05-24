@@ -28,23 +28,11 @@ export const WEEKLY_OFFICER_REPORT: QuestionnaireDef = {
   title:     'Weekly Officer Report',
   ownerRole: 'pro_consul',
   questions: [
-    { id: 'goal',     type: 'goal',          prompt: 'This week’s goal / focus', allowNoUpdate: true, hint: 'What are you driving toward this week?' },
-    { id: 'progress', type: 'current_value', prompt: 'Members recruited',             allowNoUpdate: true, target: 12, unit: 'members' },
-    { id: 'confidence', type: 'percentage',  prompt: 'Confidence you’ll hit the goal', allowNoUpdate: true },
-    { id: 'status',   type: 'single_select', prompt: 'Overall status this week',       allowNoUpdate: true, options: [
-      { id: 'on_track', label: 'On track' },
-      { id: 'at_risk',  label: 'At risk' },
-      { id: 'blocked',  label: 'Blocked' },
-    ] },
-    { id: 'support',  type: 'multi_select',  prompt: 'Where could you use support?',   allowNoUpdate: true, options: [
-      { id: 'budget',     label: 'Budget' },
-      { id: 'volunteers', label: 'Volunteers' },
-      { id: 'scheduling', label: 'Scheduling' },
-      { id: 'comms',      label: 'Communications' },
-    ] },
-    { id: 'help',     type: 'short_text',    prompt: 'Do you need help with anything?', allowNoUpdate: true, hint: 'Short ask, or leave on No update' },
-    { id: 'announce', type: 'long_text',     prompt: 'Announcements for the chapter',   allowNoUpdate: true, hint: 'Anything to share at the meeting?' },
-    { id: 'other',    type: 'long_text',     prompt: 'What else are you working on?',   allowNoUpdate: true },
+    { id: 'goal',     type: 'long_text',  prompt: 'This week’s goal / focus',       allowNoUpdate: true, hint: 'What are you driving toward this week?' },
+    { id: 'progress', type: 'number',     prompt: 'Members recruited',              allowNoUpdate: true, config: { mode: 'progress', target: 12, unit: 'members' } },
+    { id: 'help',     type: 'short_text', prompt: 'Do you need help with anything?', allowNoUpdate: true, hint: 'Short ask, or leave on No update' },
+    { id: 'announce', type: 'long_text',  prompt: 'Announcements for the chapter',   allowNoUpdate: true, hint: 'Anything to share at the meeting?' },
+    { id: 'other',    type: 'long_text',  prompt: 'What else are you working on?',   allowNoUpdate: true },
   ],
 };
 
