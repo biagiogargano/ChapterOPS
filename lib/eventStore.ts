@@ -175,11 +175,16 @@ const OFFICERS: Role[] = [
  * generate a placeholder RSVP task and add it to the dynamic task store.
  */
 function maybeGenerateRsvpTask(event: UserCreatedEvent, dayOffset: number): void {
-  // Only generate for this week; optional events don't require RSVP
+  // Only generate for this week. Plain 'optional' events require NO RSVP and
+  // generate nothing; 'optional_rsvp' is optional to attend but still needs an
+  // RSVP/headcount, so it DOES generate (as a non-mandatory response).
   if (dayOffset < 0 || dayOffset > 6) return;
   if (event.audience === 'optional')  return;
 
-  const isOfficersOnly = event.audience === 'officers';
+  const isOfficersOnly     = event.audience === 'officers';
+  // Attendance is required for mandatory + officer events, but NOT for
+  // optional_rsvp (you must respond, but "Not attending" needs no excuse).
+  const attendanceRequired = event.audience === 'all' || event.audience === 'officers';
   const todayOffset    = (new Date().getDay() + 6) % 7;
   const urgency: TaskUrgency = dayOffset === todayOffset ? 'today' : 'week';
 
@@ -188,12 +193,17 @@ function maybeGenerateRsvpTask(event: UserCreatedEvent, dayOffset: number): void
     ? 'Today — RSVP required'
     : `RSVP by ${dayNames[dayOffset] ?? '?'}`;
 
+  const description =
+    isOfficersOnly         ? `RSVP for ${event.title}. Officer attendance required.` :
+    attendanceRequired     ? `RSVP for ${event.title}. Attendance is mandatory for all members.` :
+                             `RSVP for ${event.title}. Attendance is optional, but please respond for a headcount.`;
+
   const task: MockTask = {
     id:                   `task_rsvp_${event.id}`,
     title:                `RSVP for ${event.title}`,
     type:                 'lightweight',
     lightweightKind:      'rsvp',
-    linkedEventMandatory: true,
+    linkedEventMandatory: attendanceRequired,
     requiresCovering:     isOfficersOnly,
     requiresApproval:     true,
     reviewerRole:         'annotator',
@@ -205,7 +215,7 @@ function maybeGenerateRsvpTask(event: UserCreatedEvent, dayOffset: number): void
     visibleTo:            isOfficersOnly ? OFFICERS : 'all',
     linkedEvent:          event.title,
     linkedEventId:        event.id,   // per-instance key for rsvpStore
-    description:          `RSVP for ${event.title}. ${isOfficersOnly ? 'Officer attendance required.' : 'Attendance is mandatory for all members.'}`,
+    description,
   };
 
   addDynamicTask(task);

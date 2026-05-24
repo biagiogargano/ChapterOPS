@@ -754,8 +754,9 @@ export default function EventDetailScreen() {
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';
 
-  // Show RSVP response roster for mandatory or officer-only events
-  const showRsvpResponses  = (isMandatory || event.audience === 'officers') && canSeeRsvps;
+  // Show RSVP response roster for mandatory, officer-only, OR optional-with-RSVP
+  // events (the last is optional to attend but still collects a headcount).
+  const showRsvpResponses  = (isMandatory || event.audience === 'officers' || event.audience === 'optional_rsvp') && canSeeRsvps;
   const rsvpResponseLabel  = event.audience === 'officers' ? 'OFFICER RSVPS' : 'MEMBER RSVPS';
 
   // Show date submissions only for date-style social events (requiresDateNames),

@@ -6,7 +6,12 @@ export type EventKind =
   | 'recruitment'   // Recruitment events, Mission 365, hangouts
   | 'philanthropy'  // Service / philanthropy
   | 'risk';         // Risk/safety events
-export type EventAudience = 'all' | 'officers' | 'optional';
+// Attendance + RSVP requirement, encoded in one field (no schema change):
+//   all          — mandatory attendance (RSVP required)
+//   officers     — officers only, attendance + RSVP required
+//   optional     — optional, NO required RSVP
+//   optional_rsvp— optional attendance, but RSVP/headcount REQUIRED
+export type EventAudience = 'all' | 'officers' | 'optional' | 'optional_rsvp';
 
 export interface MockEvent {
   id:          string;
@@ -117,6 +122,7 @@ export const AUDIENCE_LABEL: Record<EventAudience, string> = {
   all: 'Mandatory',
   officers: 'Officers Only',
   optional: 'Optional',
+  optional_rsvp: 'Optional · RSVP required',
 };
 
 export const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

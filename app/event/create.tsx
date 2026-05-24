@@ -119,9 +119,10 @@ const MONTH_NAMES    = [
 const MINUTE_CHIPS: string[] = ['00', '15', '30', '45'];
 
 const AUDIENCE_OPTIONS: { value: EventAudience; label: string; sub: string }[] = [
-  { value: 'all',      label: 'Mandatory',    sub: 'All active members required' },
-  { value: 'officers', label: 'Officers Only', sub: 'E-Board and officers'        },
-  { value: 'optional', label: 'Optional',      sub: 'Open to all — not required'  },
+  { value: 'all',           label: 'Mandatory',          sub: 'All active members required' },
+  { value: 'officers',      label: 'Officers Only',       sub: 'E-Board and officers'        },
+  { value: 'optional_rsvp', label: 'Optional · RSVP',     sub: 'Not required to attend, but must RSVP (headcount)' },
+  { value: 'optional',      label: 'Optional',            sub: 'Open to all — no RSVP needed' },
 ];
 
 const RECURRENCE_OPTS: RecurrenceType[] = ['none', 'daily', 'weekly', 'biweekly', 'monthly'];

@@ -165,6 +165,7 @@ export function deriveReminders(role: Role, now: Date = new Date()): Reminder[] 
     const relevant =
       ev.audience === 'all' ||
       ev.audience === 'optional' ||
+      ev.audience === 'optional_rsvp' ||
       (ev.audience === 'officers' && isOfficer(role));
     if (!relevant) continue;
 
