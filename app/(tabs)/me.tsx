@@ -162,9 +162,16 @@ export default function MeScreen() {
         </Pressable>
       )}
 
-      {/* ── Weekly report prototype (dev only; feature-branch preview, never in alpha) ── */}
+      {/* ── Prototypes (dev only; feature-branch preview, never in alpha) ── */}
       {__DEV__ && (
         <>
+          <Pressable style={s.linkCard} onPress={() => router.push('/setup' as any)}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.linkTitle}>Org setup wizard (prototype)</Text>
+              <Text style={s.linkSub}>Guided first-run: name, owner, structure, invites</Text>
+            </View>
+            <Text style={s.linkChevron}>›</Text>
+          </Pressable>
           <Pressable style={s.linkCard} onPress={() => router.push('/report/weekly' as any)}>
             <View style={{ flex: 1 }}>
               <Text style={s.linkTitle}>Weekly report (prototype)</Text>
