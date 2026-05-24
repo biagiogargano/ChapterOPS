@@ -56,23 +56,14 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    label: 'COMMUNICATION',
+    // Per triage: NOT on the near-term roadmap. Kept as experiments only so we
+    // don't lose the idea — they don't fit the core events/tasks model.
+    label: 'EXPERIMENTS · deferred (not roadmap)',
     items: [
-      { title: 'Announcements', sub: 'Chapter-wide notices feed + post',  route: '/announcements' },
-      { title: 'Quick poll',    sub: 'Lightweight chapter vote with tallies', route: '/poll' },
-    ],
-  },
-  {
-    label: 'ENGAGEMENT',
-    items: [
-      { title: 'Points & leaderboard', sub: 'Participation points and rankings', route: '/points' },
-    ],
-  },
-  {
-    label: 'APP SHELL',
-    items: [
-      { title: 'Pinned tab',  sub: 'Customizable quick-access shortcuts (role-gated)', route: '/pinned' },
-      { title: 'First-time experience ✨', sub: 'Empty chapter → guided first event', route: '/first-run' },
+      { title: 'Announcements',        sub: 'Chapter notices feed + post',          route: '/announcements' },
+      { title: 'Quick poll',           sub: 'Lightweight chapter vote',             route: '/poll' },
+      { title: 'Points & leaderboard', sub: 'Participation points and rankings',    route: '/points' },
+      { title: 'Pinned tab',           sub: 'Customizable quick-access shortcuts',  route: '/pinned' },
     ],
   },
 ];
