@@ -55,6 +55,12 @@ const GROUPS: Group[] = [
       { title: 'Quick poll',    sub: 'Lightweight chapter vote with tallies', route: '/poll' },
     ],
   },
+  {
+    label: 'ENGAGEMENT',
+    items: [
+      { title: 'Points & leaderboard', sub: 'Participation points and rankings', route: '/points' },
+    ],
+  },
 ];
 
 export default function PrototypesHub() {
