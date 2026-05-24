@@ -110,8 +110,8 @@ export default function SetupWizardScreen() {
               <Text style={[s.choiceTitle, !useTiers && s.choiceTitleOn]}>Start minimal</Text>
               <Text style={s.choiceHint}>Just you + members. Add structure whenever you want.</Text>
             </Pressable>
-            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/tree' as any)}>
-              <Text style={s.previewText}>Or build your tree step by step (Q&A) ›</Text>
+            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/invite-people' as any)}>
+              <Text style={s.previewText}>Invite people, then build your tree from them ›</Text>
             </Pressable>
           </View>
         )}

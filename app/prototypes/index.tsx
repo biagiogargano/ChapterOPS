@@ -17,7 +17,8 @@ const GROUPS: Group[] = [
     items: [
       { title: 'First-time experience ✨', sub: 'Empty chapter → guided → create your first event', route: '/first-run' },
       { title: 'Org setup wizard',      sub: 'Guided first-run: name, owner, structure, invites', route: '/setup' },
-      { title: 'Build org tree (Q&A)',  sub: 'Build the hierarchy by answering questions',          route: '/setup/tree' },
+      { title: 'Invite people',         sub: 'Add name/email/position to your roster',              route: '/setup/invite-people' },
+      { title: 'Build org tree',        sub: 'Place invited people into the hierarchy',             route: '/setup/tree' },
       { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',   route: '/invite' },
       { title: 'Welcome walkthrough',   sub: 'First-use intro to the main surfaces',                 route: '/tutorial' },
       { title: 'Org settings',          sub: 'Rename org · transfer ownership · customize',          route: '/org-settings' },

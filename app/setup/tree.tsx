@@ -1,87 +1,68 @@
 /**
- * app/setup/tree.tsx — guided "build your org tree by asking" prototype.
- * PROTOTYPE ONLY (see SPEC_ONBOARDING_ORG_SETUP.md §2a).
- *
- * Instead of a grid/graph editor, the owner builds the hierarchy by answering
- * questions, top-down: "what's your role?" → "who reports to them?" → repeat down
- * the chain until each branch ends or is marked General members. The resulting
- * tree is shown at the end. Mock/local state, nothing saved. Dev-only; not linked
- * from phase-2, not wired into the alpha.
+ * app/setup/tree.tsx — build the leadership tree by PLACING invited people.
+ * PROTOTYPE / mock. After inviting people (name/email/position), build the
+ * hierarchy by answering "who reports to X?" and picking from your roster — no
+ * typing role names from scratch. Falls back to typing if nobody's invited.
+ * Local state, nothing saved. Dev-only; not in phase-2 / the alpha.
  */
 
+import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-interface Node { id: string; name: string; parentId: string | null; isMembers?: boolean }
+interface Node { id: string; name: string; position?: string; parentId: string | null; isMembers?: boolean; inviteeId?: string }
 let _seq = 0;
-const newId = () => `n${_seq++}`;
+const newId = () => `t${_seq++}`;
 
 export default function TreeBuilderScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
+  useOrgBuildVersion();
 
-  const [phase, setPhase]   = useState<'root' | 'asking' | 'review'>('root');
-  const [nodes, setNodes]   = useState<Node[]>([]);
-  const [queue, setQueue]   = useState<string[]>([]);   // node ids still to ask about
-  const [rootDraft, setRootDraft]   = useState('');
-  const [childDraft, setChildDraft] = useState('');
+  const [nodes, setNodes] = useState<Node[]>([{ id: 'root', name: 'You', position: 'Owner', parentId: null }]);
+  const [queue, setQueue] = useState<string[]>(['root']);
+  const [phase, setPhase] = useState<'asking' | 'review'>('asking');
+  const [manual, setManual] = useState('');
 
   useEffect(() => { navigation.setOptions({ title: 'Build your org' }); }, [navigation]);
 
-  const current      = nodes.find(n => n.id === queue[0]) ?? null;
-  const currentKids  = useMemo(
-    () => (current ? nodes.filter(n => n.parentId === current.id) : []),
-    [nodes, current],
-  );
+  const invited = getInvited();
+  const current = nodes.find(n => n.id === queue[0]) ?? null;
+  const placedInviteeIds = new Set(nodes.map(n => n.inviteeId).filter(Boolean) as string[]);
+  const unplaced = invited.filter(i => !placedInviteeIds.has(i.id));
+  const currentKids = current ? nodes.filter(n => n.parentId === current.id) : [];
 
-  function startRoot() {
-    const name = rootDraft.trim();
-    if (!name) return;
-    const root: Node = { id: newId(), name, parentId: null };
-    setNodes([root]);
-    setQueue([root.id]);
-    setPhase('asking');
-  }
-
-  function addChild(name: string, isMembers = false) {
+  function placeInvitee(inv: Invitee) {
     if (!current) return;
-    const n = name.trim();
-    if (!n) return;
-    setNodes(prev => [...prev, { id: newId(), name: n, parentId: current.id, isMembers }]);
-    setChildDraft('');
+    setNodes(prev => [...prev, { id: newId(), name: inv.name, position: inv.position, parentId: current.id, inviteeId: inv.id }]);
   }
-
+  function addManual() {
+    if (!current || !manual.trim()) return;
+    setNodes(prev => [...prev, { id: newId(), name: manual.trim(), parentId: current.id }]);
+    setManual('');
+  }
   function addMembers() {
-    if (currentKids.some(k => k.isMembers)) return;   // one bucket is enough
-    addChild('General members', true);
+    if (!current || currentKids.some(k => k.isMembers)) return;
+    setNodes(prev => [...prev, { id: newId(), name: 'General members', parentId: current.id, isMembers: true }]);
   }
-
   function nextRole() {
     if (!current) return;
-    // Enqueue this role's non-members children so we ask about them next.
     const kids = nodes.filter(n => n.parentId === current.id && !n.isMembers).map(n => n.id);
     const nextQueue = [...queue.slice(1), ...kids];
     if (nextQueue.length === 0) setPhase('review');
     else setQueue(nextQueue);
   }
 
-  function finish() {
-    Alert.alert(
-      'Org tree built (prototype)',
-      `${nodes.length} roles defined.\n\n(Mock — nothing saved. In the real app this becomes your editable leadership tree.)`,
-      [{ text: 'OK', onPress: () => router.back() }],
-    );
-  }
-
-  // Indented outline for review.
   function renderTree(parentId: string | null, depth: number): ReactNode[] {
     return nodes
       .filter(n => n.parentId === parentId)
       .flatMap(n => [
         <View key={n.id} style={[s.treeRow, { paddingLeft: 12 + depth * 18 }]}>
           <View style={[s.bullet, n.isMembers && s.bulletMembers]} />
-          <Text style={[s.treeName, n.isMembers && s.treeMembers]}>{n.name}</Text>
+          <Text style={[s.treeName, n.isMembers && s.treeMembers]}>
+            {n.name}{n.position ? <Text style={s.treePos}>  · {n.position}</Text> : null}
+          </Text>
           {depth === 0 && <Text style={s.ownerTag}>owner</Text>}
         </View>,
         ...renderTree(n.id, depth + 1),
@@ -93,62 +74,61 @@ export default function TreeBuilderScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock, nothing saved</Text></View>
 
-        {/* ── Root: your role ── */}
-        {phase === 'root' && (
-          <View style={s.block}>
-            <Text style={s.q}>What’s your role called?</Text>
-            <Text style={s.help}>You’re the top of the tree. Use whatever your org calls it — President, CEO, Consul, Captain…</Text>
-            <TextInput style={s.input} placeholder="e.g. President" placeholderTextColor="#475569" value={rootDraft} onChangeText={setRootDraft} autoFocus onSubmitEditing={startRoot} />
-            <Pressable style={[s.primary, !rootDraft.trim() && s.primaryOff]} onPress={startRoot} disabled={!rootDraft.trim()}>
-              <Text style={[s.primaryText, !rootDraft.trim() && s.primaryTextOff]}>Start building</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* ── Asking: who reports to current ── */}
         {phase === 'asking' && current && (
           <View style={s.block}>
             <Text style={s.crumb}>Building under</Text>
             <Text style={s.q}>Who reports to {current.name}?</Text>
-            <Text style={s.help}>Add the roles directly below {current.name}. We’ll then ask who reports to each of them.</Text>
+            <Text style={s.help}>Pick people from your roster. We'll then ask who reports to each of them.</Text>
 
-            <View style={s.inviteRow}>
-              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="e.g. Vice President" placeholderTextColor="#475569" value={childDraft} onChangeText={setChildDraft} onSubmitEditing={() => addChild(childDraft)} />
-              <Pressable style={s.addBtn} onPress={() => addChild(childDraft)}><Text style={s.addBtnText}>Add</Text></Pressable>
-            </View>
+            {/* Already placed under current */}
+            {currentKids.map(k => (
+              <View key={k.id} style={s.kidItem}>
+                <View style={[s.bullet, k.isMembers && s.bulletMembers]} />
+                <Text style={[s.kidName, k.isMembers && s.treeMembers]}>{k.name}{k.position ? `  · ${k.position}` : ''}</Text>
+              </View>
+            ))}
 
-            {currentKids.length > 0 ? (
-              currentKids.map(k => (
-                <View key={k.id} style={s.kidItem}>
-                  <View style={[s.bullet, k.isMembers && s.bulletMembers]} />
-                  <Text style={[s.kidName, k.isMembers && s.treeMembers]}>{k.name}</Text>
+            {/* Unplaced roster people to pick */}
+            {unplaced.length > 0 ? (
+              <>
+                <Text style={s.pickLabel}>From your roster:</Text>
+                <View style={s.chips}>
+                  {unplaced.map(inv => (
+                    <Pressable key={inv.id} style={s.personChip} onPress={() => placeInvitee(inv)}>
+                      <Text style={s.personChipName}>{inv.name}</Text>
+                      <Text style={s.personChipPos}>{inv.position}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-              ))
+              </>
             ) : (
-              <Text style={s.help}>No one yet. Add roles above, mark general members, or move on if no one reports to {current.name}.</Text>
+              invited.length === 0 && (
+                <View style={s.manualRow}>
+                  <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a role/person…" placeholderTextColor="#475569" value={manual} onChangeText={setManual} onSubmitEditing={addManual} />
+                  <Pressable style={s.addBtn} onPress={addManual}><Text style={s.addBtnText}>Add</Text></Pressable>
+                </View>
+              )
             )}
 
-            <Pressable style={s.ghost} onPress={addMembers}>
-              <Text style={s.ghostText}>+ Add “General members” here</Text>
-            </Pressable>
+            <Pressable style={s.ghost} onPress={addMembers}><Text style={s.ghostText}>+ Add "General members" here</Text></Pressable>
+            {invited.length > 0 && unplaced.length === 0 && (
+              <Text style={s.help}>Everyone you invited has been placed. You can still add general members, or move on.</Text>
+            )}
 
             <Pressable style={s.primary} onPress={nextRole}>
               <Text style={s.primaryText}>{currentKids.filter(k => !k.isMembers).length > 0 ? 'Next role ›' : 'No one reports to them ›'}</Text>
             </Pressable>
-            <Text style={s.footHint}>Roles left to ask about after this: {Math.max(0, queue.length - 1)}</Text>
+            <Text style={s.footHint}>Roles left to ask about after this: {Math.max(0, queue.length - 1)}{invited.length > 0 ? ` · ${unplaced.length} people unplaced` : ''}</Text>
+            <Pressable style={s.back} onPress={() => router.push('/setup/invite-people' as any)}><Text style={s.backText}>← Invite more people</Text></Pressable>
           </View>
         )}
 
-        {/* ── Review ── */}
         {phase === 'review' && (
           <View style={s.block}>
-            <Text style={s.q}>Here’s your org tree</Text>
-            <Text style={s.help}>Built just by answering questions — no grid. You’ll be able to edit this anytime.</Text>
+            <Text style={s.q}>Here's your org tree</Text>
+            <Text style={s.help}>Built from the people you invited — no grid. Editable anytime.</Text>
             <View style={s.treeBox}>{renderTree(null, 0)}</View>
-            <Text style={s.footHint}>
-              Full version: a role can “also report to” another (second manager), and you can rename or move anyone later.
-            </Text>
-            <Pressable style={s.primary} onPress={finish}><Text style={s.primaryText}>Looks good</Text></Pressable>
+            <Text style={s.footHint}>Full version: a person can "also report to" another, and you can move anyone later.</Text>
           </View>
         )}
 
@@ -170,9 +150,14 @@ const s = StyleSheet.create({
   q:     { fontSize: 21, fontWeight: '800', color: '#f8fafc' },
   help:  { fontSize: 13, color: '#64748b', lineHeight: 18 },
 
-  input: { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 4 },
+  pickLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', marginTop: 4 },
+  chips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  personChip:    { backgroundColor: '#1e1b4b', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: '#4f46e5' },
+  personChipName:{ fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
+  personChipPos: { fontSize: 11, color: '#a5b4fc', marginTop: 1 },
 
-  inviteRow:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  input: { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
+  manualRow:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
   addBtn:     { backgroundColor: '#1e3a5f', borderRadius: 10, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 12, paddingHorizontal: 16 },
   addBtnText: { color: '#60a5fa', fontWeight: '700', fontSize: 14 },
 
@@ -185,15 +170,16 @@ const s = StyleSheet.create({
   ghost:     { alignSelf: 'flex-start', paddingVertical: 8 },
   ghostText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
-  primary:       { backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 14, alignItems: 'center', marginTop: 4 },
-  primaryOff:    { backgroundColor: '#1e293b', borderColor: '#334155' },
-  primaryText:   { color: '#60a5fa', fontSize: 15, fontWeight: '700' },
-  primaryTextOff:{ color: '#475569' },
-  footHint:      { fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 6, lineHeight: 17 },
+  primary:     { backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  primaryText: { color: '#60a5fa', fontSize: 15, fontWeight: '700' },
+  footHint:    { fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 6, lineHeight: 17 },
+  back:        { alignSelf: 'center', paddingVertical: 8 },
+  backText:    { color: '#64748b', fontSize: 13, fontWeight: '600' },
 
   treeBox:    { backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 10, marginTop: 4 },
   treeRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingRight: 12 },
   treeName:   { fontSize: 14, fontWeight: '600', color: '#f1f5f9', flex: 1 },
+  treePos:    { fontSize: 12, color: '#818cf8', fontWeight: '500' },
   treeMembers:{ color: '#94a3b8', fontWeight: '500' },
   ownerTag:   { fontSize: 10, fontWeight: '700', color: '#a5b4fc', backgroundColor: '#312e81', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
 });
