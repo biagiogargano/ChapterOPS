@@ -1,9 +1,10 @@
-import { getStoredState, loadTaskState, saveTaskState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { getStoredState, loadTaskState, refreshTaskStates, saveTaskState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { fetchAllEvents } from '@/lib/eventService';
+import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
 import { DAY_LABELS } from '@/lib/mockEvents';
@@ -15,17 +16,20 @@ import {
   dueLabelOf,
   getResponsibilityGroups,
   isOverdue,
+  setSupabaseTaskCache,
   urgencyOf,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
 import {
   getNoticesForRole,
+  hydrateUpdateNotices,
   useUpdateNoticesVersion,
 } from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
   hydrateRsvpsFromSupabase,
+  refreshRsvpsFromSupabase,
   setRsvpEntry,
   useRsvpEntry,
   useRsvpVersion,
@@ -649,11 +653,33 @@ export default function TodayScreen() {
     all.forEach(ev => { void hydrateRsvpsFromSupabase(ev.id); });
   }, [dataOrgId]);
 
+  // Manual pull-to-refresh: SERVER-WINS across the board so another user's changes
+  // in the same org appear. Refetches events, RSVPs/date submissions (overwrite),
+  // tasks, task states (overwrite), and notices — reusing the same fetchers
+  // DataBootstrap uses. Distinct from the focus effect (loadEvents), which stays
+  // local-wins so a just-made optimistic write isn't clobbered before it persists.
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try { await loadEvents(); } finally { setRefreshing(false); }
-  }, [loadEvents]);
+    try {
+      const remoteEvents = await fetchAllEvents(dataOrgId);
+      setSupabaseEventCache(remoteEvents);
+      const all = getAllEvents();
+      setAllEvents(all);
+      // RSVP / date submissions — server-wins for each displayed event.
+      await Promise.all(all.map(ev => refreshRsvpsFromSupabase(ev.id)));
+      // Tasks + task states + notices — same fetchers as DataBootstrap.
+      const [remoteTasks, remoteStates] = await Promise.all([
+        fetchAllTasks(dataOrgId),
+        fetchTaskStates(dataOrgId),
+      ]);
+      setSupabaseTaskCache(remoteTasks);
+      refreshTaskStates(remoteStates);
+      await hydrateUpdateNotices(dataOrgId);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dataOrgId]);
 
   useFocusEffect(
     useCallback(() => {

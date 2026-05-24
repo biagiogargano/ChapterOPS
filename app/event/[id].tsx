@@ -13,13 +13,14 @@ import {
   getAllRsvpsForEvent,
   getRsvpEntry,
   hydrateRsvpsFromSupabase,
+  refreshRsvpsFromSupabase,
   setRsvpEntry,
   useRsvpEntry,
   useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
-import { emitUpdateNotice } from '@/lib/updateNoticeStore';
+import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
   addGeneratedTask,
@@ -29,16 +30,17 @@ import {
   filterTasksForRole,
   getAllTasks,
   isOverdue,
+  setSupabaseTaskCache,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
-import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { getStoredState, refreshTaskStates, useTaskStateVersion } from '@/lib/devTaskStore';
 import { summarizeEventOps } from '@/lib/eventOps';
 import { rsvpReviewTaskId } from '@/lib/generatedTasks';
 import { NO_TEMPLATE } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
 import SearchablePicker from '@/components/SearchablePicker';
-import { insertTask, removeTask } from '@/lib/taskService';
+import { fetchAllTasks, fetchTaskStates, insertTask, removeTask } from '@/lib/taskService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -697,9 +699,11 @@ export default function EventDetailScreen() {
     void hydrateRsvpsFromSupabase(event.id);
   }, [event?.id]);
 
-  // Pull-to-refresh: re-fetch this event's fields and re-hydrate its RSVP roster
-  // so another user's edit / RSVP shows without leaving the screen. Tasks are
-  // re-read from the store via the focus bump. No-ops on non-UUID (mock) ids.
+  // Manual pull-to-refresh: SERVER-WINS so another user's changes in the same org
+  // appear. Re-fetches this event, OVERWRITES its RSVP/date roster from the server
+  // (refreshRsvpsFromSupabase), and refetches tasks + task states + notices so the
+  // related-task list / prep progress reflect cross-device updates. Distinct from
+  // the mount hydrate (local-wins), so a just-made optimistic write isn't clobbered.
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -708,7 +712,14 @@ export default function EventDetailScreen() {
         const remote = await fetchEventById(id, dataOrgId);
         if (remote) setEvent(remote);
       }
-      if (event?.id) await hydrateRsvpsFromSupabase(event.id);
+      if (event?.id) await refreshRsvpsFromSupabase(event.id);
+      const [remoteTasks, remoteStates] = await Promise.all([
+        fetchAllTasks(dataOrgId),
+        fetchTaskStates(dataOrgId),
+      ]);
+      setSupabaseTaskCache(remoteTasks);
+      refreshTaskStates(remoteStates);
+      await hydrateUpdateNotices(dataOrgId);
       _bumpFocus(n => n + 1);
     } finally {
       setRefreshing(false);

@@ -129,6 +129,29 @@ export async function hydrateRsvpsFromSupabase(eventId: string): Promise<void> {
 }
 
 /**
+ * SERVER-WINS refresh for MANUAL pull-to-refresh: load every Supabase RSVP row
+ * for one event and OVERWRITE the local entries (unlike hydrateRsvpsFromSupabase,
+ * which keeps the local entry). This is what lets another user's *changed* RSVP /
+ * date answer appear after a manual refresh across devices.
+ *
+ * Safe for same-device: the user's own writes are pushed to Supabase immediately
+ * (setRsvpEntry → upsertRsvp), so the server row already matches and overwriting
+ * is a no-op for their own data. No-op for non-UUID event ids (service
+ * short-circuits → returns []), so the flag-off demo seed is untouched.
+ *
+ * Use this ONLY on explicit manual refresh; mount/focus keeps the local-wins
+ * hydrate so a just-made optimistic write is never clobbered before it persists.
+ */
+export async function refreshRsvpsFromSupabase(eventId: string): Promise<void> {
+  const rows = await fetchRsvpsForEvent(eventId);
+  if (rows.length === 0) return;
+  for (const r of rows) {
+    _store[_key(r.eventId, r.role)] = r;   // server wins (overwrite)
+  }
+  _notify();
+}
+
+/**
  * Clear all RSVP entries on an org transition so the next org starts clean.
  * Clears data only and notifies subscribers; the listener set is left intact.
  * (The demo seeds live in _store too, but they only matter in the flag-off

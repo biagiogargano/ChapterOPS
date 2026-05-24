@@ -1,7 +1,9 @@
 import { useDevRole } from '@/lib/devRoleStore';
-import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { getStoredState, refreshTaskStates, useTaskStateVersion } from '@/lib/devTaskStore';
 import { fetchAllEvents } from '@/lib/eventService';
+import { fetchAllTasks, fetchTaskStates } from '@/lib/taskService';
 import { getAllEvents, setSupabaseEventCache } from '@/lib/eventStore';
+import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import {
   AUDIENCE_LABEL,
@@ -17,6 +19,7 @@ import {
   STATE_COLOR,
   dueLabelOf,
   filterTasksForRole,
+  setSupabaseTaskCache,
   type MockTask,
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
@@ -178,11 +181,28 @@ export default function CalendarScreen() {
     setEvents(getAllEvents());
   }, [dataOrgId]);
 
+  // Manual pull-to-refresh: server-wins refetch of events + tasks + task states +
+  // notices so another user's changes in the same org appear. (Calendar shows
+  // events + tasks-due; no RSVP roster, so RSVP refresh is handled on Today/Event
+  // detail.) Distinct from the focus effect (loadEvents = events only).
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try { await loadEvents(); } finally { setRefreshing(false); }
-  }, [loadEvents]);
+    try {
+      const [remoteEvents, remoteTasks, remoteStates] = await Promise.all([
+        fetchAllEvents(dataOrgId),
+        fetchAllTasks(dataOrgId),
+        fetchTaskStates(dataOrgId),
+      ]);
+      setSupabaseEventCache(remoteEvents);
+      setSupabaseTaskCache(remoteTasks);
+      refreshTaskStates(remoteStates);
+      await hydrateUpdateNotices(dataOrgId);
+      setEvents(getAllEvents());
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dataOrgId]);
 
   useFocusEffect(
     useCallback(() => {

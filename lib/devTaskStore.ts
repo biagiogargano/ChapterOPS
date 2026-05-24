@@ -50,6 +50,28 @@ export function seedTaskStates(states: PersistedTaskState[]): void {
   }
 }
 
+/**
+ * SERVER-WINS refresh for MANUAL pull-to-refresh: OVERWRITE local interaction
+ * state with the persisted server values (unlike seedTaskStates, which skips ids
+ * that already have a local entry). This lets another user's task completion /
+ * approval appear after a manual refresh across devices.
+ *
+ * Safe for same-device: saveTaskState writes through to Supabase immediately, so
+ * the server already matches the user's own state. Use ONLY on manual refresh;
+ * mount/startup keeps seedTaskStates (local-wins) so an in-session edit isn't
+ * clobbered before it persists. Notifies subscribers so badges/counts update.
+ */
+export function refreshTaskStates(states: PersistedTaskState[]): void {
+  for (const s of states) {
+    _store[s.id] = {
+      state:         s.state,
+      proofContent:  s.proofContent,
+      rejectionNote: s.rejectionNote,
+    };
+  }
+  _notify();
+}
+
 export function loadTaskState(
   taskId:   string,
   defaults: { state: TaskState },
