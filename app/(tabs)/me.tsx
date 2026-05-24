@@ -162,6 +162,17 @@ export default function MeScreen() {
         </Pressable>
       )}
 
+      {/* ── Weekly report prototype (dev only; feature-branch preview, never in alpha) ── */}
+      {__DEV__ && (
+        <Pressable style={s.linkCard} onPress={() => router.push('/report/weekly' as any)}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.linkTitle}>Weekly report (prototype)</Text>
+            <Text style={s.linkSub}>Preview the questionnaire / report flow — mock data, not saved</Text>
+          </View>
+          <Text style={s.linkChevron}>›</Text>
+        </Pressable>
+      )}
+
       {/* ── Sign out ── */}
       <Pressable style={s.signOutButton} onPress={() => { void signOut(); }}>
         <Text style={s.signOutText}>Sign Out</Text>
