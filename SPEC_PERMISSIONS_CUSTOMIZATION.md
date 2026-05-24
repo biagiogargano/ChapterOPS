@@ -1,5 +1,13 @@
 # Product Spec — Permissions & Customization ("built for each org")
 
+> **DECISION (2026-05): DEFERRED — keep permissions IMPLICIT for now.** The full
+> matrix model below felt overly complicated, and the role×resource×level grid
+> prototype was removed. Today's sensible hardcoded role behavior stays as-is.
+> When we revisit this, **favor a much simpler model** — e.g. **3 tiers**
+> (Member / Officer / Admin-owner) with good defaults, or a short list of
+> **plain-English toggles** — NOT a full permission grid. This doc is kept only
+> as long-term reference for the eventual (auth/RLS-backed) version.
+
 **PLANNING ONLY.** No schema/RLS/RPC/auth/flags/data-model changes here. This is
 the design + phasing for the system that lets each organization shape the app to
 itself. Lives on `feature/questionnaire-reports-planning`; does **not** touch
