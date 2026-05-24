@@ -11,7 +11,6 @@ import {
   getAllTasks,
   getResponsibilityGroups,
   isOverdue,
-  sortByUrgency,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
@@ -311,7 +310,7 @@ function SectionHeader({
 // ─── Filter + sort ────────────────────────────────────────────────────────────
 
 type StatusFilter = 'all' | 'todo' | 'inreview' | 'done' | 'overdue';
-type SortBy       = 'due' | 'urgency';
+type SortBy       = 'due' | 'type' | 'event';
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all',      label: 'All' },
@@ -322,22 +321,32 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 ];
 
 const SORTS: { id: SortBy; label: string }[] = [
-  { id: 'due',     label: 'Due date' },
-  { id: 'urgency', label: 'Urgency' },
+  { id: 'due',   label: 'Due date' },
+  { id: 'type',  label: 'Type' },
+  { id: 'event', label: 'Event' },
 ];
 
-/** Does a task's effective state match the chosen status filter? */
+/**
+ * Does a task's effective state match the chosen status filter?
+ * 'all' HIDES completed (approved) tasks by default — done tasks only appear
+ * under the explicit 'done' filter, so the list stays focused on open work.
+ */
 function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
-  if (filter === 'all') return true;
   const st      = getStoredState(t.id, t.state);
   const overdue = isOverdue(t.dueAt, st) || st === 'escalated';
   switch (filter) {
+    case 'all':      return st !== 'approved';   // hide completed by default
     case 'overdue':  return overdue;
     case 'done':     return st === 'approved';
     case 'inreview': return st === 'submitted';
     case 'todo':     return !overdue && (st === 'assigned' || st === 'rejected');
   }
 }
+
+// Sort keys (stable, with due date as the tiebreaker for type/event sorts).
+const dueKey  = (t: MockTask) => t.dueAt ?? '9999';
+const typeKey = (t: MockTask) => t.lightweightKind ?? t.type;          // rsvp/name/ack/yes_no/structured
+const evtKey  = (t: MockTask) => (t.linkedEvent ?? '~~~').toLowerCase(); // no-event sorts last
 
 /** Apply the active search + filter + sort to a bucket's tasks (pure). */
 function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, query: string): MockTask[] {
@@ -346,8 +355,10 @@ function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, quer
     matchesStatus(t, filter) &&
     (q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q)),
   );
-  if (sortBy === 'urgency') return sortByUrgency(filtered);
-  return [...filtered].sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'));
+  const arr = [...filtered];
+  if (sortBy === 'type')  return arr.sort((a, b) => typeKey(a).localeCompare(typeKey(b)) || dueKey(a).localeCompare(dueKey(b)));
+  if (sortBy === 'event') return arr.sort((a, b) => evtKey(a).localeCompare(evtKey(b))   || dueKey(a).localeCompare(dueKey(b)));
+  return arr.sort((a, b) => dueKey(a).localeCompare(dueKey(b)));   // due date (default)
 }
 
 function FilterSortBar({
@@ -434,13 +445,14 @@ export default function TasksScreen() {
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [sortPickerOpen, setSortPickerOpen] = useState(false);
 
-  const viewAlert    = applyView(alert,    statusFilter, sortBy, taskQuery);
-  const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery);
-  const viewReview   = applyView(review,   statusFilter, sortBy, taskQuery);
-  const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery);
+  // My tasks = my own work + anything I review, merged into ONE list so the sort
+  // orders the whole list (not grouped). reviewIds tags which get a REVIEW label.
+  const reviewIds  = new Set(review.map(t => t.id));
+  const myView     = applyView([...mine, ...review], statusFilter, sortBy, taskQuery);
+  const viewAlert  = applyView(alert, statusFilter, sortBy, taskQuery);
 
-  const myCount    = viewMine.length + viewReview.length;   // mine + things to review
-  const shownCount = myCount + viewAlert.length + viewReviewed.length;
+  const myCount    = myView.length;
+  const shownCount = myCount + viewAlert.length;
 
   // The one unique bit from the old Chapter Overview: upcoming events with
   // incomplete prep (a compact link, not a 3-tile glance). Soonest first.
@@ -515,20 +527,26 @@ export default function TasksScreen() {
         ) : shownCount === 0 ? (
           <View style={s.emptyFull}>
             <Text style={s.emptyTitle}>Nothing here</Text>
-            <Text style={s.emptyText}>No tasks match this filter.</Text>
+            <Text style={s.emptyText}>
+              {statusFilter === 'all' ? 'No open tasks — completed ones are hidden (filter by Done to see them).' : 'No tasks match this filter.'}
+            </Text>
           </View>
         ) : (
           <>
-            {/* My tasks — your own work PLUS things to review (labeled REVIEW),
-                one list, no separate review bucket. */}
+            {/* My tasks — your own work + things to review (labeled REVIEW), one
+                merged, sorted list. Completed tasks are hidden unless Status=Done. */}
             {myCount > 0 && (
               <View style={s.section}>
                 <SectionHeader label="MY TASKS" count={myCount} />
-                {viewMine.map(t => (
-                  <TaskCard key={t.id} task={t} role={role} showAssignee={false} onPress={() => nav(t)} />
-                ))}
-                {viewReview.map(t => (
-                  <TaskCard key={t.id} task={t} role={role} showAssignee reviewTag onPress={() => nav(t)} />
+                {myView.map(t => (
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    role={role}
+                    showAssignee={reviewIds.has(t.id)}
+                    reviewTag={reviewIds.has(t.id)}
+                    onPress={() => nav(t)}
+                  />
                 ))}
               </View>
             )}
@@ -539,15 +557,6 @@ export default function TasksScreen() {
               <View style={s.section}>
                 <SectionHeader label="BELOW YOU · OVERDUE" count={viewAlert.length} urgent />
                 {viewAlert.map(t => (
-                  <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
-                ))}
-              </View>
-            )}
-
-            {viewReviewed.length > 0 && (
-              <View style={s.section}>
-                <SectionHeader label="RECENTLY REVIEWED" count={viewReviewed.length} />
-                {viewReviewed.map(t => (
                   <TaskCard key={t.id} task={t} role={role} showAssignee onPress={() => nav(t)} />
                 ))}
               </View>
