@@ -14,9 +14,9 @@ import {
   reportsTo,
   rolesByLevel,
 } from '@/lib/leadership/hierarchy';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const LEVEL_TITLES: Record<number, string> = {
   0: 'Chapter lead',
@@ -27,6 +27,7 @@ const LEVEL_TITLES: Record<number, string> = {
 
 export default function LeadershipScreen() {
   const navigation = useNavigation();
+  const router     = useRouter();
   const { role }   = useDevRole();
 
   useEffect(() => { navigation.setOptions({ title: 'Leadership' }); }, [navigation]);
@@ -81,6 +82,10 @@ export default function LeadershipScreen() {
         )}
       </View>
 
+      <Pressable style={s.delegateBtn} onPress={() => router.push('/delegate' as any)}>
+        <Text style={s.delegateBtnText}>Try delegating a task ›</Text>
+      </Pressable>
+
       <Text style={s.footNote}>
         Role-level for now. Member-level delegation (assigning a specific brother on
         your committee) arrives with member-level assignment.
@@ -119,6 +124,9 @@ const s = StyleSheet.create({
   chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip:         { backgroundColor: '#0f172a', borderRadius: 7, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#166534' },
   chipText:     { fontSize: 13, color: '#86efac', fontWeight: '600' },
+
+  delegateBtn:     { marginTop: 18, backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 13, alignItems: 'center' },
+  delegateBtnText: { fontSize: 15, fontWeight: '700', color: '#60a5fa' },
 
   footNote: { fontSize: 12, color: '#475569', marginTop: 16, lineHeight: 18 },
 });
