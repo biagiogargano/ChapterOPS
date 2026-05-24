@@ -15,6 +15,7 @@ const GROUPS: Group[] = [
   {
     label: 'ONBOARDING & SETUP',
     items: [
+      { title: 'First-time experience ✨', sub: 'Empty chapter → guided → create your first event', route: '/first-run' },
       { title: 'Org setup wizard',      sub: 'Guided first-run: name, owner, structure, invites', route: '/setup' },
       { title: 'Build org tree (Q&A)',  sub: 'Build the hierarchy by answering questions',          route: '/setup/tree' },
       { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',   route: '/invite' },
