@@ -11,6 +11,7 @@ import {
   getAllTasks,
   getResponsibilityGroups,
   isOverdue,
+  urgencyOf,
   type MockTask,
   type TaskState,
 } from '@/lib/mockTasks';
@@ -309,14 +310,13 @@ function SectionHeader({
 
 // ─── Filter + sort ────────────────────────────────────────────────────────────
 
-type StatusFilter = 'all' | 'todo' | 'inreview' | 'done' | 'overdue';
+type StatusFilter = 'all' | 'todo' | 'inreview' | 'overdue';
 type SortBy       = 'due' | 'type' | 'event';
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all',      label: 'All' },
   { id: 'todo',     label: 'To do' },
   { id: 'inreview', label: 'In review' },
-  { id: 'done',     label: 'Done' },
   { id: 'overdue',  label: 'Overdue' },
 ];
 
@@ -327,49 +327,79 @@ const SORTS: { id: SortBy; label: string }[] = [
 ];
 
 /**
- * Does a task's effective state match the chosen status filter?
- * 'all' HIDES completed (approved) tasks by default — done tasks only appear
- * under the explicit 'done' filter, so the list stays focused on open work.
+ * Is a task COMPLETED? Covers all completion paths, not just the structured
+ * state machine: an answered RSVP (attending/not-attending), a saved date name,
+ * and structured/ack/yes-no tasks that reached 'approved'. Completed tasks are
+ * hidden by default (toggle "Show completed" to see them).
  */
+function isCompleted(t: MockTask, role: string): boolean {
+  const eventKey = t.linkedEventId ?? t.linkedEvent;
+  if (t.lightweightKind === 'rsvp' && eventKey) {
+    const st = getRsvpEntry(resolveEventId(eventKey), role).status;
+    return st === 'attending' || st === 'not_attending';
+  }
+  if (t.lightweightKind === 'name_submission' && eventKey) {
+    return getRsvpEntry(resolveEventId(eventKey), role).dateName.trim().length > 0;
+  }
+  return getStoredState(t.id, t.state) === 'approved';
+}
+
+/** Match the chosen status filter (completed-hiding is handled separately). */
 function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
+  if (filter === 'all') return true;
   const st      = getStoredState(t.id, t.state);
   const overdue = isOverdue(t.dueAt, st) || st === 'escalated';
   switch (filter) {
-    case 'all':      return st !== 'approved';   // hide completed by default
     case 'overdue':  return overdue;
-    case 'done':     return st === 'approved';
     case 'inreview': return st === 'submitted';
     case 'todo':     return !overdue && (st === 'assigned' || st === 'rejected');
   }
+  return true;
 }
 
-// Sort keys (stable, with due date as the tiebreaker for type/event sorts).
-const dueKey  = (t: MockTask) => t.dueAt ?? '9999';
-const typeKey = (t: MockTask) => t.lightweightKind ?? t.type;          // rsvp/name/ack/yes_no/structured
-const evtKey  = (t: MockTask) => (t.linkedEvent ?? '~~~').toLowerCase(); // no-event sorts last
+// ── Sort comparators ───────────────────────────────────────────────────────
+// Due-date sort: tasks with a real dueAt sort by it; undated tasks fall back to
+// urgency (overdue → today → week) so the order is meaningful even when most
+// tasks carry only a dueLabel (no dueAt).
+const URGENCY_RANK: Record<string, number> = { overdue: 0, today: 1, week: 2 };
+function dueCompare(a: MockTask, b: MockTask): number {
+  const ad = a.dueAt, bd = b.dueAt;
+  if (ad && bd) return ad.localeCompare(bd);
+  if (ad) return -1;            // dated tasks before undated
+  if (bd) return 1;
+  return (URGENCY_RANK[urgencyOf(a)] ?? 3) - (URGENCY_RANK[urgencyOf(b)] ?? 3);
+}
+const typeKey = (t: MockTask) => t.lightweightKind ?? t.type;            // rsvp/name/ack/yes_no/structured
+const evtKey  = (t: MockTask) => (t.linkedEvent ?? '~~~').toLowerCase();  // no-event sorts last
 
-/** Apply the active search + filter + sort to a bucket's tasks (pure). */
-function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, query: string): MockTask[] {
+/** Apply the active completed-toggle + status + search + sort to a bucket (pure). */
+function applyView(
+  tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, query: string,
+  showCompleted: boolean, role: string,
+): MockTask[] {
   const q = query.trim().toLowerCase();
-  const filtered = tasks.filter(t =>
-    matchesStatus(t, filter) &&
-    (q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q)),
-  );
+  const filtered = tasks.filter(t => {
+    if (!showCompleted && isCompleted(t, role)) return false;   // hide completed by default
+    if (!matchesStatus(t, filter)) return false;
+    return q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q);
+  });
   const arr = [...filtered];
-  if (sortBy === 'type')  return arr.sort((a, b) => typeKey(a).localeCompare(typeKey(b)) || dueKey(a).localeCompare(dueKey(b)));
-  if (sortBy === 'event') return arr.sort((a, b) => evtKey(a).localeCompare(evtKey(b))   || dueKey(a).localeCompare(dueKey(b)));
-  return arr.sort((a, b) => dueKey(a).localeCompare(dueKey(b)));   // due date (default)
+  if (sortBy === 'type')  return arr.sort((a, b) => typeKey(a).localeCompare(typeKey(b)) || dueCompare(a, b));
+  if (sortBy === 'event') return arr.sort((a, b) => evtKey(a).localeCompare(evtKey(b))   || dueCompare(a, b));
+  return arr.sort(dueCompare);   // due date (default)
 }
 
 function FilterSortBar({
-  status, sortBy, query, onOpenStatus, onOpenSort, onQuery,
+  status, sortBy, query, showCompleted, onOpenStatus, onOpenSort, onQuery, onToggleCompleted,
 }: {
-  status:       StatusFilter;
-  sortBy:       SortBy;
-  query:        string;
-  onOpenStatus: () => void;
-  onOpenSort:   () => void;
-  onQuery:      (q: string) => void;
+  status:        StatusFilter;
+  sortBy:        SortBy;
+  query:         string;
+  showCompleted: boolean;
+  onOpenStatus:  () => void;
+  onOpenSort:    () => void;
+  onQuery:       (q: string) => void;
+  onToggleCompleted: () => void;
 }) {
   const statusLabel = STATUS_FILTERS.find(f => f.id === status)?.label ?? 'All';
   const sortLabel   = SORTS.find(o => o.id === sortBy)?.label ?? 'Due date';
@@ -395,6 +425,10 @@ function FilterSortBar({
           <Text style={s.dropBtnValue}>{sortLabel}  ▾</Text>
         </Pressable>
       </View>
+      <Pressable style={s.completedToggle} onPress={onToggleCompleted}>
+        <View style={[s.checkbox, showCompleted && s.checkboxOn]}>{showCompleted && <Text style={s.checkboxTick}>✓</Text>}</View>
+        <Text style={s.completedToggleText}>Show completed tasks</Text>
+      </Pressable>
     </View>
   );
 }
@@ -442,14 +476,15 @@ export default function TasksScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('due');
   const [taskQuery, setTaskQuery] = useState('');
+  const [showCompleted, setShowCompleted] = useState(false);   // hide completed by default
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [sortPickerOpen, setSortPickerOpen] = useState(false);
 
   // My tasks = my own work + anything I review, merged into ONE list so the sort
   // orders the whole list (not grouped). reviewIds tags which get a REVIEW label.
   const reviewIds  = new Set(review.map(t => t.id));
-  const myView     = applyView([...mine, ...review], statusFilter, sortBy, taskQuery);
-  const viewAlert  = applyView(alert, statusFilter, sortBy, taskQuery);
+  const myView     = applyView([...mine, ...review], statusFilter, sortBy, taskQuery, showCompleted, role);
+  const viewAlert  = applyView(alert, statusFilter, sortBy, taskQuery, showCompleted, role);
 
   const myCount    = myView.length;
   const shownCount = myCount + viewAlert.length;
@@ -512,9 +547,11 @@ export default function TasksScreen() {
             status={statusFilter}
             sortBy={sortBy}
             query={taskQuery}
+            showCompleted={showCompleted}
             onOpenStatus={() => setStatusPickerOpen(true)}
             onOpenSort={() => setSortPickerOpen(true)}
             onQuery={setTaskQuery}
+            onToggleCompleted={() => setShowCompleted(v => !v)}
           />
         )}
 
@@ -528,7 +565,7 @@ export default function TasksScreen() {
           <View style={s.emptyFull}>
             <Text style={s.emptyTitle}>Nothing here</Text>
             <Text style={s.emptyText}>
-              {statusFilter === 'all' ? 'No open tasks — completed ones are hidden (filter by Done to see them).' : 'No tasks match this filter.'}
+              {!showCompleted ? 'No open tasks — completed ones are hidden. Turn on "Show completed" to see them.' : 'No tasks match this filter.'}
             </Text>
           </View>
         ) : (
@@ -609,6 +646,13 @@ const s = StyleSheet.create({
   dropBtn:         { flex: 1, backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingHorizontal: 12, paddingVertical: 8 },
   dropBtnLabel:    { fontSize: 10, fontWeight: '700', color: '#64748b', letterSpacing: 0.6 },
   dropBtnValue:    { fontSize: 13, fontWeight: '600', color: '#cbd5e1', marginTop: 2 },
+
+  // Show-completed toggle
+  completedToggle:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, paddingHorizontal: 2 },
+  checkbox:            { width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  checkboxOn:          { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },
+  checkboxTick:        { color: '#fff', fontSize: 11, fontWeight: '800' },
+  completedToggleText: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
 
   // Events-need-prep link (kept from old overview)
   prepLink: { backgroundColor: '#1e1b4b', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 14, borderWidth: 1, borderColor: '#312e81' },
