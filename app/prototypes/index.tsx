@@ -44,6 +44,7 @@ const GROUPS: Group[] = [
   {
     label: 'EVENTS',
     items: [
+      { title: 'Event automation defaults', sub: 'Per-type: agenda/attendance/RSVP rules', route: '/event-defaults' },
       { title: 'RSVP settings',    sub: 'Required RSVP on optional events (decoupled)', route: '/rsvp-optional' },
       { title: 'Attendance (as tasks)', sub: 'Annotator tasks tied to mandatory meetings', route: '/attendance' },
       { title: 'Attendance check-in', sub: "Mark who's present at an event",            route: '/checkin' },

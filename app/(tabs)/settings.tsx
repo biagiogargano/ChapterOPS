@@ -58,6 +58,7 @@ export default function SettingsScreen() {
       <Row title="Members & positions" sub={`${memberCount} people · assign roles`} onPress={() => router.push('/roster' as any)} />
       <Row title="Leadership structure" sub="Edit the tree (Q&A builder)" onPress={() => router.push('/setup/tree' as any)} />
       <Row title="Report questions" sub="What officers report each week" onPress={() => router.push('/report/weekly' as any)} />
+      <Row title="Event automation" sub="What each event type auto-creates" onPress={() => router.push('/event-defaults' as any)} />
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>NOTIFICATIONS</Text>
       <View style={s.toggleCard}>
