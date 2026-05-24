@@ -7,6 +7,7 @@
  */
 
 import { ORG_TEMPLATES, getOrgTemplate } from '@/lib/orgTemplates/mockOrgTemplates';
+import { getActiveTemplateId, setActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -14,11 +15,16 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 export default function OrgTypeScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
-  const [selected, setSelected] = useState('fraternity');
+  const [selected, setSelected] = useState(getActiveTemplateId());
 
   useEffect(() => { navigation.setOptions({ title: 'Org type' }); }, [navigation]);
 
   const t = getOrgTemplate(selected)!;
+
+  function useDefaults() {
+    setActiveTemplate(selected);   // feeds defaults into the rest of onboarding
+    router.push('/setup/invite-link' as any);
+  }
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
@@ -56,7 +62,7 @@ export default function OrgTypeScreen() {
         <Text style={s.pValue}>{t.defaultReport ? `Yes — ${t.reportName}` : 'None by default'}</Text>
       </View>
 
-      <Pressable style={s.primary} onPress={() => router.push('/setup/invite-link' as any)}>
+      <Pressable style={s.primary} onPress={useDefaults}>
         <Text style={s.primaryText}>Use {t.label} defaults ›</Text>
       </Pressable>
       <Text style={s.footNote}>

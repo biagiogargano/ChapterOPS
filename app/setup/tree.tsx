@@ -7,6 +7,7 @@
  */
 
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
+import { getActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -20,7 +21,8 @@ export default function TreeBuilderScreen() {
   const router     = useRouter();
   useOrgBuildVersion();
 
-  const [nodes, setNodes] = useState<Node[]>([{ id: 'root', name: 'You', position: 'Owner', parentId: null }]);
+  // Owner's title comes from the chosen org template (Consul / President / Captain…).
+  const [nodes, setNodes] = useState<Node[]>(() => [{ id: 'root', name: 'You', position: getActiveTemplate().leaderTitle, parentId: null }]);
   const [queue, setQueue] = useState<string[]>(['root']);
   const [phase, setPhase] = useState<'asking' | 'review'>('asking');
   const [manual, setManual] = useState('');

@@ -6,6 +6,7 @@
  */
 
 import { addInvite, getInvited, removeInvite, useOrgBuildVersion } from '@/lib/orgBuild/mockOrgBuild';
+import { useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -14,6 +15,9 @@ export default function InvitePeopleScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
   useOrgBuildVersion();
+  const template = useActiveTemplate();
+  // Positions suggested by the chosen org type (skip the leader/owner role).
+  const suggestedRoles = template.roles.slice(1);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -44,7 +48,15 @@ export default function InvitePeopleScreen() {
         <View style={s.form}>
           <TextInput style={s.input} placeholder="Name" placeholderTextColor="#475569" value={name} onChangeText={setName} />
           <TextInput style={s.input} placeholder="Email" placeholderTextColor="#475569" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-          <TextInput style={s.input} placeholder="Position (e.g. Vice President)" placeholderTextColor="#475569" value={position} onChangeText={setPosition} onSubmitEditing={add} />
+          <TextInput style={s.input} placeholder={`Position (e.g. ${suggestedRoles[0] ?? 'Member'})`} placeholderTextColor="#475569" value={position} onChangeText={setPosition} onSubmitEditing={add} />
+          {/* Positions suggested by your org type — tap to fill. */}
+          <View style={s.roleChips}>
+            {suggestedRoles.map(r => (
+              <Pressable key={r} style={[s.roleChip, position === r && s.roleChipOn]} onPress={() => setPosition(r)}>
+                <Text style={[s.roleChipText, position === r && s.roleChipTextOn]}>{r}</Text>
+              </Pressable>
+            ))}
+          </View>
           <Pressable style={[s.addBtn, !name.trim() && s.addBtnOff]} onPress={add} disabled={!name.trim()}>
             <Text style={[s.addBtnText, !name.trim() && s.addBtnTextOff]}>+ Add person</Text>
           </Pressable>
@@ -87,6 +99,11 @@ const s = StyleSheet.create({
   linkBannerText: { color: '#a5b4fc', fontSize: 13, fontWeight: '700', textAlign: 'center' },
 
   form:  { gap: 10, marginBottom: 20 },
+  roleChips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  roleChip:    { backgroundColor: '#0f172a', borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
+  roleChipOn:  { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  roleChipText:{ fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  roleChipTextOn:{ color: '#a5b4fc' },
   input: { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
   addBtn:     { backgroundColor: '#1e3a5f', borderRadius: 10, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 12, alignItems: 'center' },
   addBtnOff:  { backgroundColor: '#1e293b', borderColor: '#334155' },

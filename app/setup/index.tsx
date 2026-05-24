@@ -9,6 +9,7 @@
  * phase-2, not wired into the alpha.
  */
 
+import { useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -26,6 +27,7 @@ interface Invite { name: string; tier: string }
 export default function SetupWizardScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
+  const template   = useActiveTemplate();
   const [step, setStep] = useState(0);
 
   const [orgName, setOrgName]   = useState('');
@@ -60,6 +62,11 @@ export default function SetupWizardScreen() {
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock setup, nothing saved</Text></View>
+
+        {/* Active org-type template — drives the defaults used below. */}
+        <View style={s.templateBanner}>
+          <Text style={s.templateText}>{template.emoji}  Using {template.label} defaults — leader: {template.leaderTitle}</Text>
+        </View>
 
         {/* Step dots */}
         <View style={s.dots}>
@@ -191,6 +198,8 @@ const s = StyleSheet.create({
 
   protoBadge: { alignSelf: 'flex-start', backgroundColor: '#422006', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 16, borderWidth: 1, borderColor: '#92400e' },
   protoText:  { color: '#fbbf24', fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+  templateBanner: { backgroundColor: '#1e1b4b', borderRadius: 9, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 14, borderWidth: 1, borderColor: '#312e81' },
+  templateText:   { color: '#a5b4fc', fontSize: 12, fontWeight: '600' },
 
   dots:      { flexDirection: 'row', gap: 6, marginBottom: 8 },
   dotWrap:   { flex: 1 },
