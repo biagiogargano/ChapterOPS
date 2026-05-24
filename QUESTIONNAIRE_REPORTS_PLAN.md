@@ -52,26 +52,38 @@ Build in tiers so an MVP can ship before the long tail:
 ## 4. Workflow / state model (the hard part)
 
 The existing task state machine is **submit → approve/reject** (a reviewer gate).
-Questionnaire tasks need a **different** lifecycle:
+Questionnaire tasks need a **different** lifecycle. **Decisions locked (Biagio):**
 
 ```
-not_started → in_progress (answers being drafted/edited, autosaved)
-            → submitted   (final submit; answers snapshotted/locked)
-            → [optional] reopened (officer/admin reopens before deadline)
+not_started → in_progress (answers edited freely; always editable within the
+                           open window; each save overwrites — latest edit wins)
+            → submitted   (final submit; notifies the annotator to look over;
+                           NOT an approval gate)
+window close → locked      (window closes → no further edits)
 ```
 
-Open design questions (to resolve in the design phase, NOT now):
-- **Edit-after-submit:** locked on submit, or editable until the window closes?
-  (Anchor use case implies editable until deadline, with an explicit final submit.)
-- **Does it need approval at all?** The officer report is likely **self-submit, no
-  reviewer**. Keep questionnaire submission *decoupled* from the approve gate so we
-  don't entangle the two state machines.
-- **Window/deadline:** open + close timestamps, driven by the recurrence cadence.
-- **"No update" shortcut:** does it count as a valid submission for the week?
+Locked design decisions:
+- **Always editable within the window.** No lock-on-submit. The responder can keep
+  revising right up until the window closes. The stored answers **always reflect
+  the most recent edit** (latest-write-wins; no separate draft vs final copy that
+  can diverge).
+- **Limited submission window.** Open + close timestamps, driven by the recurrence
+  cadence (e.g. opens Monday, closes Sunday night). After close → **locked**, no
+  edits.
+- **No reviewer / no approval gate.** Submission is **self-submit**. It does
+  **not** enter the submit→approve machine. Instead, **final submit fires a
+  notification to the Annotator** ("X submitted their weekly report") so the
+  Annotator can review/compile — informational, not a blocking sign-off.
+- **"Something must change" rule.** A submission must contain **at least one real
+  update**. Individual prompts may legitimately be "No update," but a questionnaire
+  has enough prompts that an **all-"No update" / fully-empty submission is not a
+  valid submission** — block or warn on final submit until at least one prompt has
+  substantive content. (Exact UX — hard block vs warn — is a §10 open item.)
 
 > Decision to preserve: **do not modify the existing submit→approve state machine.**
 > Questionnaire tasks get their own parallel lifecycle so the current alpha flows
-> are untouched.
+> are untouched. The only cross-system touch point is an outbound **notification to
+> the Annotator** on submit (reuses the existing notice/notification surface).
 
 ## 5. Data model (DESIGN ONLY — do not create yet)
 
@@ -82,8 +94,12 @@ Sketch for the future schema phase. **Not** to be built in planning.
   interval for time-slot, target for value-vs-target). Likely attached to a
   template or a task kind.
 - **response** — keyed to **(task instance + responder)**; holds per-question
-  answers + status (in_progress/submitted) + submitted_at. Today tasks only store
-  proof text/state, so this is a genuine new table/shape.
+  answers + status (in_progress / submitted / locked) + open/close window +
+  submitted_at + last_edited_at. A **single mutable answer set per responder**
+  (latest-write-wins — no separate draft vs final copy); `submitted_at` marks the
+  point the Annotator notification fired, but answers can still change until the
+  window closes. Today tasks only store proof text/state, so this is a genuine new
+  table/shape.
 - **answer** — per-question value; shape varies by type (text, number, selected
   option id(s), date/time, slot, file ref).
 
@@ -124,13 +140,23 @@ response row, exactly like prep tasks generate per occurrence today.
 - No server-shared templates work.
 - Nothing merges to `phase-2` without approval.
 
-## 10. Open questions for Biagio (answer before the schema phase)
+## 10. Open questions for Biagio
 
-1. Weekly officer report: **lock on submit**, or **editable until the window
-   closes** with a final submit? (Anchor use case leans editable-until-deadline.)
-2. Does the officer report need **any reviewer/approval**, or is it pure
-   self-submit?
-3. Is **"No update"** a complete valid submission for the week?
-4. Tier-1 question types — is the §3 Tier-1 list the right MVP cut?
-5. Who authors questionnaires — officers per committee, or a fixed chapter-wide
-   set to start?
+**Resolved (folded into §4):** editability (always editable within the window),
+window (limited, recurrence-driven), latest-edit-wins, no reviewer/approval but
+notify the Annotator on submit, and the "something must change" rule.
+
+**Still open (answer before the schema phase):**
+1. **"Something must change" enforcement:** **hard block** the final submit until
+   ≥1 prompt has real content, or **warn but allow**? And what counts as
+   "substantive" — any non-empty field, or specifically not the "No update"
+   shortcut?
+2. **Edit-after-submit notifications:** if someone submits, then edits again before
+   the window closes, does the Annotator get **re-notified**, or only on the first
+   submit?
+3. **Window close behavior for non-submitters:** if the window closes and an
+   officer never submitted, is that a **missed/overdue report** (and does the
+   Annotator get notified of who's missing)?
+4. **Tier-1 question types** — is the §3 Tier-1 list the right MVP cut?
+5. **Authoring:** who creates questionnaires — officers per committee, or a fixed
+   chapter-wide set to start?
