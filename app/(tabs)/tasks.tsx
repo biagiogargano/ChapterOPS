@@ -16,6 +16,7 @@ import {
   type TaskState,
 } from '@/lib/mockTasks';
 import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
+import { isTaskCompleted } from '@/lib/taskCompletion';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
@@ -326,24 +327,6 @@ const SORTS: { id: SortBy; label: string }[] = [
   { id: 'event', label: 'Event' },
 ];
 
-/**
- * Is a task COMPLETED? Covers all completion paths, not just the structured
- * state machine: an answered RSVP (attending/not-attending), a saved date name,
- * and structured/ack/yes-no tasks that reached 'approved'. Completed tasks are
- * hidden by default (toggle "Show completed" to see them).
- */
-function isCompleted(t: MockTask, role: string): boolean {
-  const eventKey = t.linkedEventId ?? t.linkedEvent;
-  if (t.lightweightKind === 'rsvp' && eventKey) {
-    const st = getRsvpEntry(resolveEventId(eventKey), role).status;
-    return st === 'attending' || st === 'not_attending';
-  }
-  if (t.lightweightKind === 'name_submission' && eventKey) {
-    return getRsvpEntry(resolveEventId(eventKey), role).dateName.trim().length > 0;
-  }
-  return getStoredState(t.id, t.state) === 'approved';
-}
-
 /** Match the chosen status filter (completed-hiding is handled separately). */
 function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
   if (filter === 'all') return true;
@@ -379,7 +362,7 @@ function applyView(
 ): MockTask[] {
   const q = query.trim().toLowerCase();
   const filtered = tasks.filter(t => {
-    if (!showCompleted && isCompleted(t, role)) return false;   // hide completed by default
+    if (!showCompleted && isTaskCompleted(t, role)) return false;   // hide completed by default
     if (!matchesStatus(t, filter)) return false;
     return q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q);
   });

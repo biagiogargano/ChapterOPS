@@ -38,6 +38,7 @@ import {
   type ReminderSeverity,
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { isTaskCompleted } from '@/lib/taskCompletion';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
@@ -601,9 +602,11 @@ export default function TodayScreen() {
   );
 
   // Urgency is computed from real due dates at read time (falls back to the
-  // stored urgency when a task has no dueAt).
-  const urgentMine = mine.filter(t => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; });
-  const weekMine   = mine.filter(t => urgencyOf(t) === 'week');
+  // stored urgency when a task has no dueAt). Completed tasks (answered RSVPs,
+  // saved date names, approved tasks) are hidden — Today shows open work only.
+  const urgentMine = mine.filter(t => !isTaskCompleted(t, role) && (() => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; })());
+  const weekMine   = mine.filter(t => !isTaskCompleted(t, role) && urgencyOf(t) === 'week');
+  const reviewOpen = review.filter(t => !isTaskCompleted(t, role));
 
   // ── Live event lists — refresh whenever screen gains focus ──────────────────
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
@@ -679,7 +682,7 @@ export default function TodayScreen() {
 
   // Today's tasks = my urgent (today/overdue) tasks PLUS anything I need to
   // review — review folds in as a labeled task, not a separate section.
-  const todaysTaskCount = urgentMine.length + review.length;
+  const todaysTaskCount = urgentMine.length + reviewOpen.length;
 
   return (
     <ReminderCtx.Provider value={reminderById}>
@@ -716,7 +719,7 @@ export default function TodayScreen() {
           <View style={s.section}>
             <SLabel text="TODAY'S TASKS" count={todaysTaskCount} />
             {urgentMine.map(renderMineTask)}
-            {review.map(t => (
+            {reviewOpen.map(t => (
               <TodayTaskCard key={t.id} task={t} showAssignee reviewTag onPress={() => navTask(t)} />
             ))}
           </View>
