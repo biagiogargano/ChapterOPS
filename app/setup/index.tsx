@@ -150,6 +150,9 @@ export default function SetupWizardScreen() {
             <Text style={s.summaryLine}>Structure: {useTiers ? 'suggested tiers' : 'minimal'}</Text>
             <Text style={s.summaryLine}>Invites drafted: {invites.length}</Text>
             <Text style={s.help}>After you finish, leaders can invite their own committees, and a quick walkthrough will show the basics.</Text>
+            <Pressable style={s.previewBtn} onPress={() => router.push('/invite' as any)}>
+              <Text style={s.previewText}>Preview what an invitee sees ›</Text>
+            </Pressable>
           </View>
         )}
 
@@ -218,6 +221,8 @@ const s = StyleSheet.create({
 
   summary:     { fontSize: 18, marginBottom: 4 },
   summaryLine: { fontSize: 14, color: '#94a3b8' },
+  previewBtn:  { marginTop: 8, alignSelf: 'flex-start' },
+  previewText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
   nav:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24 },
   backBtn:       { paddingVertical: 12, paddingHorizontal: 14 },
