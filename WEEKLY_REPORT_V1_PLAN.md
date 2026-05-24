@@ -1,6 +1,11 @@
 # Structured Response Tasks v1 — Smallest Schema/Workflow Plan
 ### (first use case: Weekly Officer Report)
 
+> **STATUS: APPROVED AS PLANNING DIRECTION ONLY (not for build).** Do not build,
+> do not create migrations, do not merge to `phase-2`. Implementation is gated
+> behind **alpha stabilization** finishing first. The feature branch is **paused**;
+> the next active work is alpha stabilization on `phase-2`.
+
 **Planning only. No code, no schema changes, no merge.** First real slice after
 alpha stabilization. The system is **generic structured-response tasks**; the
 **Weekly Officer Report is just the first default template**, seeded by the
@@ -18,10 +23,12 @@ fraternity org template — not a fraternity-only feature.
 9. **Schema org-agnostic** — Sigma Chi terms come from org templates/defaults, never
    from core table/column names.
 
-v1 field types (max 5): **short text · long text · number/current value ·
-current-vs-target · no update** (where "no update" is a per-field option, not a 5th
-input type). v1 includes: one recurring structured-response task for officers ·
-editable draft · final submit · reviewer/leadership view · submitted/missing status.
+v1 input types (3): **short text · long text · number**. "**Current vs target /
+progress**" is **not a separate type** — it's a `number` field with JSON `config`
+(e.g. `{ mode: 'progress', target, unit }`), keeping the type list generic. "**No
+update**" is a per-field option, not a type. v1 includes: one recurring
+structured-response task for officers · editable draft · final submit ·
+reviewer/leadership view · submitted/missing status.
 
 ## Org-agnostic principle (must hold from v1)
 ChapterOPS should serve **any** org (clubs, student orgs, teams, classes,
@@ -46,9 +53,13 @@ Three new generic, org-scoped tables (all carry `org_id`) + one column:
   `id, org_id, key (text), title (text), created_at`.
   (Generic. "Weekly Officer Report" is just a `title`; `key` e.g. `weekly_report`.)
 - **`response_form_fields`** — ordered fields for a form.
-  `id, form_id (fk), position (int), type (enum: short_text|long_text|number|
-  target_value), prompt (text), config (jsonb: { unit?, target? }), allow_no_update
-  (bool), required (bool)`.
+  `id, form_id (fk), position (int), type (enum: short_text|long_text|number),
+  prompt (text), config (jsonb), allow_no_update (bool), required (bool)`.
+  **`config` drives variants generically** — a plain number is `{}`; a
+  current-vs-target/progress field is `{ mode: 'progress', target?, unit? }`. No
+  fraternity/report-specific field type exists; "goal/current vs target" is just a
+  configured `number`. This keeps the type enum tiny and future variants
+  (percentage, etc.) become config, not new types.
 - **`task_field_responses`** — one row per (task, field) = a responder's answer.
   `id, org_id, task_id (fk tasks), field_id (fk response_form_fields),
   no_update (bool), text (text null), number (numeric null), updated_at`.
@@ -129,7 +140,9 @@ Stop there. Steps 1–2 are the schema phase; 3–6 are UI/logic.
 
 ## 7. Risks & what to defer
 **Risks (mitigate):**
-- *Scope creep in field types* → cap at 5; defer select/percentage/scheduler.
+- *Scope creep in field types* → keep the enum to 3 (short_text/long_text/number);
+  express variants (progress/target, later percentage) via `config`, not new types;
+  defer select/scheduler.
 - *State-machine drift* → reuse assigned/submitted; no new states in v1.
 - *Hidden fraternity coupling* → keep table/column names generic; roles/labels/forms via
   template; review the migration specifically for any literal Sigma Chi terms.
