@@ -737,8 +737,11 @@ export default function EventDetailScreen() {
     t => t.lightweightKind === 'rsvp' && !!t.requiresCovering,
   );
 
-  // Only officer-created events are deletable (the 4 seed events are not).
+  // Only officer-created events are deletable (the 4 seed events are not), and
+  // only by someone who can manage the event (creator role or BROAD leadership) —
+  // same gate as the header Edit button, so a brother can't delete an officer's event.
   const isUserCreated = isUserCreatedEvent(event.id);
+  const canManage     = canManageEvent(event, role);
 
   function handleDelete() {
     if (!event) return;
@@ -938,8 +941,8 @@ export default function EventDetailScreen() {
       <SectionLabel text="ABOUT" />
       <Text style={s.description}>{event.description}</Text>
 
-      {/* ── Delete button — user-created events only ── */}
-      {isUserCreated && (
+      {/* ── Delete button — user-created events, manager roles only ── */}
+      {isUserCreated && canManage && (
         <>
           <View style={s.divider} />
           <Pressable style={s.deleteBtn} onPress={handleDelete}>
