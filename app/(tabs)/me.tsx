@@ -179,6 +179,13 @@ export default function MeScreen() {
             </View>
             <Text style={s.linkChevron}>›</Text>
           </Pressable>
+          <Pressable style={s.linkCard} onPress={() => router.push('/agenda' as any)}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.linkTitle}>Meeting agenda (prototype)</Text>
+              <Text style={s.linkSub}>Auto-drafted from this week's events & tasks</Text>
+            </View>
+            <Text style={s.linkChevron}>›</Text>
+          </Pressable>
         </>
       )}
 
