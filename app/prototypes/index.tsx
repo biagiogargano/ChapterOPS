@@ -19,6 +19,7 @@ const GROUPS: Group[] = [
       { title: 'Build org tree (Q&A)',  sub: 'Build the hierarchy by answering questions',          route: '/setup/tree' },
       { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',   route: '/invite' },
       { title: 'Welcome walkthrough',   sub: 'First-use intro to the main surfaces',                 route: '/tutorial' },
+      { title: 'Org settings',          sub: 'Rename org · transfer ownership · customize',          route: '/org-settings' },
     ],
   },
   {
@@ -42,7 +43,9 @@ const GROUPS: Group[] = [
   {
     label: 'EVENTS',
     items: [
-      { title: 'RSVP settings',  sub: 'Required RSVP on optional events (decoupled)', route: '/rsvp-optional' },
+      { title: 'RSVP settings',    sub: 'Required RSVP on optional events (decoupled)', route: '/rsvp-optional' },
+      { title: 'Attendance check-in', sub: "Mark who's present at an event",            route: '/checkin' },
+      { title: 'Availability picker', sub: 'Generated time-slots for scheduling',        route: '/availability' },
     ],
   },
   {
