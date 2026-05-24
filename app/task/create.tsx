@@ -276,10 +276,11 @@ export default function CreateTaskScreen() {
   const effState     = existing ? getStoredState(existing.id, existing.state) : 'assigned';
   const reviewLocked = editing && (effState === 'submitted' || effState === 'approved' || effState === 'rejected');
 
-  // BROAD officers can assign to any officer role; others only to themselves.
+  // BROAD officers can assign to any officer role OR a brother; others only to
+  // themselves. (Brothers are assignable — they receive and complete tasks too.)
   const isBroad         = role === 'president' || role === 'pro_consul';
   const assignableRoles = useMemo<Role[]>(
-    () => (isBroad ? OFFICER_ROLES : [role]),
+    () => (isBroad ? [...OFFICER_ROLES, 'brother' as Role] : [role]),
     [isBroad, role],
   );
 
