@@ -186,6 +186,13 @@ export default function MeScreen() {
             </View>
             <Text style={s.linkChevron}>›</Text>
           </Pressable>
+          <Pressable style={s.linkCard} onPress={() => router.push('/leadership' as any)}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.linkTitle}>Leadership tree (prototype)</Text>
+              <Text style={s.linkSub}>Who reports to whom · who can delegate down</Text>
+            </View>
+            <Text style={s.linkChevron}>›</Text>
+          </Pressable>
         </>
       )}
 
