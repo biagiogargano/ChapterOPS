@@ -74,10 +74,30 @@ Not blockers: custom templates visible across Biagio's orgs (expected local), si
 approval, org-preference landing on default after re-login, cosmetic issues.
 
 ## 8. Known limitations to tell testers
-- **Custom templates are device-local** — Biagio sees his in both orgs; VP and Tester 3 won't see Biagio's. Expected.
-- **Approvals are single-gate:** Pro Consul reviews; "President" shows as oversight, not a second required sign-off.
-- **Recurring events:** prep tasks generate per occurrence; "Entire Series" actions affect all occurrences; the RSVP-review task is generated for the first occurrence only.
-- **Not built yet:** questionnaire/report tasks, meeting-agenda auto-population, member-level assignment, separate "required RSVP for optional events."
+- **Not real-time yet** — the app does **not** live-sync between devices. When
+  another member creates/edits an event or changes an RSVP, you won't see it
+  automatically. **Pull down to refresh** on Today, Calendar, and an Event's
+  detail screen, or switch tabs / reopen the app, to pull the latest data.
+  (Supabase Realtime is intentionally not built for this alpha.)
+- **Refresh to see others' changes** — same point, restated for the field: if a
+  number/list looks stale (a teammate's new event or RSVP isn't showing), pull
+  to refresh first before reporting it as missing.
+- **Custom templates are device-local** — a template you build is stored only on
+  **your** device; it shows across *your* orgs but other testers won't see it.
+  Expected, not a leak.
+- **Approvals are single-gate:** Pro Consul reviews; "President"/Consul shows as
+  oversight, not a second required sign-off.
+- **Recurring events:** prep tasks generate per occurrence; "Entire Series"
+  actions affect all occurrences; the RSVP-review task is generated for the first
+  occurrence only.
+- **Expo Go / tunnel build** — testers run through **Expo Go** over a dev-server
+  **tunnel**. Expect rough edges: the app may fail to reopen if the dev server is
+  stopped/asleep or the phone lost the tunnel (you'll see a "could not connect to
+  development server" / red error screen — **not** an app crash). Fix by
+  re-scanning the QR while the server is running. Backgrounding for a long time
+  can drop the connection. A later EAS build removes this dependency.
+- **Not built yet:** questionnaire/report tasks, meeting-agenda auto-population,
+  member-level assignment, separate "required RSVP for optional events."
 - **Early alpha:** data may be reset; it's a preview, not the system of record.
 
 ## 9. Env setup, build & run (recap)
