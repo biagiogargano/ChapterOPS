@@ -9,15 +9,17 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { delegableRoles } from '@/lib/leadership/hierarchy';
-import { useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
-const SAMPLE_TASK = 'Reserve the venue for Formal';
 
 export default function DelegateScreen() {
   const navigation = useNavigation();
   const { role }   = useDevRole();
+  // Task name passed from the Task detail tie-in; falls back to a sample when
+  // opened directly from the prototypes hub.
+  const params = useLocalSearchParams<{ title?: string }>();
+  const SAMPLE_TASK = (typeof params.title === 'string' && params.title.trim()) || 'Reserve the venue for Formal';
 
   useEffect(() => { navigation.setOptions({ title: 'Delegate task' }); }, [navigation]);
 

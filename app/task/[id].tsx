@@ -904,7 +904,7 @@ export default function TaskDetailScreen() {
         {__DEV__ && isOfficer(role) && (
           <Pressable
             style={{ alignSelf: 'flex-start', marginBottom: 12, backgroundColor: '#1e293b', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' }}
-            onPress={() => router.push('/delegate' as any)}
+            onPress={() => router.push(`/delegate?title=${encodeURIComponent(task.title)}` as any)}
           >
             <Text style={{ color: '#818cf8', fontSize: 13, fontWeight: '600' }}>↪ Delegate this task (preview)</Text>
           </Pressable>
