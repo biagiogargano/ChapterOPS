@@ -17,6 +17,14 @@ the smallest first slice.
    or full org-tree builder yet.
 8. **Keep it simple — smart defaults first, customization second.**
 
+## ⚠️ Biggest risk (ChatGPT review): configuration creep
+A new org must be **useful within ~5 minutes of setup**. Every config surface,
+toggle, picker, or "set this up first" step is a liability. Rule of thumb for all
+future work: **ship a working default; expose a knob only when a real need is
+proven.** If onboarding/settings can't get an org productive in ~5 minutes, it's
+too complex. (This is why the permissions grid, full org-tree builder, pinned/
+custom tabs, and per-committee templates stay deferred/experimental.)
+
 ---
 
 ## 1. Near-term roadmap (build after alpha stabilization)
