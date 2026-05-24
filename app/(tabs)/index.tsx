@@ -46,6 +46,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -634,24 +635,33 @@ export default function TodayScreen() {
     }
   }, [dataOrgId]);
 
+  // Refetch events from Supabase + re-hydrate RSVP state for each. Shared by the
+  // focus effect and pull-to-refresh so a manual pull picks up another user's
+  // newly-created/edited events and RSVP changes without leaving the screen.
+  const loadEvents = useCallback(async () => {
+    const remote = await fetchAllEvents(dataOrgId);
+    setSupabaseEventCache(remote);
+    const all = getAllEvents();
+    setAllEvents(all);
+    // Hydrate RSVP state for each displayed event so RSVP cards reflect the
+    // saved Supabase status (not the seeded mock 'e1' entry). No-ops on non-UUID
+    // ids and fires _notify(), which re-renders the reactive RSVP cards.
+    all.forEach(ev => { void hydrateRsvpsFromSupabase(ev.id); });
+  }, [dataOrgId]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await loadEvents(); } finally { setRefreshing(false); }
+  }, [loadEvents]);
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
       // Show whatever is cached immediately, then refresh from Supabase so the
       // shared cache (and this screen's event ids) are Supabase UUIDs.
       setAllEvents(getAllEvents());
-      fetchAllEvents(dataOrgId).then(remote => {
-        if (cancelled) return;
-        setSupabaseEventCache(remote);
-        const all = getAllEvents();
-        setAllEvents(all);
-        // Hydrate RSVP state for each displayed event so RSVP cards reflect the
-        // saved Supabase status on startup (not the seeded mock 'e1' entry).
-        // hydrateRsvpsFromSupabase no-ops on non-UUID ids and fires _notify(),
-        // which re-renders the reactive RSVP cards.
-        all.forEach(ev => { void hydrateRsvpsFromSupabase(ev.id); });
-      });
-      return () => { cancelled = true; };
+      void loadEvents();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dataOrgId]),
   );
 
@@ -699,6 +709,9 @@ export default function TodayScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#818cf8" colors={['#818cf8']} />
+        }
       >
         {/* Dev badge — only meaningful while auth is bypassed (flag-off) */}
         {!AUTH_ENABLED && (

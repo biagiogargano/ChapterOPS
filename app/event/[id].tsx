@@ -52,6 +52,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -696,6 +697,24 @@ export default function EventDetailScreen() {
     void hydrateRsvpsFromSupabase(event.id);
   }, [event?.id]);
 
+  // Pull-to-refresh: re-fetch this event's fields and re-hydrate its RSVP roster
+  // so another user's edit / RSVP shows without leaving the screen. Tasks are
+  // re-read from the store via the focus bump. No-ops on non-UUID (mock) ids.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (id && isUUID(id)) {
+        const remote = await fetchEventById(id, dataOrgId);
+        if (remote) setEvent(remote);
+      }
+      if (event?.id) await hydrateRsvpsFromSupabase(event.id);
+      _bumpFocus(n => n + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id, dataOrgId, event?.id]);
+
   if (loading) {
     return (
       <View style={s.notFound}>
@@ -839,6 +858,9 @@ export default function EventDetailScreen() {
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#818cf8" colors={['#818cf8']} />
+      }
     >
       {/* Kind + audience badges */}
       <View style={s.badgeRow}>

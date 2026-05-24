@@ -23,7 +23,7 @@ import { isOfficer } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // ─── Date helpers ───────────────────────────────────────────────────────────
 
@@ -169,15 +169,25 @@ export default function CalendarScreen() {
     if (prevOrg.current !== dataOrgId) { setEvents([]); prevOrg.current = dataOrgId; }
   }, [dataOrgId]);
 
+  // Refetch events from Supabase. Shared by the focus effect and pull-to-refresh
+  // so a manual pull picks up another user's newly-created/edited events without
+  // leaving the screen.
+  const loadEvents = useCallback(async () => {
+    const remote = await fetchAllEvents(dataOrgId);
+    setSupabaseEventCache(remote);
+    setEvents(getAllEvents());
+  }, [dataOrgId]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await loadEvents(); } finally { setRefreshing(false); }
+  }, [loadEvents]);
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      fetchAllEvents(dataOrgId).then(remote => {
-        if (cancelled) return;
-        setSupabaseEventCache(remote);
-        setEvents(getAllEvents());
-      });
-      return () => { cancelled = true; };
+      void loadEvents();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dataOrgId]),
   );
 
@@ -237,7 +247,14 @@ export default function CalendarScreen() {
   const selHeading = selDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={s.root}
+      contentContainerStyle={s.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#818cf8" colors={['#818cf8']} />
+      }
+    >
       {/* Month nav */}
       <View style={s.nav}>
         <Pressable style={s.navBtn} onPress={() => goMonth(-1)}><Text style={s.navArrow}>‹</Text></Pressable>
