@@ -11,9 +11,11 @@ import {
   getMembers,
   removeMember,
   roleLabel,
+  roleTier,
   setMemberRole,
   useRosterVersion,
 } from '@/lib/roster/mockRoster';
+import { tierColor } from '@/lib/orgTemplates/tiers';
 import { isOfficer, type Role } from '@/lib/roles';
 import { useNavigation } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -56,13 +58,14 @@ export default function RosterScreen() {
   }
 
   function Row({ id, name, role }: { id: string; name: string; role: Role }) {
+    const tc = tierColor(roleTier(role));
     return (
-      <View style={s.row}>
-        <View style={s.avatar}><Text style={s.avatarText}>{name.split(' ').map(p => p[0]).join('').slice(0, 2)}</Text></View>
+      <View style={[s.row, { borderLeftWidth: 3, borderLeftColor: tc }]}>
+        <View style={[s.avatar, { backgroundColor: tc }]}><Text style={s.avatarText}>{name.split(' ').map(p => p[0]).join('').slice(0, 2)}</Text></View>
         <View style={s.body}>
           <Text style={s.name}>{name}</Text>
           <Pressable onPress={() => changeRole(id, name)}>
-            <Text style={s.roleBtn}>{roleLabel(role)}  ▾</Text>
+            <Text style={[s.roleBtn, { color: tc }]}>{roleLabel(role)}  ▾</Text>
           </Pressable>
         </View>
         <Pressable onPress={() => confirmRemove(id, name)} hitSlop={8}><Text style={s.remove}>✕</Text></Pressable>

@@ -8,6 +8,26 @@
 
 import { useSyncExternalStore } from 'react';
 import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, type Role } from '@/lib/roles';
+import { type TierId } from '@/lib/orgTemplates/tiers';
+
+// Map each position (dev Role) to a structure tier so the roster + structure can
+// color-code positions with the SAME constant tier colors (Leadership=blue,
+// Executives=green, Officers=red, Members=yellow).
+const ROLE_TIER: Record<string, TierId> = {
+  president: 'lead',
+  pro_consul: 'exec',
+  annotator: 'officer',
+  risk_manager: 'officer',
+  social_chair: 'officer',
+  recruitment_chair: 'officer',
+  treasurer: 'officer',
+  brother: 'member',
+};
+
+/** Structure tier for a position (role). Defaults to 'member'. */
+export function roleTier(role: Role): TierId {
+  return ROLE_TIER[role] ?? 'member';
+}
 
 export interface RosterMember {
   id:        string;

@@ -10,7 +10,8 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
 import { getActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
-import { TIERS, defaultTiers, tierColor, type TierId } from '@/lib/orgTemplates/tiers';
+import { TIERS, defaultTiers, tierColor } from '@/lib/orgTemplates/tiers';
+import { roleTier } from '@/lib/roster/mockRoster';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -32,12 +33,6 @@ const ROLE_DESC: Record<string, string> = {
   brother:           'General member — assigned tasks, RSVPs, attendance.',
 };
 
-// Which tier the viewer's role sits in (color-codes their title + box to match).
-const ROLE_TIER: Record<string, TierId> = {
-  president: 'lead', pro_consul: 'exec',
-  annotator: 'officer', risk_manager: 'officer', social_chair: 'officer', recruitment_chair: 'officer', treasurer: 'officer',
-  brother: 'member',
-};
 
 export default function TreeBuilderScreen() {
   const navigation = useNavigation();
@@ -51,7 +46,7 @@ export default function TreeBuilderScreen() {
 
   const tpl       = useActiveTemplate();
   const tierMap   = defaultTiers(tpl.roles);
-  const myTier    = ROLE_TIER[role] ?? 'member';
+  const myTier    = roleTier(role as Role);
   const myColor   = tierColor(myTier);
 
   // Owner's title comes from the chosen org template (Consul / President / Captain…).
