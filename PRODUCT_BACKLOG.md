@@ -202,6 +202,52 @@ review — never a generic inbox or feed.
 - Comment/clarification pushes depend on #9 (action-linked communication).
 - **Do not begin push setup or EAS changes for this yet** — direction only.
 
+# 11. Lightweight teams/committees under roles
+
+**Planning/direction only — no code, no schema.**
+
+Instead of forcing a full org tree, a leader/officer can create a **team/committee
+under their role** and invite people to join it. Once someone joins, they're part
+of that leader's team and can be **assigned tasks/events through the team**. This is
+the practical, opt-in alternative to a reporting graph.
+
+## Examples
+- Social Chair → **Social Committee**
+- Recruitment Chair → **Rush Team**
+- Risk Manager → **Risk Team**
+- Treasurer → **Finance Team**
+- An event lead → a **temporary event team**
+
+## Where it lives (NOT setup)
+- **Setup stays simple:** choose org type → pick roles → order into tiers → invite
+  members. Teams are **not** created during onboarding.
+- Teams/committees are **optional, later** — created from **Settings → Roles &
+  structure** or a **leader's role page** ("My Team"). Always opt-in.
+
+## Good use cases
+- **Assign a task to a whole team** (fan-out to its members).
+- **Staff an event** with a team.
+- Let a **chair manage helpers** without making them "officers."
+- Show **"My Team"** for a chair (their members + the team's events/tasks).
+- Eventually support **delegation** down to team members and **team-level reports**.
+
+## Explicit non-goals (avoid)
+- A **full org-chart builder** during onboarding.
+- A **complex reporting graph** ("who reports to whom" as the default).
+- Turning teams into **chat channels** (see #9 — communication is action-linked only).
+- Forcing **every member to be "below" someone**; flat membership is fine.
+- Building a **Teams/Slack clone**.
+
+## Relationship to existing model
+- A team is just a **named group of members under a role**; tasks/events assigned to
+  a team are still ordinary tasks/events (fan-out by membership) — no new primitive.
+- Complements the **tier model** (Leadership/Executives/Officers/Members): tiers give
+  the coarse structure; teams give a leader an optional working group. Neither is a
+  reporting tree.
+- The existing **/committee** ("My committee") and **/setup/tree** prototypes already
+  hint at this; a real version is **server work** (membership table) → defer with the
+  other schema items (#5/#6); UI/mock can be explored on the feature branch first.
+
 ---
 
 # Post-TestFlight priority order (APPROVED)
