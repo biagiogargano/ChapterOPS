@@ -52,8 +52,10 @@ These are explicitly **not** part of the simplified core (`PRODUCT_DIRECTION.md`
 to Today/Tasks/Events. Revisit later, if ever, as scoped checkpoints.
 - **/announcements** — chapter announcements feed + composer. *(Future: only as
   action-linked notices tied to an event/task — backlog #9, never a general feed.)*
-- **/poll** — quick chapter poll with live tallies. *(Future: a structured-response
-  task, reusing the report engine — not a standalone module.)*
+- **/poll** — quick chapter poll with live tallies. *(DECIDED: a poll is just a
+  **structured-response task (one question) assigned to all brothers**, riding on
+  the Weekly Reports v1 engine — NOT a standalone module. This screen is a throwaway
+  mock; the real poll = create-task-with-a-question.)*
 - **/points** — engagement points + leaderboard. *(Deferred; gamification is not core.)*
 - **Pinned / custom tabs** — Pinned has been **retired** from the tab bar (route
   still reachable directly); custom tabs deferred.

@@ -33,7 +33,8 @@ not a new module, queue, or dashboard.
 | Feature | It is really… |
 |---------|---------------|
 | **Reports / Weekly Officer Report** | a **structured-response task** (form fields, draft → submit) |
-| **Polls / surveys / quizzes** | structured-response tasks (deferred; same engine) |
+| **Polls** | a **structured-response task assigned to all brothers** — one question to answer; tallies are the responses. NOT a standalone module/feed. |
+| **Surveys / quizzes** | structured-response tasks (deferred; same engine, more fields) |
 | **Attendance** | an **event-linked task** (Annotator-owned, opens at event start) |
 | **RSVP** | an **event-linked task/action** (headcount; can be required separately) |
 | **Reviews / approvals** | a **task in a review state** with a REVIEW label — not a queue |
@@ -90,7 +91,11 @@ part of the simplified core and must not add tabs/sections to Today:
 - **Pinned / custom tabs** (Pinned already retired from the bar)
 - **Full permissions grid / matrix** (permissions stay *implicit*; revisit as simple tiers)
 - **Full org-tree builder** (Q&A tree is a prototype; full builder deferred)
-- **Generic polls / surveys / quizzes** (will reuse the structured-response engine later)
+- **Surveys / quizzes** (deferred; reuse the structured-response engine later).
+  **Polls are NOT deferred as a concept** — a poll is just a structured-response
+  task (one question) assigned to all brothers, so it rides on Weekly Reports v1's
+  engine rather than being its own module. The standalone `/poll` prototype is
+  retired-in-spirit (kept only as a throwaway mock).
 - **AI** (natural-language → draft events/tasks/templates; proposes only, never replaces the deterministic engine)
 - **General messaging / chat / DMs / channels / reactions / feed / file-sharing**
   (see backlog #9 — only *action-linked* comments are ever in scope)

@@ -65,7 +65,8 @@ schema, no task-state-machine, no AI changes now.**
 
 ## Use cases
 1. Weekly officer reports
-2. Polls
+2. Polls — **a structured-response task (one question) assigned to all brothers**,
+   not a standalone module/feed. Tallies = the responses. Rides this same engine.
 3. Surveys
 4. RSVP questionnaires
 5. Goal updates
