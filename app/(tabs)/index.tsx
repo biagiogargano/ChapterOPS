@@ -39,6 +39,7 @@ import {
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { isTaskCompleted } from '@/lib/taskCompletion';
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { promptCreate } from '@/lib/ui/createPrompt';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
@@ -533,10 +534,10 @@ function EventCard({
   );
 }
 
-function UpcomingRow({ label, meta }: { label: string; meta: string }) {
+function UpcomingRow({ label, meta, color }: { label: string; meta: string; color?: string }) {
   return (
     <View style={s.upcomingRow}>
-      <View style={s.upcomingDot} />
+      <View style={[s.upcomingDot, color ? { backgroundColor: color } : null]} />
       <View>
         <Text style={s.upcomingLabel}>{label}</Text>
         <Text style={s.upcomingMeta}>{meta}</Text>
@@ -775,7 +776,7 @@ export default function TodayScreen() {
             <View style={s.upcomingBlock}>
               {weekMine.map(t => (
                 <Pressable key={t.id} onPress={() => navTask(t)}>
-                  <UpcomingRow label={t.title} meta={t.dueLabel} />
+                  <UpcomingRow label={t.title} meta={t.dueLabel} color={ENTITY_COLORS.task} />
                 </Pressable>
               ))}
               {comingUpEvs.map(ev => (
@@ -783,6 +784,7 @@ export default function TodayScreen() {
                   <UpcomingRow
                     label={ev.title}
                     meta={`${DAY_LABELS[ev.dayOffset] ?? ''} · ${ev.time} · ${ev.location}`}
+                    color={KIND_COLORS[ev.kind]}
                   />
                 </Pressable>
               ))}
