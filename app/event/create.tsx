@@ -446,6 +446,7 @@ export default function CreateEventScreen() {
   const [recurrence,  setRecurrence ] = useState<RecurrenceType>('none');
   const [repeatUntil, setRepeatUntil] = useState('');
   const [requiresDateNames, setRequiresDateNames] = useState(existing?.requiresDateNames ?? false);
+  const [generateAgenda, setGenerateAgenda] = useState(false);   // meeting events: auto-draft an agenda
   const [templateId,  setTemplateId ] = useState<string>(NO_TEMPLATE);
   const [errors,      setErrors     ] = useState<string[]>([]);
 
@@ -745,6 +746,28 @@ export default function CreateEventScreen() {
                 </Text>
               </View>
             </Pressable>
+          </View>
+        )}
+
+        {/* ── Generate agenda (meeting events) — auto-draft from related items ── */}
+        {!editing && (kind === 'chapter' || kind === 'eboard') && (
+          <View style={s.field}>
+            <Pressable style={s.dateToggleRow} onPress={() => setGenerateAgenda(v => !v)}>
+              <View style={[s.dateToggleBox, generateAgenda && s.dateToggleBoxOn]}>
+                {generateAgenda && <Text style={s.dateToggleCheck}>✓</Text>}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dateToggleLabel}>Generate agenda</Text>
+                <Text style={s.dateToggleSub}>
+                  Auto-draft a meeting agenda from related events, tasks, reports, and unresolved items. Editable after.
+                </Text>
+              </View>
+            </Pressable>
+            {generateAgenda && (
+              <Pressable onPress={() => router.push('/agenda' as any)} style={s.agendaPreviewBtn}>
+                <Text style={s.agendaPreviewText}>Preview agenda ›</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -1086,6 +1109,8 @@ const s = StyleSheet.create({
   dateToggleCheck: { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 16 },
   dateToggleLabel: { fontSize: 14, fontWeight: '600', color: '#e2e8f0' },
   dateToggleSub:   { fontSize: 12, color: '#64748b', marginTop: 2 },
+  agendaPreviewBtn:  { marginTop: 8, alignSelf: 'flex-start' },
+  agendaPreviewText: { color: '#60a5fa', fontSize: 13, fontWeight: '700' },
 
   // Audience
   audienceList: { gap: 8 },
