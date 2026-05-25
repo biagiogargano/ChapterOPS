@@ -63,11 +63,24 @@ to do?"** — nothing more on Today.
 - Points/leaderboard, polls, announcements feed, pinned/custom tabs, full
   permissions grid, full org-tree builder, per-committee report templates, AI.
 
-## Implemented in this pass (feature branch, UI/mock)
-- **Today prototype simplified** to the 3 blocks above; review items render as
-  tasks with a REVIEW label; per-role section sprawl removed.
-- (Already done earlier on the branch: Tasks tab one-list + REVIEW label; reports
-  aligned to v1 structured responses; attendance/agenda/duties prototypes.)
+## Implemented (feature branch, UI/mock) — current state
+- **Today** → 3 blocks (Today's tasks · Today's events · Coming up). Review items
+  render inline as tasks with a REVIEW label; per-role section sprawl + chapter
+  alerts removed. **Completed tasks hidden** (open work only).
+- **Tasks** → one "My tasks" list; review folds in with a REVIEW label; overdue
+  "below you" observation; **completed hidden by default with a "Show completed"
+  toggle**; **working sort** (Due date / Type / Event — due-date falls back to
+  urgency when a task has no dueAt).
+- **Calendar** → day-detail tasks + task dots show **open tasks only** (completed
+  hidden), consistent with Today/Tasks.
+- **Event detail** → "Tasks this event creates" (events own their tasks). The
+  per-event related-task checklist intentionally still shows completed items
+  (progress view), unlike the to-do surfaces.
+- **Completion** is one shared rule (`lib/taskCompletion.ts`): answered RSVP,
+  saved date name, or approved structured/ack/yes-no task.
+- **Reports** aligned to the v1 structured-response model; attendance/agenda/
+  duties prototypes exist.
+- **Prototypes hub** separates core-direction from deferred experiments.
 
 ## Still needs product review before any merge to phase-2
 - Confirm Today should drop "chapter alerts" entirely (vs a tiny observation note).
