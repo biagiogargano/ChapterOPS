@@ -114,6 +114,50 @@ Auto-draft a meeting agenda from existing data:
 This is largely an **aggregation/read** over events, tasks, and questionnaire answers —
 much of it becomes feasible once #6 exists. Mostly read-side; no AI required.
 
+# 9. Action-linked communication, not general messaging
+
+**Planning/direction only — no code, no schema.**
+
+We are considering messaging/texting, but ChapterOPS should **not** become a full
+GroupMe/Teams replacement.
+
+## Concern
+If ChapterOPS adds general chat, it risks looking like an *upgraded GroupMe/Teams*
+instead of something new — and competing on chat is the wrong fight.
+
+## Product principle
+**ChapterOPS should not replace group chat. It should turn communication into
+organized action.** Every message should hang off a task, event, report, or notice —
+never a free-floating conversation.
+
+## Messaging should be action-linked
+- **Task comments / clarification** — discussion attached to a specific task.
+- **Event updates** — change/cancellation notes tied to an event.
+- **Report follow-up comments** — threaded on a submitted report/questionnaire (depends on #6).
+- **Announcement notices** tied to events/tasks (not a standalone wall).
+- **Reminders / notifications** that always link back to the relevant task/event.
+
+## Avoid for now (explicit non-goals)
+- General group chat
+- DMs
+- Channels
+- Reactions
+- Social feed
+- File-sharing chat
+- Anything aimed at replacing GroupMe / Teams
+
+## Possible future direction — external bridges
+- Later: **SMS, email, GroupMe, Slack, Teams, push notifications** as *delivery channels*.
+- **ChapterOPS remains the source of truth**; outside tools are just where the
+  action-linked message gets delivered/echoed. Inbound replies (if ever) route back
+  to the originating task/event, not into a generic inbox.
+
+## Dependencies / placement
+- Comment threads need a **data model** keyed to the parent task/event/report
+  (**server work** — schema/RLS) → defer with the other server items (#5, #6).
+- Push/SMS/email bridges are **integration work**, separate from in-app comments;
+  sequence after the in-app action-linked comment model exists.
+
 ---
 
 # Roadmap placement (recommendation)
