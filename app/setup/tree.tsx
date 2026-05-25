@@ -9,9 +9,9 @@
 
 import { useDevRole } from '@/lib/devRoleStore';
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
-import { getActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
-import { TIERS, defaultTiers, tierColor } from '@/lib/orgTemplates/tiers';
-import { roleTier } from '@/lib/roster/mockRoster';
+import { getActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
+import { TIERS, tierColor } from '@/lib/orgTemplates/tiers';
+import { getMembers, roleTier, useRosterVersion, type RosterMember } from '@/lib/roster/mockRoster';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -44,10 +44,16 @@ export default function TreeBuilderScreen() {
   // identity/membership layer later. Only the owner may edit structure.
   const isOwner = role === 'president';
 
-  const tpl       = useActiveTemplate();
-  const tierMap   = defaultTiers(tpl.roles);
   const myTier    = roleTier(role as Role);
   const myColor   = tierColor(myTier);
+
+  // Real roster members, grouped by tier — selectable in the structure.
+  useRosterVersion();
+  const members = getMembers();
+  const membersByTier: Record<string, RosterMember[]> = {};
+  for (const m of members) (membersByTier[roleTier(m.role)] ??= []).push(m);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const selectedMember = members.find(m => m.id === selectedMemberId) ?? null;
 
   // Owner's title comes from the chosen org template (Consul / President / Captain…).
   const [nodes, setNodes] = useState<Node[]>(() => [{ id: 'root', name: 'You', position: getActiveTemplate().leaderTitle, parentId: null }]);
@@ -113,26 +119,46 @@ export default function TreeBuilderScreen() {
 
         {/* Read-only tier structure visual — everyone sees this */}
         <Text style={s.q}>Org structure</Text>
-        <Text style={s.help}>Your org by tier. Roles in the same tier are equals — structure is a few tiers, not a deep chart.</Text>
+        <Text style={s.help}>Your org by tier. Tap a member to see who they are. Members in the same tier are equals — a few tiers, not a deep chart.</Text>
+
+        {/* Selected member detail — shows the name after you tap a member */}
+        {selectedMember && (
+          <View style={[s.selCard, { borderColor: tierColor(roleTier(selectedMember.role)), backgroundColor: tierColor(roleTier(selectedMember.role)) + '1f' }]}>
+            <Text style={s.selName}>{selectedMember.name}</Text>
+            <Text style={s.selMeta}>
+              {ROLE_LABELS[selectedMember.role]} · {TIERS.find(t => t.id === roleTier(selectedMember.role))?.label}
+              {selectedMember.committee ? ` · ${selectedMember.committee}` : ''}
+            </Text>
+          </View>
+        )}
+
         <View style={s.tierVisual}>
           {TIERS.map(tier => {
-            const rs = tpl.roles.filter(r => tierMap[r] === tier.id);
-            if (rs.length === 0) return null;
             const tc       = tierColor(tier.id);
+            const mems     = membersByTier[tier.id] ?? [];
             const isMyTier = tier.id === myTier;
             return (
               <View key={tier.id} style={[s.tierBand, { borderLeftWidth: 3, borderLeftColor: tc }, isMyTier && { backgroundColor: tc + '14' }]}>
                 <Text style={[s.tierBandLabel, { color: tc }]}>{tier.label.toUpperCase()}{isMyTier ? '  · you' : ''}</Text>
-                <View style={s.tierBandRoles}>
-                  {rs.map(r => {
-                    const mine = isMyTier && r === ROLE_LABELS[role as Role];
-                    return (
-                      <View key={r} style={[s.tierRolePill, { borderColor: tc }, isMyTier && { backgroundColor: tc + '22' }, mine && { borderWidth: 2 }]}>
-                        <Text style={[s.tierRolePillText, isMyTier && { color: '#f1f5f9' }]}>{r}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
+                {mems.length === 0 ? (
+                  <Text style={s.tierEmpty}>No one assigned yet</Text>
+                ) : (
+                  <View style={s.tierBandRoles}>
+                    {mems.map(m => {
+                      const sel = m.id === selectedMemberId;
+                      return (
+                        <Pressable
+                          key={m.id}
+                          onPress={() => setSelectedMemberId(sel ? null : m.id)}
+                          style={[s.memberPill, { borderColor: tc }, sel && { backgroundColor: tc + '33', borderWidth: 2 }]}
+                        >
+                          <Text style={s.memberPillName}>{m.name}</Text>
+                          <Text style={[s.memberPillRole, { color: tc }]}>{ROLE_LABELS[m.role]}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -239,6 +265,15 @@ const s = StyleSheet.create({
   tierRolePill:    { backgroundColor: '#0f172a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
   tierRolePillMine:{ borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
   tierRolePillText:{ fontSize: 13, color: '#cbd5e1', fontWeight: '600' },
+  tierEmpty:       { fontSize: 12, color: '#475569', fontStyle: 'italic' },
+  memberPill:      { backgroundColor: '#0f172a', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 7, borderWidth: 1, borderColor: '#334155' },
+  memberPillName:  { fontSize: 13, color: '#f1f5f9', fontWeight: '700' },
+  memberPillRole:  { fontSize: 11, fontWeight: '600', marginTop: 1 },
+
+  // Selected-member detail card
+  selCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 16, gap: 2 },
+  selName: { fontSize: 18, fontWeight: '800', color: '#f8fafc' },
+  selMeta: { fontSize: 13, color: '#cbd5e1', fontWeight: '600' },
 
   divider:      { height: 1, backgroundColor: '#1e293b', marginVertical: 22 },
   sectionLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 8 },
