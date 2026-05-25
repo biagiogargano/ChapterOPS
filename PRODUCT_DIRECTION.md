@@ -70,9 +70,12 @@ If something can't be expressed this way, that's a signal it may not belong in t
 - Templates apply here to generate prep tasks (Add vs Replace, single vs series).
 - Agenda is generated from event + task + report data (read-only derivation).
 
-### Settings (Me) — identity, org, and configuration
-- Profile/identity, org switching, **org settings** (rename, transfer ownership),
-  smart-default configuration (roles, labels, templates, event types, reports).
+### Me — the single identity/config surface (Settings nested inside)
+- **One** profile/identity surface: your profile, org switching, manage templates,
+  sign out, and a **Settings** link.
+- **Settings is reached from inside Me** (a tap-in, not its own tab): org details &
+  ownership, members & positions, leadership structure, report questions, event
+  automation, notification prefs — the smart-default configuration.
 - The **🧪 Prototype features** hub lives here (sandbox only).
 - **NOT** a place for day-to-day work — no task lists or event feeds.
 

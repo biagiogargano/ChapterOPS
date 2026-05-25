@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Calendar, CheckSquare, Home, Pin, PlusSquare, Settings, User } from 'lucide-react-native';
+import { Calendar, CheckSquare, Home, PlusSquare, User } from 'lucide-react-native';
 import { useRouteTarget } from '@/lib/useRouteTarget';
 import { hrefForTarget } from '@/lib/routeTarget';
 import Splash from '../../components/auth/Splash';
@@ -29,7 +29,8 @@ export default function TabLayout() {
       {/* Pinned retired from the tab bar (deferred prototype); route still reachable directly. */}
       <Tabs.Screen name="pinned"   options={{ href: null }} />
       <Tabs.Screen name="me"       options={{ title: 'Me',       tabBarIcon: ({ color, size }) => <User        color={color} size={size} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Settings    color={color} size={size} /> }} />
+      {/* Settings is reached from inside the Me tab (one identity/config surface), not its own tab. */}
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -151,6 +151,16 @@ export default function MeScreen() {
         </View>
       )}
 
+      {/* ── Settings (org config, notifications, profile) — one surface, reached
+          from here rather than its own tab. ── */}
+      <Pressable style={s.linkCard} onPress={() => router.push('/settings' as any)}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.linkTitle}>Settings</Text>
+          <Text style={s.linkSub}>Organization, members, structure, notifications</Text>
+        </View>
+        <Text style={s.linkChevron}>›</Text>
+      </Pressable>
+
       {/* ── Manage templates (officers) ── */}
       {isOfficer(role) && (
         <Pressable style={s.linkCard} onPress={() => router.push('/templates' as any)}>
