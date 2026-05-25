@@ -4,6 +4,26 @@ Paste this whole file into ChatGPT for a review pass. It's a snapshot of where
 things stand and the open questions I want pressure-tested. Be blunt; catch bad
 ideas and over-complexity.
 
+## Update since last handoff (what shipped + what simplified)
+- **Alpha (`phase-2`) shipped 4 fixes** (tested two-device, same-org): server-wins
+  pull-to-refresh (events/RSVPs/tasks/states/notices), brothers can be assigned
+  tasks, Tasks-tab pull-to-refresh + single-back-after-edit, and required-RSVP-on-
+  optional events (new `optional_rsvp` audience; needed a one-line CHECK widen).
+- **Feature branch — "everything is a task/event" simplification (UI/mock):**
+  - **Today** = only Today's tasks · Today's events · Coming up. Review items show
+    inline as tasks with a REVIEW label (no separate review/approval/alert
+    sections); per-role sprawl removed; **completed tasks hidden**.
+  - **Tasks** = one "My tasks" list (review folds in, REVIEW label) + "below you"
+    overdue observation; **completed hidden by default** with a **"Show completed"
+    toggle**; **working sort** (Due date / Type / Event).
+  - **Calendar** = open tasks + events only (completed hidden) — consistent.
+  - **Event detail** = "Tasks this event creates" (events own their tasks).
+  - Shared completion rule (`lib/taskCompletion.ts`): answered RSVP, saved date
+    name, or approved task.
+  - Onboarding: invite-link-first (manual = fallback); org-type templates feed
+    default roles/labels; Q&A tree builder places invited people.
+  - Prototypes hub separates core-direction from deferred experiments.
+
 ## What the app is
 A chapter/organization management app. Core primitives: **organizations, events,
 tasks, roles, templates, structured responses, automation.** Goal: sophisticated

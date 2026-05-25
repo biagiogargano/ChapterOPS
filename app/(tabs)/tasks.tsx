@@ -541,14 +541,15 @@ export default function TasksScreen() {
         {!hasAny ? (
           <View style={s.emptyFull}>
             <Text style={s.emptyIcon}>✓</Text>
-            <Text style={s.emptyTitle}>All clear</Text>
-            <Text style={s.emptyText}>No tasks assigned to {roleLabel}</Text>
+            <Text style={s.emptyTitle}>You're all caught up</Text>
+            <Text style={s.emptyText}>No open tasks for {roleLabel}.</Text>
           </View>
         ) : shownCount === 0 ? (
           <View style={s.emptyFull}>
-            <Text style={s.emptyTitle}>Nothing here</Text>
+            <Text style={s.emptyIcon}>✓</Text>
+            <Text style={s.emptyTitle}>You're all caught up</Text>
             <Text style={s.emptyText}>
-              {!showCompleted ? 'No open tasks — completed ones are hidden. Turn on "Show completed" to see them.' : 'No tasks match this filter.'}
+              {!showCompleted ? 'No open tasks — completed ones are hidden. Turn on "Show completed" to see them.' : 'Nothing matches this filter.'}
             </Text>
           </View>
         ) : (
