@@ -20,6 +20,8 @@ import {
   type MockTask,
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
+import { isTaskCompleted } from '@/lib/taskCompletion';
+import { useRsvpVersion } from '@/lib/rsvpStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -151,6 +153,7 @@ export default function CalendarScreen() {
   const officer    = isOfficer(role);
 
   useTaskStateVersion();   // re-render when task state changes (badges/dots)
+  useRsvpVersion();        // re-render when an RSVP/date answer changes (completion)
 
   const today    = new Date();
   const todayIso = isoOf(today);
@@ -213,19 +216,24 @@ export default function CalendarScreen() {
     return m;
   }, [events]);
 
-  // Role-visible tasks with a due date, keyed by due day.
-  const tasksByDate = useMemo(() => {
+  // Role-visible OPEN tasks with a due date, keyed by due day. Completed tasks
+  // (answered RSVPs, saved date names, approved tasks) are hidden — consistent
+  // with Today/Tasks; the calendar shows what still needs doing. Not memoized so
+  // it reflects task/RSVP completion immediately (component re-renders via the
+  // version hooks above).
+  const tasksByDate = (() => {
     const m = new Map<string, MockTask[]>();
     for (const t of filterTasksForRole(role)) {
       if (t.isWorkflowParent || !t.dueAt) continue;
+      if (isTaskCompleted(t, role)) continue;
       const iso = t.dueAt.slice(0, 10);
       (m.get(iso) ?? m.set(iso, []).get(iso)!).push(t);
     }
     return m;
-  }, [role, events]);   // `events` dep also nudges recompute on focus refresh
+  })();
 
   const eventDays = useMemo(() => new Set(eventsByDate.keys()), [eventsByDate]);
-  const taskDays  = useMemo(() => new Set(tasksByDate.keys()),  [tasksByDate]);
+  const taskDays  = new Set(tasksByDate.keys());
 
   function goMonth(delta: number) {
     let m = viewMonth + delta;
