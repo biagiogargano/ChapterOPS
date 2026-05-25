@@ -5,11 +5,14 @@
  * (owner-only) structure/tree screen so they agree on the same tiers. Mock only.
  */
 
+// Tier colors are CONSTANT for everyone (a tier is always the same color, no
+// matter who is viewing): Leadership = blue, Executives = green, Officers = red,
+// Members = yellow.
 export const TIERS = [
-  { id: 'lead',    label: 'Leadership', color: '#818cf8' },  // indigo
-  { id: 'exec',    label: 'Executives', color: '#38bdf8' },  // sky
-  { id: 'officer', label: 'Officers',   color: '#34d399' },  // emerald
-  { id: 'member',  label: 'Members',    color: '#94a3b8' },  // slate
+  { id: 'lead',    label: 'Leadership', color: '#3b82f6' },  // blue
+  { id: 'exec',    label: 'Executives', color: '#22c55e' },  // green
+  { id: 'officer', label: 'Officers',   color: '#ef4444' },  // red
+  { id: 'member',  label: 'Members',    color: '#eab308' },  // yellow
 ] as const;
 
 export type TierId = typeof TIERS[number]['id'];

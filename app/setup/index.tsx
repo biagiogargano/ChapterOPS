@@ -12,7 +12,7 @@
 
 import { ORG_TEMPLATES, getOrgTemplate } from '@/lib/orgTemplates/mockOrgTemplates';
 import { getActiveTemplateId, setActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
-import { TIERS, TIER_ORDER, defaultTiers, type TierId } from '@/lib/orgTemplates/tiers';
+import { TIERS, TIER_ORDER, defaultTiers, tierColor, type TierId } from '@/lib/orgTemplates/tiers';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -179,7 +179,7 @@ export default function SetupWizardScreen() {
               if (tierRoles.length === 0) return null;
               return (
                 <View key={tier.id} style={s.tierGroup}>
-                  <Text style={s.tierHeader}>{tier.label.toUpperCase()}</Text>
+                  <Text style={[s.tierHeader, { color: tierColor(tier.id) }]}>{tier.label.toUpperCase()}</Text>
                   {tierRoles.map(r => {
                     const on = included.has(r);
                     const ti = TIER_ORDER.indexOf(tierOf[r] ?? 'officer');
