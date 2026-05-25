@@ -169,10 +169,10 @@ export default function SetupWizardScreen() {
           <View style={s.block}>
             <Text style={s.q}>Roles &amp; tiers</Text>
             <Text style={s.help}>
-              Keep the {template.label} roles your org uses, add your own, and sort them into
-              a few tiers. Roles in the same tier are equals — no need to rank minor
-              differences. ▲▼ moves a role up or down a tier. People get assigned to roles
-              later in Settings → Members &amp; positions.
+              Setup just defines your roles and how they’re grouped into tiers (the
+              seniority/order) — nothing more. Keep the {template.label} roles you use, add
+              your own, and use ▲▼ to move a role between tiers. Roles in the same tier are
+              equals — no need to rank minor differences.
             </Text>
             {TIERS.map(tier => {
               const tierRoles = roles.filter(r => (tierOf[r] ?? 'officer') === tier.id);
@@ -206,7 +206,12 @@ export default function SetupWizardScreen() {
               <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a custom role…" placeholderTextColor="#475569" value={customRole} onChangeText={setCustomRole} onSubmitEditing={addCustomRole} returnKeyType="done" />
               <Pressable style={s.addBtn} onPress={addCustomRole}><Text style={s.addBtnText}>Add</Text></Pressable>
             </View>
-            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} included across {TIERS.filter(t => roles.some(r => included.has(r) && (tierOf[r] ?? 'officer') === t.id)).length} tier(s). No org chart required.</Text>
+            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} included across {TIERS.filter(t => roles.some(r => included.has(r) && (tierOf[r] ?? 'officer') === t.id)).length} tier(s).</Text>
+            <Text style={s.help}>
+              You’ll assign actual people to these roles later in Settings → Members &amp;
+              positions. Detailed committees and reporting lines are optional, also later in
+              Settings → Roles &amp; structure. You don’t build a full org chart here.
+            </Text>
           </View>
         )}
 
@@ -251,7 +256,7 @@ export default function SetupWizardScreen() {
             <Text style={s.summaryLine}>Owner: {ownerMe ? 'you' : 'will be transferred to your invite'}</Text>
             <Text style={s.summaryLine}>Roles in use: {selectedRoles.length}</Text>
             <Text style={s.summaryLine}>Invites drafted: {invites.length}</Text>
-            <Text style={s.help}>Next: leaders can invite their own people, and committees / reporting lines can be set up later in Settings — none of it required to start.</Text>
+            <Text style={s.help}>Next, anytime: assign people to roles in Settings → Members &amp; positions, and set up optional committees / reporting lines in Settings → Roles &amp; structure. None of it is required to start.</Text>
             <Pressable style={s.optionBtn} onPress={() => router.push('/invite' as any)}>
               <Text style={s.optionBtnText}>👀  Preview the invitee view</Text>
               <Text style={s.optionBtnSub}>See what someone sees when they accept</Text>
