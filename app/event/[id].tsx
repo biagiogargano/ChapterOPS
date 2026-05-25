@@ -899,14 +899,16 @@ export default function EventDetailScreen() {
         requiresCovering={rsvpNeedsCovering}
       />
 
-      {/* ── Tasks this event creates (officers) — events own their tasks ── */}
-      {officer && (() => {
+      {/* ── What this event will create (officers, only before tasks exist) —
+          a setup hint; once real tasks are attached, "Related tasks" below is
+          the source of truth (no duplicate task sections). ── */}
+      {officer && relatedTasks.length === 0 && (() => {
         const duties = deriveEventDuties(event);
         if (duties.length === 0) return null;
         return (
           <View style={{ marginTop: 18 }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 10 }}>
-              TASKS THIS EVENT CREATES
+              THIS EVENT WILL CREATE
             </Text>
             {duties.map(d => {
               const ownerLabel = d.owner === 'all' ? 'All members' : ROLE_LABELS[d.owner];
