@@ -1,14 +1,17 @@
 /**
- * app/setup/tree.tsx — OPTIONAL detailed structure editor (reporting lines).
- * PROTOTYPE / mock. This is the ADVANCED, opt-in "who reports to whom" view —
- * NOT part of required onboarding. Setup is roles-first (app/setup/index.tsx);
- * committees and reporting lines are an optional follow-up reached from
- * Settings → Roles & structure. Build the hierarchy by placing invited people;
- * local state, nothing saved. Dev-only; not in phase-2 / the alpha.
+ * app/setup/tree.tsx — org STRUCTURE view (tiers) + owner-only reporting editor.
+ * PROTOTYPE / mock. Everyone can VIEW the structure as tiers (Leadership ·
+ * Executives · Officers · Members) and see their own role + description. Only the
+ * group OWNER can edit detailed reporting lines (the optional "who reports to whom"
+ * builder). Reached from the Me tab (tap your role) and from Settings → Roles &
+ * structure. Local state, nothing saved. Dev-only; not in phase-2 / the alpha.
  */
 
+import { useDevRole } from '@/lib/devRoleStore';
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
-import { getActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
+import { getActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
+import { TIERS, defaultTiers } from '@/lib/orgTemplates/tiers';
+import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -17,10 +20,30 @@ interface Node { id: string; name: string; position?: string; parentId: string |
 let _seq = 0;
 const newId = () => `t${_seq++}`;
 
+// Short, generic "what this role does" blurbs for the Your-role card.
+const ROLE_DESC: Record<string, string> = {
+  president:         'Top leader / owner — full oversight; runs setup and owns the org structure.',
+  pro_consul:        'Second-in-command — reviews and approves submitted work.',
+  annotator:         'Secretary — minutes, attendance, and records.',
+  risk_manager:      'Owns risk & safety tasks and event compliance.',
+  social_chair:      'Plans socials and related events.',
+  recruitment_chair: 'Runs recruitment events and the pipeline.',
+  treasurer:         'Manages dues, budgets, and reimbursements.',
+  brother:           'General member — assigned tasks, RSVPs, attendance.',
+};
+
 export default function TreeBuilderScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
   useOrgBuildVersion();
+
+  const { role } = useDevRole();
+  // Owner proxy for the prototype: the top leader. Real ownership comes from the
+  // identity/membership layer later. Only the owner may edit structure.
+  const isOwner = role === 'president';
+
+  const tpl     = useActiveTemplate();
+  const tierMap = defaultTiers(tpl.roles);
 
   // Owner's title comes from the chosen org template (Consul / President / Captain…).
   const [nodes, setNodes] = useState<Node[]>(() => [{ id: 'root', name: 'You', position: getActiveTemplate().leaderTitle, parentId: null }]);
@@ -28,7 +51,7 @@ export default function TreeBuilderScreen() {
   const [phase, setPhase] = useState<'asking' | 'review'>('asking');
   const [manual, setManual] = useState('');
 
-  useEffect(() => { navigation.setOptions({ title: 'Build your org' }); }, [navigation]);
+  useEffect(() => { navigation.setOptions({ title: 'Roles & structure' }); }, [navigation]);
 
   const invited = getInvited();
   const current = nodes.find(n => n.id === queue[0]) ?? null;
@@ -77,72 +100,105 @@ export default function TreeBuilderScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock, nothing saved</Text></View>
 
-        {/* This screen is the optional, advanced structure editor — setup does not
-            require it. Make that explicit so it never feels like a mandatory chart. */}
-        <View style={s.optionalNote}>
-          <Text style={s.optionalNoteText}>
-            Optional — you don’t need this to finish setup. Structure is primarily a few
-            tiers (Leadership · Executives · Officers · Members) set in setup; detailed
-            reporting lines and committees are an advanced add-on most orgs can skip.
-          </Text>
+        {/* Your role + description */}
+        <View style={s.roleCard}>
+          <Text style={s.roleCardLabel}>YOUR ROLE</Text>
+          <Text style={s.roleCardName}>{ROLE_LABELS[role as Role]}</Text>
+          <Text style={s.roleCardDesc}>{ROLE_DESC[role] ?? 'Member of the organization.'}</Text>
         </View>
 
-        {phase === 'asking' && current && (
-          <View style={s.block}>
-            <Text style={s.crumb}>Building under</Text>
-            <Text style={s.q}>Who reports to {current.name}?</Text>
-            <Text style={s.help}>Pick people from your roster. We'll then ask who reports to each of them.</Text>
-
-            {/* Already placed under current */}
-            {currentKids.map(k => (
-              <View key={k.id} style={s.kidItem}>
-                <View style={[s.bullet, k.isMembers && s.bulletMembers]} />
-                <Text style={[s.kidName, k.isMembers && s.treeMembers]}>{k.name}{k.position ? `  · ${k.position}` : ''}</Text>
-              </View>
-            ))}
-
-            {/* Unplaced roster people to pick */}
-            {unplaced.length > 0 ? (
-              <>
-                <Text style={s.pickLabel}>From your roster:</Text>
-                <View style={s.chips}>
-                  {unplaced.map(inv => (
-                    <Pressable key={inv.id} style={s.personChip} onPress={() => placeInvitee(inv)}>
-                      <Text style={s.personChipName}>{inv.name}</Text>
-                      <Text style={s.personChipPos}>{inv.position}</Text>
-                    </Pressable>
+        {/* Read-only tier structure visual — everyone sees this */}
+        <Text style={s.q}>Org structure</Text>
+        <Text style={s.help}>Your org by tier. Roles in the same tier are equals — structure is a few tiers, not a deep chart.</Text>
+        <View style={s.tierVisual}>
+          {TIERS.map(tier => {
+            const rs = tpl.roles.filter(r => tierMap[r] === tier.id);
+            if (rs.length === 0) return null;
+            return (
+              <View key={tier.id} style={s.tierBand}>
+                <Text style={s.tierBandLabel}>{tier.label.toUpperCase()}</Text>
+                <View style={s.tierBandRoles}>
+                  {rs.map(r => (
+                    <View key={r} style={[s.tierRolePill, r === ROLE_LABELS[role as Role] && s.tierRolePillMine]}>
+                      <Text style={s.tierRolePillText}>{r}</Text>
+                    </View>
                   ))}
                 </View>
-              </>
-            ) : (
-              invited.length === 0 && (
-                <View style={s.manualRow}>
-                  <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a role/person…" placeholderTextColor="#475569" value={manual} onChangeText={setManual} onSubmitEditing={addManual} />
-                  <Pressable style={s.addBtn} onPress={addManual}><Text style={s.addBtnText}>Add</Text></Pressable>
-                </View>
-              )
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Owner-only: detailed reporting-line editor (optional, advanced) */}
+        {!isOwner ? (
+          <View style={s.optionalNote}>
+            <Text style={s.optionalNoteText}>
+              Only the group owner can edit the org structure. You can view the tiers above;
+              ask your owner to change roles or reporting lines.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={s.divider} />
+            <Text style={s.sectionLabel}>EDIT REPORTING LINES (OPTIONAL · OWNER ONLY)</Text>
+            <Text style={s.help}>Advanced: most orgs can skip this. Build detailed “who reports to whom” by placing people.</Text>
+
+            {phase === 'asking' && current && (
+              <View style={s.block}>
+                <Text style={s.crumb}>Building under</Text>
+                <Text style={s.q}>Who reports to {current.name}?</Text>
+                <Text style={s.help}>Pick people from your roster. We'll then ask who reports to each of them.</Text>
+
+                {currentKids.map(k => (
+                  <View key={k.id} style={s.kidItem}>
+                    <View style={[s.bullet, k.isMembers && s.bulletMembers]} />
+                    <Text style={[s.kidName, k.isMembers && s.treeMembers]}>{k.name}{k.position ? `  · ${k.position}` : ''}</Text>
+                  </View>
+                ))}
+
+                {unplaced.length > 0 ? (
+                  <>
+                    <Text style={s.pickLabel}>From your roster:</Text>
+                    <View style={s.chips}>
+                      {unplaced.map(inv => (
+                        <Pressable key={inv.id} style={s.personChip} onPress={() => placeInvitee(inv)}>
+                          <Text style={s.personChipName}>{inv.name}</Text>
+                          <Text style={s.personChipPos}>{inv.position}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  invited.length === 0 && (
+                    <View style={s.manualRow}>
+                      <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a role/person…" placeholderTextColor="#475569" value={manual} onChangeText={setManual} onSubmitEditing={addManual} />
+                      <Pressable style={s.addBtn} onPress={addManual}><Text style={s.addBtnText}>Add</Text></Pressable>
+                    </View>
+                  )
+                )}
+
+                <Pressable style={s.ghost} onPress={addMembers}><Text style={s.ghostText}>+ Add "General members" here</Text></Pressable>
+                {invited.length > 0 && unplaced.length === 0 && (
+                  <Text style={s.help}>Everyone you invited has been placed. You can still add general members, or move on.</Text>
+                )}
+
+                <Pressable style={s.primary} onPress={nextRole}>
+                  <Text style={s.primaryText}>{currentKids.filter(k => !k.isMembers).length > 0 ? 'Next role ›' : 'No one reports to them ›'}</Text>
+                </Pressable>
+                <Text style={s.footHint}>Roles left to ask about after this: {Math.max(0, queue.length - 1)}{invited.length > 0 ? ` · ${unplaced.length} people unplaced` : ''}</Text>
+                <Pressable style={s.back} onPress={() => router.push('/setup/invite-people' as any)}><Text style={s.backText}>← Invite more people</Text></Pressable>
+              </View>
             )}
 
-            <Pressable style={s.ghost} onPress={addMembers}><Text style={s.ghostText}>+ Add "General members" here</Text></Pressable>
-            {invited.length > 0 && unplaced.length === 0 && (
-              <Text style={s.help}>Everyone you invited has been placed. You can still add general members, or move on.</Text>
+            {phase === 'review' && (
+              <View style={s.block}>
+                <Text style={s.q}>Here's your reporting tree</Text>
+                <Text style={s.help}>Built from the people you placed — editable anytime.</Text>
+                <View style={s.treeBox}>{renderTree(null, 0)}</View>
+                <Text style={s.footHint}>Full version: a person can "also report to" another, and you can move anyone later.</Text>
+              </View>
             )}
-
-            <Pressable style={s.primary} onPress={nextRole}>
-              <Text style={s.primaryText}>{currentKids.filter(k => !k.isMembers).length > 0 ? 'Next role ›' : 'No one reports to them ›'}</Text>
-            </Pressable>
-            <Text style={s.footHint}>Roles left to ask about after this: {Math.max(0, queue.length - 1)}{invited.length > 0 ? ` · ${unplaced.length} people unplaced` : ''}</Text>
-            <Pressable style={s.back} onPress={() => router.push('/setup/invite-people' as any)}><Text style={s.backText}>← Invite more people</Text></Pressable>
-          </View>
-        )}
-
-        {phase === 'review' && (
-          <View style={s.block}>
-            <Text style={s.q}>Here's your org tree</Text>
-            <Text style={s.help}>Built from the people you invited — no grid. Editable anytime.</Text>
-            <View style={s.treeBox}>{renderTree(null, 0)}</View>
-            <Text style={s.footHint}>Full version: a person can "also report to" another, and you can move anyone later.</Text>
-          </View>
+          </>
         )}
 
         <View style={{ height: 40 }} />
@@ -157,8 +213,26 @@ const s = StyleSheet.create({
 
   protoBadge: { alignSelf: 'flex-start', backgroundColor: '#422006', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 18, borderWidth: 1, borderColor: '#92400e' },
   protoText:  { color: '#fbbf24', fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
-  optionalNote:     { backgroundColor: '#0a1628', borderRadius: 10, borderWidth: 1, borderColor: '#1e293b', padding: 12, marginBottom: 18 },
+  optionalNote:     { backgroundColor: '#0a1628', borderRadius: 10, borderWidth: 1, borderColor: '#1e293b', padding: 12, marginTop: 18 },
   optionalNoteText: { fontSize: 12, color: '#64748b', lineHeight: 18 },
+
+  // Your-role card
+  roleCard:      { backgroundColor: '#1e1b4b', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#312e81', marginBottom: 20, gap: 3 },
+  roleCardLabel: { fontSize: 11, fontWeight: '700', color: '#818cf8', letterSpacing: 0.8 },
+  roleCardName:  { fontSize: 18, fontWeight: '800', color: '#f8fafc' },
+  roleCardDesc:  { fontSize: 13, color: '#a5b4fc', lineHeight: 18, marginTop: 2 },
+
+  // Tier visual
+  tierVisual:    { gap: 10, marginTop: 6 },
+  tierBand:      { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, gap: 8 },
+  tierBandLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
+  tierBandRoles: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tierRolePill:    { backgroundColor: '#0f172a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
+  tierRolePillMine:{ borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  tierRolePillText:{ fontSize: 13, color: '#cbd5e1', fontWeight: '600' },
+
+  divider:      { height: 1, backgroundColor: '#1e293b', marginVertical: 22 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 8 },
 
   block: { gap: 12 },
   crumb: { fontSize: 12, fontWeight: '700', color: '#64748b', letterSpacing: 0.6 },

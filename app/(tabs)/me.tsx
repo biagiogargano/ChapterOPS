@@ -108,9 +108,11 @@ export default function MeScreen() {
         <View style={s.userInfo}>
           <Text style={s.userName}>{userName}</Text>
           <Text style={s.userChapter}>{orgName}</Text>
-          <View style={s.rolePill}>
+          {/* Tap your role → org structure (tiers) + your role description. */}
+          <Pressable style={s.rolePill} onPress={() => router.push('/setup/tree' as any)}>
             <Text style={s.rolePillText}>{ROLE_LABELS[role]}</Text>
-          </View>
+            <Text style={s.rolePillChevron}>›</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -238,6 +240,9 @@ const s = StyleSheet.create({
     color: '#64748b',
   },
   rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     alignSelf: 'flex-start',
     backgroundColor: '#312e81',
     borderRadius: 20,
@@ -249,6 +254,12 @@ const s = StyleSheet.create({
     color: '#a5b4fc',
     fontSize: 12,
     fontWeight: '600',
+  },
+  rolePillChevron: {
+    color: '#818cf8',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 14,
   },
 
   // Role switcher

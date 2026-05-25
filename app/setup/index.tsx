@@ -12,32 +12,12 @@
 
 import { ORG_TEMPLATES, getOrgTemplate } from '@/lib/orgTemplates/mockOrgTemplates';
 import { getActiveTemplateId, setActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
+import { TIERS, TIER_ORDER, defaultTiers, type TierId } from '@/lib/orgTemplates/tiers';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 interface Invite { name: string; role: string }
-
-// Roles group into a few TIERS rather than a fine-grained ranking — roles in the
-// same tier are peers (no minor-seniority distinctions to fuss over).
-const TIERS = [
-  { id: 'lead',    label: 'Leadership' },
-  { id: 'exec',    label: 'Executives' },
-  { id: 'officer', label: 'Officers'   },
-  { id: 'member',  label: 'Members'    },
-] as const;
-type TierId = typeof TIERS[number]['id'];
-const TIER_ORDER = TIERS.map(t => t.id) as TierId[];
-
-/** Sensible default tier per role based on its position in the template list. */
-function defaultTiers(roleList: string[]): Record<string, TierId> {
-  const n = roleList.length;
-  const map: Record<string, TierId> = {};
-  roleList.forEach((r, i) => {
-    map[r] = i === 0 ? 'lead' : i === n - 1 ? 'member' : i <= 2 ? 'exec' : 'officer';
-  });
-  return map;
-}
 
 export default function SetupWizardScreen() {
   const navigation = useNavigation();
