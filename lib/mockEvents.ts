@@ -93,6 +93,9 @@ export const KIND_LABELS: Record<EventKind, string> = {
   risk:        'Risk/Safety',
 };
 
+// Event-kind colors. IMPORTANT: never use bright yellow (#facc15) here — that
+// color is RESERVED for tasks (see lib/ui/entityColors.ts) so tasks always stand
+// out against any number of event types. Pick from any other hue for new kinds.
 export const KIND_COLORS: Record<EventKind, string> = {
   chapter:     '#6366f1',
   eboard:      '#f59e0b',

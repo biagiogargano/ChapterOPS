@@ -22,6 +22,7 @@ import {
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
 import { isTaskCompleted } from '@/lib/taskCompletion';
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { useRsvpVersion } from '@/lib/rsvpStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -92,7 +93,7 @@ function MonthGrid({
                   {kinds.slice(0, 3).map((k, idx) => (
                     <View key={idx} style={[s.dot, { backgroundColor: isSel ? '#fff' : KIND_COLORS[k] }]} />
                   ))}
-                  {hasTask && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : '#fbbf24' }]} />}
+                  {hasTask && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : ENTITY_COLORS.task }]} />}
                 </View>
               </Pressable>
             );

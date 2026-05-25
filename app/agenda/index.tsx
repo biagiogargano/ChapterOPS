@@ -9,6 +9,7 @@
  */
 
 import { buildAgenda, isAgendaEmpty, type AgendaItem } from '@/lib/agenda/buildAgenda';
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
@@ -26,7 +27,7 @@ function Section({ label, items, onItem }: { label: string; items: AgendaItem[];
       ) : (
         items.map(i => (
           <Pressable key={`${i.kind}_${i.id}`} style={s.row} onPress={() => onItem(i)}>
-            <View style={[s.dot, { backgroundColor: i.kind === 'event' ? '#818cf8' : '#fbbf24' }]} />
+            <View style={[s.dot, { backgroundColor: i.kind === 'event' ? ENTITY_COLORS.event : ENTITY_COLORS.task }]} />
             <View style={s.rowBody}>
               <Text style={s.rowTitle} numberOfLines={1}>{i.title}</Text>
               <Text style={s.rowMeta} numberOfLines={1}>{i.meta}</Text>

@@ -7,7 +7,10 @@
  */
 export const ENTITY_COLORS = {
   event:        '#6366f1', // indigo (per-kind overrides via KIND_COLORS)
-  task:         '#22c55e', // green
+  // RESERVED: bright yellow is the TASK color and is used for tasks ONLY. No
+  // event kind (KIND_COLORS) or other entity may use it, no matter how many event
+  // types exist — tasks must always stand out. Do not reuse #facc15 anywhere else.
+  task:         '#facc15', // yellow — RESERVED for tasks
   announcement: '#f59e0b', // amber
   group:        '#a855f7', // purple
 } as const;
