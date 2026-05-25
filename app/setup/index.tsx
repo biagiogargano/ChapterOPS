@@ -3,14 +3,15 @@
  * PROTOTYPE ONLY (see SPEC_ONBOARDING_ORG_SETUP.md).
  *
  * ⚠️ MOCK / NON-FUNCTIONAL. No real invites sent, nothing persisted, no auth.
- * Roles-first model: name the org → who's in charge → pick WHICH ROLES your org
- * uses (from the org-type template) → invite people into those roles → done.
- * NO org chart and NO "who reports to whom" here — committees and reporting lines
- * are an optional follow-up in Settings → Roles & structure. Every step after the
- * name is skippable. Dev-only; not linked from phase-2, not wired into the alpha.
+ * Strictly LINEAR, roles-first: Name → Org type → Who's in charge → which ROLES
+ * your org uses → invite people into roles → done. Each decision is its own step
+ * (no critical choices hidden as a small link below a step). NO org chart and NO
+ * "who reports to whom" here — committees/reporting lines are an optional
+ * follow-up in Settings → Roles & structure. Dev-only; not in phase-2 / alpha.
  */
 
-import { useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
+import { ORG_TEMPLATES, getOrgTemplate } from '@/lib/orgTemplates/mockOrgTemplates';
+import { getActiveTemplateId, setActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -24,6 +25,7 @@ export default function SetupWizardScreen() {
   const [step, setStep] = useState(0);
 
   const [orgName, setOrgName]   = useState('');
+  const [orgTypeId, setOrgTypeId] = useState(getActiveTemplateId());
   const [ownerMe, setOwnerMe]   = useState(true);
   // Which of the template's default roles this org actually uses (all on to start).
   const [selectedRoles, setSelectedRoles] = useState<string[]>(() => template.roles);
@@ -31,8 +33,7 @@ export default function SetupWizardScreen() {
   const [draftName, setDraftName] = useState('');
   const [draftRole, setDraftRole] = useState('');
 
-  // If the org type changes (via the org-type screen) reset the role selection to
-  // that template's defaults so step 3 reflects the chosen org type.
+  // When the org type changes, reset role selection to that template's defaults.
   const tplIdRef = useRef(template.id);
   useEffect(() => {
     if (tplIdRef.current !== template.id) {
@@ -43,30 +44,31 @@ export default function SetupWizardScreen() {
 
   useEffect(() => { navigation.setOptions({ title: 'Set up your org' }); }, [navigation]);
 
-  const steps = ['Name', 'Who’s in charge', 'Roles', 'Invite', 'Done'];
+  const steps = ['Name', 'Org type', 'Who’s in charge', 'Roles', 'Invite', 'Done'];
   const last  = steps.length - 1;
   const canNext = step !== 0 || orgName.trim().length > 0;
 
-  // Default the invite role to a non-leader role the org actually uses.
   const effectiveDraftRole = selectedRoles.includes(draftRole)
     ? draftRole
     : (selectedRoles[1] ?? selectedRoles[0] ?? '');
 
+  function pickOrgType(id: string) {
+    setOrgTypeId(id);
+    setActiveTemplate(id);   // drives the suggested roles in the next step
+  }
   function toggleRole(r: string) {
     setSelectedRoles(prev => (prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]));
   }
-
   function addInvite() {
     const n = draftName.trim();
     if (!n || !effectiveDraftRole) return;
     setInvites(prev => [...prev, { name: n, role: effectiveDraftRole }]);
     setDraftName('');
   }
-
   function finish() {
     Alert.alert(
       'Setup complete (prototype)',
-      `${orgName || 'Your org'} is set up.\nOwner: ${ownerMe ? 'you' : 'to be transferred'}.\nRoles in use: ${selectedRoles.length}.\nInvites drafted: ${invites.length}.\n\n(Mock — nothing was sent or saved.)`,
+      `${orgName || 'Your org'} is set up.\nType: ${template.label}.\nOwner: ${ownerMe ? 'you' : 'to be transferred'}.\nRoles in use: ${selectedRoles.length}.\nInvites drafted: ${invites.length}.\n\n(Mock — nothing was sent or saved.)`,
       [{ text: 'OK', onPress: () => router.back() }],
     );
   }
@@ -75,11 +77,6 @@ export default function SetupWizardScreen() {
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock setup, nothing saved</Text></View>
-
-        {/* Active org-type template — drives the suggested roles below. */}
-        <View style={s.templateBanner}>
-          <Text style={s.templateText}>{template.emoji}  Using {template.label} defaults — leader: {template.leaderTitle}</Text>
-        </View>
 
         {/* Step dots */}
         <View style={s.dots}>
@@ -96,15 +93,37 @@ export default function SetupWizardScreen() {
           <View style={s.block}>
             <Text style={s.q}>What’s your organization called?</Text>
             <TextInput style={s.input} placeholder="e.g. Sigma Chi — Beta Chapter" placeholderTextColor="#475569" value={orgName} onChangeText={setOrgName} autoFocus />
-            <Text style={s.help}>You can change this later. That’s the only thing you must do — everything after is optional.</Text>
-            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/org-type' as any)}>
-              <Text style={s.previewText}>Choose your org type for smart defaults ›</Text>
-            </Pressable>
+            <Text style={s.help}>You can change this later. It’s the only required step — everything after is optional.</Text>
           </View>
         )}
 
-        {/* ── Step 1: Owner ── */}
+        {/* ── Step 1: Org type (its own step, not a hidden link) ── */}
         {step === 1 && (
+          <View style={s.block}>
+            <Text style={s.q}>What kind of organization?</Text>
+            <Text style={s.help}>This sets your starting defaults — roles, event types, and reports. Change anything later.</Text>
+            <View style={s.typeGrid}>
+              {ORG_TEMPLATES.map(tpl => {
+                const on = tpl.id === orgTypeId;
+                return (
+                  <Pressable key={tpl.id} style={[s.typeCard, on && s.typeCardOn]} onPress={() => pickOrgType(tpl.id)}>
+                    <Text style={s.typeEmoji}>{tpl.emoji}</Text>
+                    <Text style={[s.typeLabel, on && s.typeLabelOn]}>{tpl.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={s.typePreview}>
+              <Text style={s.typePreviewLabel}>LEADER</Text>
+              <Text style={s.typePreviewValue}>{getOrgTemplate(orgTypeId)?.leaderTitle}</Text>
+              <Text style={[s.typePreviewLabel, { marginTop: 8 }]}>SUGGESTED ROLES</Text>
+              <Text style={s.typePreviewValue}>{getOrgTemplate(orgTypeId)?.roles.join(' · ')}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* ── Step 2: Owner ── */}
+        {step === 2 && (
           <View style={s.block}>
             <Text style={s.q}>Who’s in charge?</Text>
             <Pressable style={[s.choice, ownerMe && s.choiceOn]} onPress={() => setOwnerMe(true)}>
@@ -118,14 +137,14 @@ export default function SetupWizardScreen() {
           </View>
         )}
 
-        {/* ── Step 2: Roles (who does what) — pick which template roles you use ── */}
-        {step === 2 && (
+        {/* ── Step 3: Roles (who does what) ── */}
+        {step === 3 && (
           <View style={s.block}>
             <Text style={s.q}>Who does what?</Text>
             <Text style={s.help}>
               These are the {template.label} default roles. Keep the ones your org uses and turn
-              off the rest. This is just roles — committees, helpers, and reporting lines are
-              optional and can be added later in Settings → Roles &amp; structure.
+              off the rest. Just roles here — committees and reporting lines are optional, later, in
+              Settings → Roles &amp; structure.
             </Text>
             <View style={s.rolePickWrap}>
               {template.roles.map(r => {
@@ -139,18 +158,22 @@ export default function SetupWizardScreen() {
                 );
               })}
             </View>
-            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} selected. You can add or rename roles anytime — no org chart required.</Text>
+            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} selected. No org chart required.</Text>
           </View>
         )}
 
-        {/* ── Step 3: Invite — place people into the roles you picked ── */}
-        {step === 3 && (
+        {/* ── Step 4: Invite — two clear options, not a hidden link ── */}
+        {step === 4 && (
           <View style={s.block}>
-            <Text style={s.q}>Invite people into roles (optional)</Text>
-            <Text style={s.help}>Invite-link first: share a link and people pick themselves up. Or add a few key people here. Either way you can finish without this.</Text>
-            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/invite-link' as any)}>
-              <Text style={s.previewText}>Share an invite link ›</Text>
+            <Text style={s.q}>Add people (optional)</Text>
+            <Text style={s.help}>Invite-link first: share a link and people pick themselves up. Or add a few key people by hand. Either way you can finish without this.</Text>
+
+            <Pressable style={s.optionBtn} onPress={() => router.push('/setup/invite-link' as any)}>
+              <Text style={s.optionBtnText}>🔗  Share an invite link</Text>
+              <Text style={s.optionBtnSub}>Recommended — people join themselves into a role</Text>
             </Pressable>
+
+            <Text style={[s.help, { marginTop: 4 }]}>Or add someone manually:</Text>
             <View style={s.inviteRow}>
               <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Name or email" placeholderTextColor="#475569" value={draftName} onChangeText={setDraftName} onSubmitEditing={addInvite} />
               <Pressable style={s.addBtn} onPress={addInvite}><Text style={s.addBtnText}>Add</Text></Pressable>
@@ -162,30 +185,28 @@ export default function SetupWizardScreen() {
                 </Pressable>
               ))}
             </View>
-            {invites.length === 0 ? (
-              <Text style={s.help}>No invites yet — leaders can also invite their own people after setup. You can skip this entirely.</Text>
-            ) : (
-              invites.map((inv, i) => (
-                <View key={i} style={s.inviteItem}>
-                  <Text style={s.inviteName}>{inv.name}</Text>
-                  <Text style={s.inviteTier}>{inv.role}</Text>
-                </View>
-              ))
-            )}
+            {invites.length > 0 && invites.map((inv, i) => (
+              <View key={i} style={s.inviteItem}>
+                <Text style={s.inviteName}>{inv.name}</Text>
+                <Text style={s.inviteTier}>{inv.role}</Text>
+              </View>
+            ))}
           </View>
         )}
 
-        {/* ── Step 4: Done ── */}
-        {step === 4 && (
+        {/* ── Step 5: Done ── */}
+        {step === 5 && (
           <View style={s.block}>
             <Text style={s.q}>You’re ready 🎉</Text>
             <Text style={s.summary}><Text style={s.bold}>{orgName || 'Your org'}</Text></Text>
+            <Text style={s.summaryLine}>Type: {template.label}</Text>
             <Text style={s.summaryLine}>Owner: {ownerMe ? 'you' : 'will be transferred to your invite'}</Text>
             <Text style={s.summaryLine}>Roles in use: {selectedRoles.length}</Text>
             <Text style={s.summaryLine}>Invites drafted: {invites.length}</Text>
-            <Text style={s.help}>Next: leaders can invite their own people, and committees / reporting lines can be set up later in Settings — none of it is required to start.</Text>
-            <Pressable style={s.previewBtn} onPress={() => router.push('/invite' as any)}>
-              <Text style={s.previewText}>Preview what an invitee sees ›</Text>
+            <Text style={s.help}>Next: leaders can invite their own people, and committees / reporting lines can be set up later in Settings — none of it required to start.</Text>
+            <Pressable style={s.optionBtn} onPress={() => router.push('/invite' as any)}>
+              <Text style={s.optionBtnText}>👀  Preview the invitee view</Text>
+              <Text style={s.optionBtnSub}>See what someone sees when they accept</Text>
             </Pressable>
           </View>
         )}
@@ -219,8 +240,6 @@ const s = StyleSheet.create({
 
   protoBadge: { alignSelf: 'flex-start', backgroundColor: '#422006', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 16, borderWidth: 1, borderColor: '#92400e' },
   protoText:  { color: '#fbbf24', fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
-  templateBanner: { backgroundColor: '#1e1b4b', borderRadius: 9, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 14, borderWidth: 1, borderColor: '#312e81' },
-  templateText:   { color: '#a5b4fc', fontSize: 12, fontWeight: '600' },
 
   dots:      { flexDirection: 'row', gap: 6, marginBottom: 8 },
   dotWrap:   { flex: 1 },
@@ -236,13 +255,24 @@ const s = StyleSheet.create({
 
   input: { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
 
+  // Org-type step
+  typeGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  typeCard:  { width: '47%', backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155', gap: 6 },
+  typeCardOn:{ borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  typeEmoji: { fontSize: 22 },
+  typeLabel: { fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  typeLabelOn:{ color: '#f1f5f9', fontWeight: '700' },
+  typePreview:      { backgroundColor: '#0a1628', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 14, marginTop: 6 },
+  typePreviewLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
+  typePreviewValue: { fontSize: 14, color: '#cbd5e1', marginTop: 2, lineHeight: 19 },
+
   choice:        { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#334155', gap: 4 },
   choiceOn:      { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
   choiceTitle:   { fontSize: 15, fontWeight: '700', color: '#cbd5e1' },
   choiceTitleOn: { color: '#f1f5f9' },
   choiceHint:    { fontSize: 12, color: '#64748b', lineHeight: 17, marginTop: 2 },
 
-  // Role picker (step 2)
+  // Role picker (step 3)
   rolePickWrap: { gap: 8 },
   roleChip:     { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' },
   roleChipOn:   { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
@@ -253,9 +283,13 @@ const s = StyleSheet.create({
   roleChipTextOn:{ color: '#f1f5f9' },
   leaderTag:    { fontSize: 10, fontWeight: '700', color: '#a5b4fc', backgroundColor: '#312e81', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
 
+  // Invite step
+  optionBtn:    { backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 13, paddingHorizontal: 14, gap: 2 },
+  optionBtnText:{ color: '#60a5fa', fontSize: 15, fontWeight: '700' },
+  optionBtnSub: { color: '#64748b', fontSize: 12 },
   inviteRow:   { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  addBtn:      { backgroundColor: '#1e3a5f', borderRadius: 10, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 12, paddingHorizontal: 16 },
-  addBtnText:  { color: '#60a5fa', fontWeight: '700', fontSize: 14 },
+  addBtn:      { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingVertical: 12, paddingHorizontal: 16 },
+  addBtnText:  { color: '#94a3b8', fontWeight: '700', fontSize: 14 },
   tierPick:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tierChip:    { backgroundColor: '#0f172a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#334155' },
   tierChipOn:  { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
@@ -267,8 +301,6 @@ const s = StyleSheet.create({
 
   summary:     { fontSize: 18, marginBottom: 4 },
   summaryLine: { fontSize: 14, color: '#94a3b8' },
-  previewBtn:  { marginTop: 8, alignSelf: 'flex-start' },
-  previewText: { color: '#818cf8', fontSize: 14, fontWeight: '600' },
 
   nav:           { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24 },
   backBtn:       { paddingVertical: 12, paddingHorizontal: 14 },
