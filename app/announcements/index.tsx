@@ -5,6 +5,7 @@
  * Local state, nothing saved. Dev-only; not in phase-2 / the alpha.
  */
 
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -81,9 +82,9 @@ const s = StyleSheet.create({
   postText: { color: '#60a5fa', fontWeight: '700', fontSize: 14 },
   postTextOff:{ color: '#475569' },
 
-  card:     { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginBottom: 8 },
+  card:     { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: ENTITY_COLORS.announcement },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  avatar:   { width: 32, height: 32, borderRadius: 16, backgroundColor: '#6366f1', alignItems: 'center', justifyContent: 'center' },
+  avatar:   { width: 32, height: 32, borderRadius: 16, backgroundColor: ENTITY_COLORS.announcement, alignItems: 'center', justifyContent: 'center' },
   avatarText:{ color: '#fff', fontWeight: '800', fontSize: 13 },
   author:   { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
   role:     { fontSize: 12, color: '#64748b', fontWeight: '500' },

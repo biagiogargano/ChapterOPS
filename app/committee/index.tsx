@@ -8,6 +8,7 @@
  * (mock). Static demo data, nothing saved. Dev-only; not in phase-2 / the alpha.
  */
 
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { useNavigation } from 'expo-router';
 import { useEffect } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -61,7 +62,7 @@ export default function CommitteeScreen() {
       <Text style={[s.sectionLabel, { marginTop: 24 }]}>COMMITTEE EVENTS</Text>
       {COMMITTEE.events.map((e, i) => (
         <View key={i} style={s.item}>
-          <View style={[s.dot, { backgroundColor: '#818cf8' }]} />
+          <View style={[s.dot, { backgroundColor: ENTITY_COLORS.event }]} />
           <View style={s.itemBody}><Text style={s.itemTitle}>{e.title}</Text><Text style={s.itemMeta}>{e.meta}</Text></View>
         </View>
       ))}
@@ -69,7 +70,7 @@ export default function CommitteeScreen() {
       <Text style={[s.sectionLabel, { marginTop: 24 }]}>COMMITTEE TASKS</Text>
       {COMMITTEE.tasks.map((t, i) => (
         <View key={i} style={s.item}>
-          <View style={[s.dot, { backgroundColor: '#fbbf24' }]} />
+          <View style={[s.dot, { backgroundColor: ENTITY_COLORS.task }]} />
           <View style={s.itemBody}><Text style={s.itemTitle}>{t.title}</Text><Text style={s.itemMeta}>{t.meta}</Text></View>
         </View>
       ))}
@@ -95,8 +96,8 @@ const s = StyleSheet.create({
 
   sectionLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 10 },
 
-  memberRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8 },
-  avatar:     { width: 38, height: 38, borderRadius: 19, backgroundColor: '#6366f1', alignItems: 'center', justifyContent: 'center' },
+  memberRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: ENTITY_COLORS.group },
+  avatar:     { width: 38, height: 38, borderRadius: 19, backgroundColor: ENTITY_COLORS.group, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   memberBody: { flex: 1 },
   memberName: { fontSize: 15, fontWeight: '600', color: '#f1f5f9' },

@@ -9,6 +9,7 @@
 
 import { useDevRole } from '@/lib/devRoleStore';
 import { isOfficer } from '@/lib/roles';
+import { ENTITY_COLORS } from '@/lib/ui/entityColors';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -16,14 +17,14 @@ interface CreateTile { icon: string; title: string; sub: string; route: string; 
 
 // CORE — the real, primary things an officer creates.
 const CORE_TILES: CreateTile[] = [
-  { icon: '📅', title: 'Event', sub: 'Meeting, social, philanthropy — with agenda/RSVP options', route: '/event/create', accent: '#6366f1' },
-  { icon: '✅', title: 'Task',  sub: 'Assign work to a role or member',                          route: '/task/create',  accent: '#22c55e' },
+  { icon: '📅', title: 'Event', sub: 'Meeting, social, philanthropy — with agenda/RSVP options', route: '/event/create', accent: ENTITY_COLORS.event },
+  { icon: '✅', title: 'Task',  sub: 'Assign work to a role or member',                          route: '/task/create',  accent: ENTITY_COLORS.task },
 ];
 
 // COMING LATER — lighter prototype concepts, deliberately de-emphasized.
 const LATER_TILES: CreateTile[] = [
-  { icon: '📣', title: 'Announcement', sub: 'A notice tied to an event or task — not a chat feed', route: '/announcements', accent: '#f59e0b' },
-  { icon: '👥', title: 'Group',        sub: 'Loosely group members (early — not a full org system)', route: '/committee',   accent: '#a855f7' },
+  { icon: '📣', title: 'Announcement', sub: 'A notice tied to an event or task — not a chat feed', route: '/announcements', accent: ENTITY_COLORS.announcement },
+  { icon: '👥', title: 'Group',        sub: 'Loosely group members (early — not a full org system)', route: '/committee',   accent: ENTITY_COLORS.group },
 ];
 
 export default function CreateScreen() {

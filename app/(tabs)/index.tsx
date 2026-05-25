@@ -6,7 +6,7 @@ import { AUTH_ENABLED } from '@/lib/flags';
 import { fetchAllEvents } from '@/lib/eventService';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getAllEvents, resolveEventId, setSupabaseEventCache, type MockEvent } from '@/lib/eventStore';
-import { DAY_LABELS } from '@/lib/mockEvents';
+import { DAY_LABELS, KIND_BG, KIND_COLORS, KIND_LABELS } from '@/lib/mockEvents';
 import {
   DISPLAY_STATE_LABEL,
   STATE_BG,
@@ -512,10 +512,13 @@ function EventCard({
   if (officersOnly && isBrother) return null;
   return (
     <Pressable style={s.eventCard} onPress={onPress}>
-      <View style={s.eventAccent} />
+      <View style={[s.eventAccent, { backgroundColor: KIND_COLORS[event.kind] }]} />
       <View style={s.eventBody}>
         <View style={s.eventTitleRow}>
           <Text style={s.eventTitle}>{event.title}</Text>
+          <View style={[s.kindBadge, { backgroundColor: KIND_BG[event.kind] }]}>
+            <Text style={[s.kindBadgeText, { color: KIND_COLORS[event.kind] }]}>{KIND_LABELS[event.kind]}</Text>
+          </View>
           {mandatory && (
             <View style={s.mandatoryBadge}><Text style={s.mandatoryText}>Mandatory</Text></View>
           )}
@@ -933,6 +936,8 @@ const s = StyleSheet.create({
   eventTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   eventTitle:    { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
   eventChevron:  { fontSize: 20, color: '#334155', paddingHorizontal: 12 },
+  kindBadge:     { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  kindBadgeText: { fontSize: 10, fontWeight: '700' },
   mandatoryBadge:{ backgroundColor: '#312e81', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   mandatoryText: { color: '#a5b4fc', fontSize: 10, fontWeight: '700' },
   officerBadge:  { backgroundColor: '#1a2535', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#334155' },
