@@ -424,7 +424,7 @@ export default function CreateEventScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
   const { role }   = useDevRole();
-  const params     = useLocalSearchParams<{ eventId?: string }>();
+  const params     = useLocalSearchParams<{ eventId?: string; date?: string }>();
 
   // Edit mode when an eventId is supplied.
   const editing     = !!params.eventId;
@@ -436,7 +436,9 @@ export default function CreateEventScreen() {
   // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
   const [title,       setTitle      ] = useState(existing?.title ?? '');
   const [kind,        setKind       ] = useState<EventKind>(() => (existing?.kind as EventKind) ?? allowedKinds[0] ?? 'chapter');
-  const [dateString,  setDateString ] = useState(existing ? isoFromDayOffset(existing.dayOffset) : '');
+  // Create mode can be opened from the Calendar with a `date` param (ISO
+  // YYYY-MM-DD) to prefill the selected day; edit mode prefills from the event.
+  const [dateString,  setDateString ] = useState(existing ? isoFromDayOffset(existing.dayOffset) : (params.date ?? ''));
   const [hour,        setHour       ] = useState(prefillTime.hour);
   const [minute,      setMinute     ] = useState(prefillTime.minute);
   const [ampm,        setAmpm       ] = useState<'AM' | 'PM'>(prefillTime.ampm);

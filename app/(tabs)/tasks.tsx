@@ -17,7 +17,6 @@ import {
 } from '@/lib/mockTasks';
 import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
 import { isTaskCompleted } from '@/lib/taskCompletion';
-import { promptCreate } from '@/lib/ui/createPrompt';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
@@ -433,12 +432,13 @@ export default function TasksScreen() {
   const [, _bumpFocus] = useState(0);
   useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
-  // Officer-only unified "+ New" (Event or Task) in the tab header.
+  // Officer-only "+ New" in the tab header — contextual: on the Tasks tab it goes
+  // straight to Create Task (not the Event/Task chooser).
   useEffect(() => {
     navigation.setOptions({
       headerRight: officer
         ? () => (
-            <Pressable style={s.createHdrBtn} onPress={() => promptCreate(r => router.push(r as any))}>
+            <Pressable style={s.createHdrBtn} onPress={() => router.push('/task/create' as any)}>
               <Text style={s.createHdrText}>+ New</Text>
             </Pressable>
           )
@@ -545,8 +545,8 @@ export default function TasksScreen() {
             <Text style={s.emptyTitle}>You're all caught up</Text>
             <Text style={s.emptyText}>No open tasks for {roleLabel}.</Text>
             {officer && (
-              <Pressable style={s.emptyCreateBtn} onPress={() => promptCreate(r => router.push(r as any))}>
-                <Text style={s.emptyCreateText}>+ New event or task</Text>
+              <Pressable style={s.emptyCreateBtn} onPress={() => router.push('/task/create' as any)}>
+                <Text style={s.emptyCreateText}>+ New task</Text>
               </Pressable>
             )}
           </View>
