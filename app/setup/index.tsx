@@ -18,6 +18,27 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 
 interface Invite { name: string; role: string }
 
+// Roles group into a few TIERS rather than a fine-grained ranking — roles in the
+// same tier are peers (no minor-seniority distinctions to fuss over).
+const TIERS = [
+  { id: 'lead',    label: 'Leadership' },
+  { id: 'exec',    label: 'Executives' },
+  { id: 'officer', label: 'Officers'   },
+  { id: 'member',  label: 'Members'    },
+] as const;
+type TierId = typeof TIERS[number]['id'];
+const TIER_ORDER = TIERS.map(t => t.id) as TierId[];
+
+/** Sensible default tier per role based on its position in the template list. */
+function defaultTiers(roleList: string[]): Record<string, TierId> {
+  const n = roleList.length;
+  const map: Record<string, TierId> = {};
+  roleList.forEach((r, i) => {
+    map[r] = i === 0 ? 'lead' : i === n - 1 ? 'member' : i <= 2 ? 'exec' : 'officer';
+  });
+  return map;
+}
+
 export default function SetupWizardScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
@@ -27,10 +48,12 @@ export default function SetupWizardScreen() {
   const [orgName, setOrgName]   = useState('');
   const [orgTypeId, setOrgTypeId] = useState(getActiveTemplateId());
   const [ownerMe, setOwnerMe]   = useState(true);
-  // Ordered role list (top = most senior) + which ones are included. Starts as the
-  // template's defaults, all included. Owner can toggle, add custom, and reorder.
+  // Role list + which are included + each role's TIER. Starts as the template's
+  // defaults, all included. Owner can toggle, add custom, and move roles between
+  // tiers (not rank them one-by-one).
   const [roles, setRoles]       = useState<string[]>(() => template.roles);
   const [included, setIncluded] = useState<Set<string>>(() => new Set(template.roles));
+  const [tierOf, setTierOf]     = useState<Record<string, TierId>>(() => defaultTiers(template.roles));
   const [customRole, setCustomRole] = useState('');
   const [invites, setInvites]   = useState<Invite[]>([]);
   const [draftName, setDraftName] = useState('');
@@ -43,6 +66,7 @@ export default function SetupWizardScreen() {
       tplIdRef.current = template.id;
       setRoles(template.roles);
       setIncluded(new Set(template.roles));
+      setTierOf(defaultTiers(template.roles));
     }
   }, [template.id, template.roles]);
 
@@ -52,8 +76,8 @@ export default function SetupWizardScreen() {
   const last  = steps.length - 1;
   const canNext = step !== 0 || orgName.trim().length > 0;
 
-  // Included roles in seniority order — used by the invite step + summary.
-  const selectedRoles = roles.filter(r => included.has(r));
+  // Included roles, grouped by tier (top tier first) — used by invite + summary.
+  const selectedRoles = TIER_ORDER.flatMap(t => roles.filter(r => included.has(r) && (tierOf[r] ?? 'officer') === t));
   const effectiveDraftRole = selectedRoles.includes(draftRole)
     ? draftRole
     : (selectedRoles[1] ?? selectedRoles[0] ?? '');
@@ -70,15 +94,16 @@ export default function SetupWizardScreen() {
     if (!r || roles.includes(r)) { setCustomRole(''); return; }
     setRoles(prev => [...prev, r]);
     setIncluded(prev => new Set(prev).add(r));
+    setTierOf(prev => ({ ...prev, [r]: 'officer' }));
     setCustomRole('');
   }
-  function moveRole(index: number, dir: -1 | 1) {
-    setRoles(prev => {
-      const j = index + dir;
-      if (j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[j]] = [next[j], next[index]];
-      return next;
+  // Promote (-1) / demote (+1) a role between tiers — no intra-tier ranking.
+  function moveTier(role: string, dir: -1 | 1) {
+    setTierOf(prev => {
+      const cur  = TIER_ORDER.indexOf(prev[role] ?? 'officer');
+      const next = Math.min(TIER_ORDER.length - 1, Math.max(0, cur + dir));
+      if (next === cur) return prev;
+      return { ...prev, [role]: TIER_ORDER[next] };
     });
   }
   function addInvite() {
@@ -159,40 +184,49 @@ export default function SetupWizardScreen() {
           </View>
         )}
 
-        {/* ── Step 3: Roles — include/exclude, add custom, order by seniority ── */}
+        {/* ── Step 3: Roles grouped into TIERS (peers within a tier) ── */}
         {step === 3 && (
           <View style={s.block}>
-            <Text style={s.q}>Roles, in order of seniority</Text>
+            <Text style={s.q}>Roles &amp; tiers</Text>
             <Text style={s.help}>
-              Keep the {template.label} roles your org uses, add your own, and arrange them
-              top (most senior) to bottom with the arrows. You’ll assign people to these roles
+              Keep the {template.label} roles your org uses, add your own, and sort them into
+              a few tiers. Roles in the same tier are equals — no need to rank minor
+              differences. ▲▼ moves a role up or down a tier. People get assigned to roles
               later in Settings → Members &amp; positions.
             </Text>
-            <View style={s.rolePickWrap}>
-              {roles.map((r, i) => {
-                const on = included.has(r);
-                return (
-                  <View key={r} style={[s.roleChip, on && s.roleChipOn]}>
-                    <Pressable style={s.roleCheckHit} onPress={() => toggleRole(r)}>
-                      <View style={[s.roleCheck, on && s.roleCheckOn]}>{on && <Text style={s.roleCheckMark}>✓</Text>}</View>
-                    </Pressable>
-                    <Text style={[s.roleChipText, on && s.roleChipTextOn]} numberOfLines={1}>{r}</Text>
-                    {r === template.leaderTitle && <Text style={s.leaderTag}>leader</Text>}
-                    <Pressable style={s.moveBtn} onPress={() => moveRole(i, -1)} disabled={i === 0}>
-                      <Text style={[s.moveText, i === 0 && s.moveDisabled]}>▲</Text>
-                    </Pressable>
-                    <Pressable style={s.moveBtn} onPress={() => moveRole(i, 1)} disabled={i === roles.length - 1}>
-                      <Text style={[s.moveText, i === roles.length - 1 && s.moveDisabled]}>▼</Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
+            {TIERS.map(tier => {
+              const tierRoles = roles.filter(r => (tierOf[r] ?? 'officer') === tier.id);
+              if (tierRoles.length === 0) return null;
+              return (
+                <View key={tier.id} style={s.tierGroup}>
+                  <Text style={s.tierHeader}>{tier.label.toUpperCase()}</Text>
+                  {tierRoles.map(r => {
+                    const on = included.has(r);
+                    const ti = TIER_ORDER.indexOf(tierOf[r] ?? 'officer');
+                    return (
+                      <View key={r} style={[s.roleChip, on && s.roleChipOn]}>
+                        <Pressable style={s.roleCheckHit} onPress={() => toggleRole(r)}>
+                          <View style={[s.roleCheck, on && s.roleCheckOn]}>{on && <Text style={s.roleCheckMark}>✓</Text>}</View>
+                        </Pressable>
+                        <Text style={[s.roleChipText, on && s.roleChipTextOn]} numberOfLines={1}>{r}</Text>
+                        {r === template.leaderTitle && <Text style={s.leaderTag}>leader</Text>}
+                        <Pressable style={s.moveBtn} onPress={() => moveTier(r, -1)} disabled={ti === 0}>
+                          <Text style={[s.moveText, ti === 0 && s.moveDisabled]}>▲</Text>
+                        </Pressable>
+                        <Pressable style={s.moveBtn} onPress={() => moveTier(r, 1)} disabled={ti === TIER_ORDER.length - 1}>
+                          <Text style={[s.moveText, ti === TIER_ORDER.length - 1 && s.moveDisabled]}>▼</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })}
             <View style={s.inviteRow}>
               <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a custom role…" placeholderTextColor="#475569" value={customRole} onChangeText={setCustomRole} onSubmitEditing={addCustomRole} returnKeyType="done" />
               <Pressable style={s.addBtn} onPress={addCustomRole}><Text style={s.addBtnText}>Add</Text></Pressable>
             </View>
-            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} included · ordered by seniority. No org chart required.</Text>
+            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} included across {TIERS.filter(t => roles.some(r => included.has(r) && (tierOf[r] ?? 'officer') === t.id)).length} tier(s). No org chart required.</Text>
           </View>
         )}
 
@@ -306,8 +340,10 @@ const s = StyleSheet.create({
   choiceTitleOn: { color: '#f1f5f9' },
   choiceHint:    { fontSize: 12, color: '#64748b', lineHeight: 17, marginTop: 2 },
 
-  // Role picker (step 3)
+  // Role picker (step 3) — grouped into tiers
   rolePickWrap: { gap: 8 },
+  tierGroup:    { gap: 8, marginTop: 6 },
+  tierHeader:   { fontSize: 11, fontWeight: '700', color: '#818cf8', letterSpacing: 0.8, marginTop: 6 },
   roleChip:     { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' },
   roleChipOn:   { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
   roleCheckHit: { padding: 2 },

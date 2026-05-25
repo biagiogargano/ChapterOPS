@@ -39,6 +39,13 @@ Structure should feel like **"Roles & structure" / "Who does what"**, not a corp
 hierarchy chart. The first version focuses on **roles**, not a full tree. An org can
 start minimal (owner + a couple roles) and grow.
 
+**Structure = a few TIERS, not fine-grained seniority.** Roles slot into a small set
+of tiers — **Leadership · Executives · Officers · Members** — and roles within a tier
+are **peers** (no one-by-one ranking of minor seniority differences). The setup roles
+step groups roles by tier and lets the owner move a role up/down a tier; that tiered
+grouping is the helpful structure *visual*, replacing a complex reporting tree as the
+default. (Detailed reporting lines stay optional/advanced — see 2a.)
+
 ### 2a. Detailed reporting lines = OPTIONAL, advanced, later (not in setup)
 The "who reports to whom?" tree (`app/setup/tree.tsx`) is the **opt-in advanced
 editor**, reached from **Settings → Roles & structure** — **not** part of required

@@ -81,8 +81,9 @@ export default function TreeBuilderScreen() {
             require it. Make that explicit so it never feels like a mandatory chart. */}
         <View style={s.optionalNote}>
           <Text style={s.optionalNoteText}>
-            Optional — you don’t need this to finish setup. Reporting lines and committees
-            are an advanced add-on; most orgs just pick roles in setup and assign people.
+            Optional — you don’t need this to finish setup. Structure is primarily a few
+            tiers (Leadership · Executives · Officers · Members) set in setup; detailed
+            reporting lines and committees are an advanced add-on most orgs can skip.
           </Text>
         </View>
 
