@@ -224,6 +224,21 @@ the practical, opt-in alternative to a reporting graph.
 - Teams/committees are **optional, later** — created from **Settings → Roles &
   structure** or a **leader's role page** ("My Team"). Always opt-in.
 
+## Auto-populates the structure visual
+- When a leader creates a team, it **automatically appears in the structure/tree
+  view** under that leader's role — no separate "add to the chart" step. Creating a
+  team *is* how the structure grows beyond the base tiers.
+- The structure visual stays the tier-grouped view; teams render as **groupings
+  under their owning role**, not a deep reporting chain.
+
+## Membership is many-to-many (people on multiple teams)
+- A person can belong to **several teams at once** — e.g. the **Social Chair is also
+  on the Rush Committee**. Membership is a **many-to-many** relationship, not a
+  single-parent tree.
+- Because of this the structure is **not a strict tree**: render a member who's on
+  multiple teams as appearing under each team (or tagged with their teams), never
+  forced under one parent. This is the key reason teams beat a reporting graph.
+
 ## Good use cases
 - **Assign a task to a whole team** (fan-out to its members).
 - **Staff an event** with a team.
@@ -242,11 +257,12 @@ the practical, opt-in alternative to a reporting graph.
 - A team is just a **named group of members under a role**; tasks/events assigned to
   a team are still ordinary tasks/events (fan-out by membership) — no new primitive.
 - Complements the **tier model** (Leadership/Executives/Officers/Members): tiers give
-  the coarse structure; teams give a leader an optional working group. Neither is a
-  reporting tree.
+  the coarse structure; teams give a leader an optional working group, and teams
+  auto-populate the structure visual under their role. Neither is a reporting tree.
 - The existing **/committee** ("My committee") and **/setup/tree** prototypes already
-  hint at this; a real version is **server work** (membership table) → defer with the
-  other schema items (#5/#6); UI/mock can be explored on the feature branch first.
+  hint at this; a real version is **server work** (a **team-membership join table**,
+  many-to-many so one member maps to many teams) → defer with the other schema items
+  (#5/#6); UI/mock can be explored on the feature branch first.
 
 ---
 

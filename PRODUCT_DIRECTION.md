@@ -43,7 +43,7 @@ not a new module, queue, or dashboard.
 | **Messaging (future)** | **action-linked comments** on a task/event/report — never general chat (backlog #9) |
 | **Onboarding** | invite link (default) places people into roles; manual entry is fallback |
 | **Org type** | smart **defaults** (roles, labels, templates, event types, reports) — not hardcoded Sigma Chi |
-| **Teams / committees** | an optional **named group of members under a role** (e.g. Social Committee); tasks/events assigned to a team fan out to its members — not a new primitive, not a chat channel (backlog #11) |
+| **Teams / committees** | an optional **named group of members under a role** (e.g. Social Committee); auto-populates the structure visual under that role; **many-to-many** (one person can be on several teams); tasks/events assigned to a team fan out to its members — not a new primitive, not a chat channel (backlog #11) |
 
 If something can't be expressed this way, that's a signal it may not belong in the core.
 
