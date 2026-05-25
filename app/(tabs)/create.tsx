@@ -1,10 +1,10 @@
 /**
  * app/(tabs)/create.tsx — the "Create" tab (prototype).
- * One place to add anything. Four core quadrants (Event, Task, Poll,
- * Announcement) shown as a 2×2 grid rather than a list. Poll is just a
- * structured-response task to all brothers (see PRODUCT_DIRECTION.md). Routes to
- * the real create screens where they exist (events/tasks) and to prototype
- * screens for the rest. Officer-gated. UI/mock; feature branch (not in alpha).
+ * One place to add anything. Four quadrants (Event, Task, Announcement, Group)
+ * shown as a 2×2 grid. (A poll isn't its own thing — it's just a task template,
+ * a one-question task; create it from the Task flow.) Routes to the real create
+ * screens where they exist (events/tasks) and to prototype screens for the rest.
+ * Officer-gated. UI/mock; feature branch (not in alpha).
  */
 
 import { useDevRole } from '@/lib/devRoleStore';
@@ -14,13 +14,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 interface CreateTile { icon: string; title: string; sub: string; route: string; accent: string; experiment?: boolean }
 
-// Four quadrants — the things an officer creates. Poll = a question to all
-// brothers (a structured-response task), not a separate module.
+// Four quadrants — the things an officer creates.
 const TILES: CreateTile[] = [
   { icon: '📅', title: 'Event',        sub: 'Meeting, social, philanthropy — with agenda/RSVP options', route: '/event/create', accent: '#6366f1' },
   { icon: '✅', title: 'Task',         sub: 'Assign work to a role or member',                          route: '/task/create',  accent: '#22c55e' },
-  { icon: '📊', title: 'Poll',         sub: 'Ask all brothers one question',                            route: '/poll',         accent: '#0ea5e9', experiment: true },
   { icon: '📣', title: 'Announcement', sub: 'Chapter-wide notice',                                      route: '/announcements',accent: '#f59e0b', experiment: true },
+  { icon: '👥', title: 'Group',        sub: 'A committee with its own members',                         route: '/committee',    accent: '#a855f7', experiment: true },
 ];
 
 export default function CreateScreen() {
@@ -56,11 +55,7 @@ export default function CreateScreen() {
         ))}
       </View>
 
-      <Pressable style={s.moreLink} onPress={() => router.push('/committee' as any)}>
-        <Text style={s.moreLinkText}>Group / committee  ›</Text>
-      </Pressable>
-
-      <Text style={s.footNote}>Polls / announcements / groups are early prototypes; events & tasks are the real, core flows. A poll is just a task that asks every brother one question.</Text>
+      <Text style={s.footNote}>Announcements & groups are early prototypes; events & tasks are the real, core flows. A poll is just a task template — make one from Task.</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -85,9 +80,6 @@ const s = StyleSheet.create({
   tileTitle:  { fontSize: 17, fontWeight: '800', color: '#f1f5f9' },
   tileSub:    { fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 16 },
   tileProto:  { fontSize: 9, fontWeight: '700', color: '#fbbf24', letterSpacing: 0.5, marginTop: 8 },
-
-  moreLink:     { marginTop: 18, backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16 },
-  moreLinkText: { fontSize: 14, fontWeight: '600', color: '#818cf8' },
 
   emptyIcon:  { fontSize: 40, color: '#334155' },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },

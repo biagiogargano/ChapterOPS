@@ -33,7 +33,7 @@ not a new module, queue, or dashboard.
 | Feature | It is really… |
 |---------|---------------|
 | **Reports / Weekly Officer Report** | a **structured-response task** (form fields, draft → submit) |
-| **Polls** | a **structured-response task assigned to all brothers** — one question to answer; tallies are the responses. NOT a standalone module/feed. |
+| **Polls** | just a **task template** — a one-question task (assigned to all brothers); not a feature of its own. Make one from the Task flow. |
 | **Surveys / quizzes** | structured-response tasks (deferred; same engine, more fields) |
 | **Attendance** | an **event-linked task** (Annotator-owned, opens at event start) |
 | **RSVP** | an **event-linked task/action** (headcount; can be required separately) |
@@ -92,10 +92,8 @@ part of the simplified core and must not add tabs/sections to Today:
 - **Full permissions grid / matrix** (permissions stay *implicit*; revisit as simple tiers)
 - **Full org-tree builder** (Q&A tree is a prototype; full builder deferred)
 - **Surveys / quizzes** (deferred; reuse the structured-response engine later).
-  **Polls are NOT deferred as a concept** — a poll is just a structured-response
-  task (one question) assigned to all brothers, so it rides on Weekly Reports v1's
-  engine rather than being its own module. The standalone `/poll` prototype is
-  retired-in-spirit (kept only as a throwaway mock).
+  A **poll** is not a separate feature — it's just a **task template** (a
+  one-question task). The standalone `/poll` prototype is throwaway.
 - **AI** (natural-language → draft events/tasks/templates; proposes only, never replaces the deterministic engine)
 - **General messaging / chat / DMs / channels / reactions / feed / file-sharing**
   (see backlog #9 — only *action-linked* comments are ever in scope)
