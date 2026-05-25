@@ -27,18 +27,22 @@ export default function SetupWizardScreen() {
   const [orgName, setOrgName]   = useState('');
   const [orgTypeId, setOrgTypeId] = useState(getActiveTemplateId());
   const [ownerMe, setOwnerMe]   = useState(true);
-  // Which of the template's default roles this org actually uses (all on to start).
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(() => template.roles);
+  // Ordered role list (top = most senior) + which ones are included. Starts as the
+  // template's defaults, all included. Owner can toggle, add custom, and reorder.
+  const [roles, setRoles]       = useState<string[]>(() => template.roles);
+  const [included, setIncluded] = useState<Set<string>>(() => new Set(template.roles));
+  const [customRole, setCustomRole] = useState('');
   const [invites, setInvites]   = useState<Invite[]>([]);
   const [draftName, setDraftName] = useState('');
   const [draftRole, setDraftRole] = useState('');
 
-  // When the org type changes, reset role selection to that template's defaults.
+  // When the org type changes, reset the role list to that template's defaults.
   const tplIdRef = useRef(template.id);
   useEffect(() => {
     if (tplIdRef.current !== template.id) {
       tplIdRef.current = template.id;
-      setSelectedRoles(template.roles);
+      setRoles(template.roles);
+      setIncluded(new Set(template.roles));
     }
   }, [template.id, template.roles]);
 
@@ -48,6 +52,8 @@ export default function SetupWizardScreen() {
   const last  = steps.length - 1;
   const canNext = step !== 0 || orgName.trim().length > 0;
 
+  // Included roles in seniority order — used by the invite step + summary.
+  const selectedRoles = roles.filter(r => included.has(r));
   const effectiveDraftRole = selectedRoles.includes(draftRole)
     ? draftRole
     : (selectedRoles[1] ?? selectedRoles[0] ?? '');
@@ -57,7 +63,23 @@ export default function SetupWizardScreen() {
     setActiveTemplate(id);   // drives the suggested roles in the next step
   }
   function toggleRole(r: string) {
-    setSelectedRoles(prev => (prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]));
+    setIncluded(prev => { const n = new Set(prev); if (n.has(r)) n.delete(r); else n.add(r); return n; });
+  }
+  function addCustomRole() {
+    const r = customRole.trim();
+    if (!r || roles.includes(r)) { setCustomRole(''); return; }
+    setRoles(prev => [...prev, r]);
+    setIncluded(prev => new Set(prev).add(r));
+    setCustomRole('');
+  }
+  function moveRole(index: number, dir: -1 | 1) {
+    setRoles(prev => {
+      const j = index + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[j]] = [next[j], next[index]];
+      return next;
+    });
   }
   function addInvite() {
     const n = draftName.trim();
@@ -137,28 +159,40 @@ export default function SetupWizardScreen() {
           </View>
         )}
 
-        {/* ── Step 3: Roles (who does what) ── */}
+        {/* ── Step 3: Roles — include/exclude, add custom, order by seniority ── */}
         {step === 3 && (
           <View style={s.block}>
-            <Text style={s.q}>Who does what?</Text>
+            <Text style={s.q}>Roles, in order of seniority</Text>
             <Text style={s.help}>
-              These are the {template.label} default roles. Keep the ones your org uses and turn
-              off the rest. Just roles here — committees and reporting lines are optional, later, in
-              Settings → Roles &amp; structure.
+              Keep the {template.label} roles your org uses, add your own, and arrange them
+              top (most senior) to bottom with the arrows. You’ll assign people to these roles
+              later in Settings → Members &amp; positions.
             </Text>
             <View style={s.rolePickWrap}>
-              {template.roles.map(r => {
-                const on = selectedRoles.includes(r);
+              {roles.map((r, i) => {
+                const on = included.has(r);
                 return (
-                  <Pressable key={r} style={[s.roleChip, on && s.roleChipOn]} onPress={() => toggleRole(r)}>
-                    <View style={[s.roleCheck, on && s.roleCheckOn]}>{on && <Text style={s.roleCheckMark}>✓</Text>}</View>
-                    <Text style={[s.roleChipText, on && s.roleChipTextOn]}>{r}</Text>
+                  <View key={r} style={[s.roleChip, on && s.roleChipOn]}>
+                    <Pressable style={s.roleCheckHit} onPress={() => toggleRole(r)}>
+                      <View style={[s.roleCheck, on && s.roleCheckOn]}>{on && <Text style={s.roleCheckMark}>✓</Text>}</View>
+                    </Pressable>
+                    <Text style={[s.roleChipText, on && s.roleChipTextOn]} numberOfLines={1}>{r}</Text>
                     {r === template.leaderTitle && <Text style={s.leaderTag}>leader</Text>}
-                  </Pressable>
+                    <Pressable style={s.moveBtn} onPress={() => moveRole(i, -1)} disabled={i === 0}>
+                      <Text style={[s.moveText, i === 0 && s.moveDisabled]}>▲</Text>
+                    </Pressable>
+                    <Pressable style={s.moveBtn} onPress={() => moveRole(i, 1)} disabled={i === roles.length - 1}>
+                      <Text style={[s.moveText, i === roles.length - 1 && s.moveDisabled]}>▼</Text>
+                    </Pressable>
+                  </View>
                 );
               })}
             </View>
-            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} selected. No org chart required.</Text>
+            <View style={s.inviteRow}>
+              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Add a custom role…" placeholderTextColor="#475569" value={customRole} onChangeText={setCustomRole} onSubmitEditing={addCustomRole} returnKeyType="done" />
+              <Pressable style={s.addBtn} onPress={addCustomRole}><Text style={s.addBtnText}>Add</Text></Pressable>
+            </View>
+            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} included · ordered by seniority. No org chart required.</Text>
           </View>
         )}
 
@@ -276,12 +310,16 @@ const s = StyleSheet.create({
   rolePickWrap: { gap: 8 },
   roleChip:     { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' },
   roleChipOn:   { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  roleCheckHit: { padding: 2 },
   roleCheck:    { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
   roleCheckOn:  { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
   roleCheckMark:{ fontSize: 12, color: '#a5b4fc', fontWeight: '700', lineHeight: 14 },
   roleChipText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#cbd5e1' },
   roleChipTextOn:{ color: '#f1f5f9' },
   leaderTag:    { fontSize: 10, fontWeight: '700', color: '#a5b4fc', backgroundColor: '#312e81', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  moveBtn:      { paddingHorizontal: 6, paddingVertical: 4 },
+  moveText:     { fontSize: 13, color: '#818cf8', lineHeight: 15 },
+  moveDisabled: { color: '#334155' },
 
   // Invite step
   optionBtn:    { backgroundColor: '#1e3a5f', borderRadius: 11, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 13, paddingHorizontal: 14, gap: 2 },
