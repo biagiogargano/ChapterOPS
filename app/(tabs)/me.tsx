@@ -2,7 +2,7 @@ import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
+import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, type Role } from '@/lib/roles';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -151,37 +151,15 @@ export default function MeScreen() {
         </View>
       )}
 
-      {/* ── Settings (org config, notifications, profile) — one surface, reached
-          from here rather than its own tab. ── */}
+      {/* ── Settings (org config, members, structure, templates, dev tools) — one
+          surface, reached from here rather than its own tab. ── */}
       <Pressable style={s.linkCard} onPress={() => router.push('/settings' as any)}>
         <View style={{ flex: 1 }}>
           <Text style={s.linkTitle}>Settings</Text>
-          <Text style={s.linkSub}>Organization, members, structure, notifications</Text>
+          <Text style={s.linkSub}>Organization, members, structure, templates, notifications</Text>
         </View>
         <Text style={s.linkChevron}>›</Text>
       </Pressable>
-
-      {/* ── Manage templates (officers) ── */}
-      {isOfficer(role) && (
-        <Pressable style={s.linkCard} onPress={() => router.push('/templates' as any)}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.linkTitle}>Manage event templates</Text>
-            <Text style={s.linkSub}>Build and edit the task workflows applied to events</Text>
-          </View>
-          <Text style={s.linkChevron}>›</Text>
-        </Pressable>
-      )}
-
-      {/* ── Prototypes hub (dev only; feature-branch preview, never in alpha) ── */}
-      {__DEV__ && (
-        <Pressable style={s.linkCard} onPress={() => router.push('/prototypes' as any)}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.linkTitle}>🧪 Prototype features</Text>
-            <Text style={s.linkSub}>Early looks: onboarding, reports, agenda, leadership — mock data</Text>
-          </View>
-          <Text style={s.linkChevron}>›</Text>
-        </Pressable>
-      )}
 
       {/* ── Sign out ── */}
       <Pressable style={s.signOutButton} onPress={() => { void signOut(); }}>

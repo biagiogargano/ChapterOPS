@@ -11,7 +11,7 @@ import { DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { AUTH_ENABLED } from '@/lib/flags';
-import { ROLE_LABELS } from '@/lib/roles';
+import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { getMembers, useRosterVersion } from '@/lib/roster/mockRoster';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -59,6 +59,9 @@ export default function SettingsScreen() {
       <Row title="Leadership structure" sub="Edit the tree (Q&A builder)" onPress={() => router.push('/setup/tree' as any)} />
       <Row title="Report questions" sub="What officers report each week" onPress={() => router.push('/report/weekly' as any)} />
       <Row title="Event automation" sub="What each event type auto-creates" onPress={() => router.push('/event-defaults' as any)} />
+      {isOfficer(role) && (
+        <Row title="Manage event templates" sub="Build and edit the task workflows applied to events" onPress={() => router.push('/templates' as any)} />
+      )}
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>NOTIFICATIONS</Text>
       <View style={s.toggleCard}>
