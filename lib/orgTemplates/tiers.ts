@@ -6,14 +6,19 @@
  */
 
 export const TIERS = [
-  { id: 'lead',    label: 'Leadership' },
-  { id: 'exec',    label: 'Executives' },
-  { id: 'officer', label: 'Officers'   },
-  { id: 'member',  label: 'Members'    },
+  { id: 'lead',    label: 'Leadership', color: '#818cf8' },  // indigo
+  { id: 'exec',    label: 'Executives', color: '#38bdf8' },  // sky
+  { id: 'officer', label: 'Officers',   color: '#34d399' },  // emerald
+  { id: 'member',  label: 'Members',    color: '#94a3b8' },  // slate
 ] as const;
 
 export type TierId = typeof TIERS[number]['id'];
 export const TIER_ORDER = TIERS.map(t => t.id) as TierId[];
+
+/** Color for a tier (used to color-code the structure visual + role card). */
+export function tierColor(id: TierId): string {
+  return TIERS.find(t => t.id === id)?.color ?? '#94a3b8';
+}
 
 /** Sensible default tier per role based on its position in the template list. */
 export function defaultTiers(roleList: string[]): Record<string, TierId> {

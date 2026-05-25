@@ -10,7 +10,7 @@
 import { useDevRole } from '@/lib/devRoleStore';
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
 import { getActiveTemplate, useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
-import { TIERS, defaultTiers } from '@/lib/orgTemplates/tiers';
+import { TIERS, defaultTiers, tierColor, type TierId } from '@/lib/orgTemplates/tiers';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -32,6 +32,13 @@ const ROLE_DESC: Record<string, string> = {
   brother:           'General member — assigned tasks, RSVPs, attendance.',
 };
 
+// Which tier the viewer's role sits in (color-codes their title + box to match).
+const ROLE_TIER: Record<string, TierId> = {
+  president: 'lead', pro_consul: 'exec',
+  annotator: 'officer', risk_manager: 'officer', social_chair: 'officer', recruitment_chair: 'officer', treasurer: 'officer',
+  brother: 'member',
+};
+
 export default function TreeBuilderScreen() {
   const navigation = useNavigation();
   const router     = useRouter();
@@ -42,8 +49,10 @@ export default function TreeBuilderScreen() {
   // identity/membership layer later. Only the owner may edit structure.
   const isOwner = role === 'president';
 
-  const tpl     = useActiveTemplate();
-  const tierMap = defaultTiers(tpl.roles);
+  const tpl       = useActiveTemplate();
+  const tierMap   = defaultTiers(tpl.roles);
+  const myTier    = ROLE_TIER[role] ?? 'member';
+  const myColor   = tierColor(myTier);
 
   // Owner's title comes from the chosen org template (Consul / President / Captain…).
   const [nodes, setNodes] = useState<Node[]>(() => [{ id: 'root', name: 'You', position: getActiveTemplate().leaderTitle, parentId: null }]);
@@ -100,11 +109,11 @@ export default function TreeBuilderScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock, nothing saved</Text></View>
 
-        {/* Your role + description */}
-        <View style={s.roleCard}>
-          <Text style={s.roleCardLabel}>YOUR ROLE</Text>
+        {/* Your role + description — colored to match your tier (and your box below) */}
+        <View style={[s.roleCard, { borderColor: myColor, backgroundColor: myColor + '22' }]}>
+          <Text style={[s.roleCardLabel, { color: myColor }]}>YOUR ROLE · {TIERS.find(t => t.id === myTier)?.label.toUpperCase()}</Text>
           <Text style={s.roleCardName}>{ROLE_LABELS[role as Role]}</Text>
-          <Text style={s.roleCardDesc}>{ROLE_DESC[role] ?? 'Member of the organization.'}</Text>
+          <Text style={[s.roleCardDesc, { color: myColor }]}>{ROLE_DESC[role] ?? 'Member of the organization.'}</Text>
         </View>
 
         {/* Read-only tier structure visual — everyone sees this */}
@@ -114,15 +123,20 @@ export default function TreeBuilderScreen() {
           {TIERS.map(tier => {
             const rs = tpl.roles.filter(r => tierMap[r] === tier.id);
             if (rs.length === 0) return null;
+            const tc       = tierColor(tier.id);
+            const isMyTier = tier.id === myTier;
             return (
-              <View key={tier.id} style={s.tierBand}>
-                <Text style={s.tierBandLabel}>{tier.label.toUpperCase()}</Text>
+              <View key={tier.id} style={[s.tierBand, { borderLeftWidth: 3, borderLeftColor: tc }, isMyTier && { backgroundColor: tc + '14' }]}>
+                <Text style={[s.tierBandLabel, { color: tc }]}>{tier.label.toUpperCase()}{isMyTier ? '  · you' : ''}</Text>
                 <View style={s.tierBandRoles}>
-                  {rs.map(r => (
-                    <View key={r} style={[s.tierRolePill, r === ROLE_LABELS[role as Role] && s.tierRolePillMine]}>
-                      <Text style={s.tierRolePillText}>{r}</Text>
-                    </View>
-                  ))}
+                  {rs.map(r => {
+                    const mine = isMyTier && r === ROLE_LABELS[role as Role];
+                    return (
+                      <View key={r} style={[s.tierRolePill, { borderColor: tc }, isMyTier && { backgroundColor: tc + '22' }, mine && { borderWidth: 2 }]}>
+                        <Text style={[s.tierRolePillText, isMyTier && { color: '#f1f5f9' }]}>{r}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             );
