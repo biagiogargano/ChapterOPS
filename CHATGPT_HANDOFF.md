@@ -5,10 +5,12 @@ things stand and the open questions I want pressure-tested. Be blunt; catch bad
 ideas and over-complexity.
 
 ## Update since last handoff (what shipped + what simplified)
-- **Alpha (`phase-2`) shipped 4 fixes** (tested two-device, same-org): server-wins
-  pull-to-refresh (events/RSVPs/tasks/states/notices), brothers can be assigned
-  tasks, Tasks-tab pull-to-refresh + single-back-after-edit, and required-RSVP-on-
-  optional events (new `optional_rsvp` audience; needed a one-line CHECK widen).
+- **Alpha (`phase-2`) shipped 4 fixes — now PUSHED and DB-complete** (tested
+  two-device, same-org): server-wins pull-to-refresh (events/RSVPs/tasks/states/
+  notices), brothers can be assigned tasks, Tasks-tab pull-to-refresh +
+  single-back-after-edit, and required-RSVP-on-optional events. The
+  `events_audience_check` CHECK constraint **has been widened** on alpha Supabase
+  to include `optional_rsvp` (verified) — so that feature is fully working end to end.
 - **Feature branch — "everything is a task/event" simplification (UI/mock):**
   - **Today** = only Today's tasks · Today's events · Coming up. Review items show
     inline as tasks with a REVIEW label (no separate review/approval/alert
@@ -20,6 +22,15 @@ ideas and over-complexity.
   - **Event detail** = "Tasks this event creates" (events own their tasks).
   - Shared completion rule (`lib/taskCompletion.ts`): answered RSVP, saved date
     name, or approved task.
+  - **First-run uses the REAL event-create screen** — "Create your first event"
+    opens `/event/create`, so a chapter's first event looks identical to every
+    later one (no bespoke first-time form).
+  - **"Generate agenda" is now a checkbox inside event create** (chapter/eboard
+    events) with a "Preview agenda ›" link — drafts a template agenda from
+    relevant items rather than being a separate flow.
+  - **New "Create" tab** in the bottom bar — single officer-gated entry point for
+    Event/Task (real) + Announcement/Poll/Group (prototype). **Pinned retired**
+    from the tab bar (route still reachable) to keep tab count sane.
   - Onboarding: invite-link-first (manual = fallback); org-type templates feed
     default roles/labels; Q&A tree builder places invited people.
   - Prototypes hub separates core-direction from deferred experiments.
@@ -38,13 +49,15 @@ but **simple and intuitive**; **all power to the user, app teaches them**;
   new ideas live here as **UI-only, mock, non-persisted** screens. Nothing merged
   to alpha. No schema/RLS/auth/flag/task-state changes anywhere.
 
-## Alpha stabilization (on phase-2)
-One fix is **committed locally but NOT pushed**, awaiting a two-device test:
-- **Comprehensive server-wins pull-to-refresh.** Manual pull now refetches events,
+## Alpha stabilization (on phase-2) — DONE + PUSHED
+All four fixes are **tested (two-device, same-org), committed, and pushed**:
+- **Comprehensive server-wins pull-to-refresh.** Manual pull refetches events,
   RSVPs/date submissions, tasks, task states, and notices so **same-org
   cross-device changes appear** (e.g., a brother changes RSVP yes→no, the Consul
   pulls and sees it). Mount/focus stays local-wins (protects optimistic writes);
   only manual refresh is server-wins. No Realtime, no schema.
+- Brothers assignable to tasks; Tasks-tab pull-to-refresh + single-back-after-edit;
+  required-RSVP-on-optional (`optional_rsvp` audience + CHECK widen applied).
 - Testing reality: full **two-org remote isolation is deferred** until an Apple
   Developer / EAS-TestFlight build (Expo Go tunnel is unreliable for a remote
   tester). Current testing = **same-org, two accounts** (Consul + Brother) in one
@@ -66,6 +79,12 @@ One fix is **committed locally but NOT pushed**, awaiting a two-device test:
 8. **Deferred/experimental, not roadmap:** points/leaderboard, pinned/custom tabs,
    full permissions grid, full org-tree builder, generic polls/surveys/quizzes,
    AI, complex per-committee customization.
+9. **Action-linked communication, NOT general messaging** (new, planning only —
+   backlog #9). ChapterOPS should not replace GroupMe/Teams; messaging must hang off
+   a task/event/report/notice (task comments, event updates, report follow-ups,
+   link-back reminders). Explicit non-goals: general chat, DMs, channels, reactions,
+   social feed, file-sharing chat. Future external bridges (SMS/email/GroupMe/Slack/
+   Teams/push) are delivery channels; ChapterOPS stays the source of truth.
 
 ## Weekly Officer Report v1 (planned, NOT built; no schema yet)
 - Generic **response forms / structured task responses**; Weekly Officer Report is
@@ -110,6 +129,10 @@ One fix is **committed locally but NOT pushed**, awaiting a two-device test:
 8. Sequencing after alpha: weekly-report slice + invite-link onboarding in
    parallel, then attendance + separate RSVP/attendance flags, then agenda v1 —
    right order?
+9. **Action-linked communication (backlog #9):** is "comments hang off tasks/events,
+   never free-floating chat" the right line to hold? Where does the first in-app
+   comment thread belong (task vs event vs report), and when do external bridges
+   (push/SMS/email) come in relative to it?
 
 ## Guardrails being honored
 Feature branch only; alpha (`phase-2`) untouched; every change tsc-clean + pure
