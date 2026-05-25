@@ -158,6 +158,49 @@ never a free-floating conversation.
 - Push/SMS/email bridges are **integration work**, separate from in-app comments;
   sequence after the in-app action-linked comment model exists.
 
+# 10. Action-linked push notifications
+
+**Planning/direction only — no code, no schema, no push setup, no EAS changes yet.**
+
+Push notifications matter, but they should be **action-linked, not noisy**. They
+support the core system (tasks, events, RSVPs, reviews, reports, attendance, and
+comments/clarifications later) — never general chat or engagement spam.
+
+## Principle — every push answers three questions
+1. **What changed?**
+2. **Why does it matter to me?**
+3. **What action can I take?**
+
+Tapping a notification **deep-links** to the relevant task, event, report, RSVP, or
+review — never a generic inbox or feed.
+
+## Good notifications (action-linked)
+- Task **assigned to you**
+- Task **due soon / overdue**
+- Task **submitted for your review**
+- Task **approved / rejected**
+- Event **time/location changed**
+- **RSVP required / RSVP deadline** approaching
+- **Attendance task opened**
+- **Weekly report due**
+- **Comment or clarification** on your task/report (depends on #9)
+
+## Avoid
+- General chat spam
+- Every minor update
+- Leaderboard / points alerts
+- Vague announcements
+- Any notification that does **not** link to an action
+
+## Dependencies / placement
+- Needs **push infrastructure** (Expo push tokens / APNs) — an **integration +
+  device-permission** layer, separate from in-app surfaces. Sequence **after** the
+  TestFlight/EAS alpha exists (real builds receive push; Expo Go is limited).
+- Notification *content* derives from existing task/event/RSVP/review state, so the
+  triggers map directly onto the core model — no new product primitives.
+- Comment/clarification pushes depend on #9 (action-linked communication).
+- **Do not begin push setup or EAS changes for this yet** — direction only.
+
 ---
 
 # Roadmap placement (recommendation)
