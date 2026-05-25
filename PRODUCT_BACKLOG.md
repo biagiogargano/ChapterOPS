@@ -203,6 +203,26 @@ review — never a generic inbox or feed.
 
 ---
 
+# Post-TestFlight priority order (APPROVED)
+
+The locked sequence once the TestFlight alpha is in officers' hands. Each item below
+is a **separate approved checkpoint**; nothing here is built yet, and Proof v1 /
+push both require a schema/storage/RLS checkpoint approval before any code.
+
+1. **5–7 officer alpha with the current app** (TestFlight) — see `EBOARD_ALPHA_PLAN.md`.
+2. **Proof v1** — schema + Supabase Storage (private bucket) + RLS implementation.
+   Direction approved (text/photo/file/link/any, one attachment, reviewer view +
+   approve/reject, no new task states). Spec: `PROOF_V1_PLAN.md`. **High priority** —
+   text/link-only proof is not enough for real officer tasks.
+3. **Action-linked push notifications** (#10 above) — after a real build exists.
+4. **Invite-link onboarding** (default onboarding path; manual = fallback).
+5. **Weekly Reports v1** (#6 above) — structured-response tasks.
+
+Guardrails unchanged: do **not** build Proof v1, change schema/storage/RLS, or touch
+`phase-2` until TestFlight setup starts and the relevant checkpoint is approved.
+
+---
+
 # Roadmap placement (recommendation)
 
 **This is the next major product layer after templates.** Suggested order:

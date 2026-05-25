@@ -5,6 +5,15 @@ Feature-branch planning doc. Goal: design the smallest proof-attachment system t
 makes task submissions actually useful (receipts, flyers, screenshots, attendance
 sheets, meeting minutes, room-setup photos) without bloating the task state machine.
 
+> **STATUS — direction APPROVED; build NOT started.** Proof v1 is a **high-priority
+> post-TestFlight feature** (text/link-only proof is not enough for real officer
+> tasks). Approved scope (locked): text/photo/file/link/any · **one attachment per
+> submission** · private Supabase Storage bucket · reviewer view + approve/reject ·
+> **no new task states** · no multiple attachments · no comments-with-attachments ·
+> no folders/versioning/integrations. **Post-TestFlight priority: #2** (see
+> `PRODUCT_BACKLOG.md` → "Post-TestFlight priority order"). This stays planning until
+> the next **approved schema/storage/RLS checkpoint** — do not build yet.
+
 ---
 
 ## 1. Current proof/submission model (as built)
