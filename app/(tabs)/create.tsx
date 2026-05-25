@@ -1,9 +1,9 @@
 /**
  * app/(tabs)/create.tsx — the "Create" tab (prototype).
- * One place to add anything. Four quadrants (Event, Task, Announcement, Group)
- * shown as a 2×2 grid. (A poll isn't its own thing — it's just a task template,
- * a one-question task; create it from the Task flow.) Routes to the real create
- * screens where they exist (events/tasks) and to prototype screens for the rest.
+ * Two tiers: CORE (Event, Task) are the real, primary actions and get full-
+ * strength tiles; "Coming later" (Announcement, Group) are lighter, dimmed
+ * prototype tiles so they read as future/secondary. (A poll isn't its own thing —
+ * it's just a task template, a one-question task; create it from the Task flow.)
  * Officer-gated. UI/mock; feature branch (not in alpha).
  */
 
@@ -12,14 +12,18 @@ import { isOfficer } from '@/lib/roles';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-interface CreateTile { icon: string; title: string; sub: string; route: string; accent: string; experiment?: boolean }
+interface CreateTile { icon: string; title: string; sub: string; route: string; accent: string }
 
-// Four quadrants — the things an officer creates.
-const TILES: CreateTile[] = [
-  { icon: '📅', title: 'Event',        sub: 'Meeting, social, philanthropy — with agenda/RSVP options', route: '/event/create', accent: '#6366f1' },
-  { icon: '✅', title: 'Task',         sub: 'Assign work to a role or member',                          route: '/task/create',  accent: '#22c55e' },
-  { icon: '📣', title: 'Announcement', sub: 'Chapter-wide notice',                                      route: '/announcements',accent: '#f59e0b', experiment: true },
-  { icon: '👥', title: 'Group',        sub: 'A committee with its own members',                         route: '/committee',    accent: '#a855f7', experiment: true },
+// CORE — the real, primary things an officer creates.
+const CORE_TILES: CreateTile[] = [
+  { icon: '📅', title: 'Event', sub: 'Meeting, social, philanthropy — with agenda/RSVP options', route: '/event/create', accent: '#6366f1' },
+  { icon: '✅', title: 'Task',  sub: 'Assign work to a role or member',                          route: '/task/create',  accent: '#22c55e' },
+];
+
+// COMING LATER — lighter prototype concepts, deliberately de-emphasized.
+const LATER_TILES: CreateTile[] = [
+  { icon: '📣', title: 'Announcement', sub: 'A notice tied to an event or task — not a chat feed', route: '/announcements', accent: '#f59e0b' },
+  { icon: '👥', title: 'Group',        sub: 'Loosely group members (early — not a full org system)', route: '/committee',   accent: '#a855f7' },
 ];
 
 export default function CreateScreen() {
@@ -42,20 +46,32 @@ export default function CreateScreen() {
       <Text style={s.heading}>Create</Text>
       <Text style={s.sub}>Everything in ChapterOPS is an event or a task — start here.</Text>
 
-      {/* 2×2 quadrant grid */}
+      {/* CORE — full-strength primary tiles */}
       <View style={s.grid}>
-        {TILES.map(t => (
+        {CORE_TILES.map(t => (
           <Pressable key={t.route} style={s.tile} onPress={() => router.push(t.route as any)}>
             <View style={[s.tileAccent, { backgroundColor: t.accent }]} />
             <Text style={s.tileIcon}>{t.icon}</Text>
             <Text style={s.tileTitle}>{t.title}</Text>
             <Text style={s.tileSub}>{t.sub}</Text>
-            {t.experiment && <Text style={s.tileProto}>PROTOTYPE</Text>}
           </Pressable>
         ))}
       </View>
 
-      <Text style={s.footNote}>Announcements & groups are early prototypes; events & tasks are the real, core flows. A poll is just a task template — make one from Task.</Text>
+      {/* COMING LATER — dimmed, dashed prototype tiles */}
+      <Text style={s.laterLabel}>COMING LATER</Text>
+      <View style={s.grid}>
+        {LATER_TILES.map(t => (
+          <Pressable key={t.route} style={[s.tile, s.tileLater]} onPress={() => router.push(t.route as any)}>
+            <Text style={[s.tileIcon, s.tileIconLater]}>{t.icon}</Text>
+            <Text style={[s.tileTitle, s.tileTitleLater]}>{t.title}</Text>
+            <Text style={s.tileSub}>{t.sub}</Text>
+            <Text style={s.tileProto}>PROTOTYPE</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={s.footNote}>Event and Task are the real, core flows. Announcements and Groups are early prototypes coming later. A poll is just a task template — make one from Task.</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -69,7 +85,7 @@ const s = StyleSheet.create({
   heading: { fontSize: 28, fontWeight: '800', color: '#f8fafc' },
   sub:     { fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 22 },
 
-  // 2×2 grid
+  // 2×2 grid (rendered as two 2-up rows)
   grid:  { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 },
   tile: {
     width: '48%', minHeight: 132, backgroundColor: '#1e293b', borderRadius: 16,
@@ -79,7 +95,13 @@ const s = StyleSheet.create({
   tileIcon:   { fontSize: 28, marginTop: 6, marginBottom: 10 },
   tileTitle:  { fontSize: 17, fontWeight: '800', color: '#f1f5f9' },
   tileSub:    { fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 16 },
-  tileProto:  { fontSize: 9, fontWeight: '700', color: '#fbbf24', letterSpacing: 0.5, marginTop: 8 },
+
+  // "Coming later" treatment — dimmer fill, dashed border, no accent bar, muted text
+  laterLabel:    { fontSize: 11, fontWeight: '700', color: '#475569', letterSpacing: 0.8, marginTop: 26, marginBottom: 12 },
+  tileLater:     { backgroundColor: '#15202e', borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', minHeight: 120, opacity: 0.92 },
+  tileIconLater: { opacity: 0.65 },
+  tileTitleLater:{ color: '#cbd5e1', fontWeight: '700' },
+  tileProto:     { fontSize: 9, fontWeight: '700', color: '#64748b', letterSpacing: 0.6, marginTop: 8 },
 
   emptyIcon:  { fontSize: 40, color: '#334155' },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },
