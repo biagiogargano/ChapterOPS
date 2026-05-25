@@ -17,6 +17,7 @@ import {
 } from '@/lib/mockTasks';
 import { getRsvpEntry, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
 import { isTaskCompleted } from '@/lib/taskCompletion';
+import { promptCreate } from '@/lib/ui/createPrompt';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
@@ -432,13 +433,13 @@ export default function TasksScreen() {
   const [, _bumpFocus] = useState(0);
   useFocusEffect(useCallback(() => { _bumpFocus(n => n + 1); }, []));
 
-  // Officer-only "+ Create" task button in the tab header.
+  // Officer-only unified "+ New" (Event or Task) in the tab header.
   useEffect(() => {
     navigation.setOptions({
       headerRight: officer
         ? () => (
-            <Pressable style={s.createHdrBtn} onPress={() => router.push('/task/create' as any)}>
-              <Text style={s.createHdrText}>+ Create</Text>
+            <Pressable style={s.createHdrBtn} onPress={() => promptCreate(r => router.push(r as any))}>
+              <Text style={s.createHdrText}>+ New</Text>
             </Pressable>
           )
         : undefined,
@@ -543,6 +544,11 @@ export default function TasksScreen() {
             <Text style={s.emptyIcon}>✓</Text>
             <Text style={s.emptyTitle}>You're all caught up</Text>
             <Text style={s.emptyText}>No open tasks for {roleLabel}.</Text>
+            {officer && (
+              <Pressable style={s.emptyCreateBtn} onPress={() => promptCreate(r => router.push(r as any))}>
+                <Text style={s.emptyCreateText}>+ New event or task</Text>
+              </Pressable>
+            )}
           </View>
         ) : shownCount === 0 ? (
           <View style={s.emptyFull}>
@@ -716,5 +722,7 @@ const s = StyleSheet.create({
   emptyFull:  { alignItems: 'center', paddingTop: 80, gap: 8 },
   emptyIcon:  { fontSize: 36 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },
-  emptyText:  { fontSize: 14, color: '#475569' },
+  emptyText:  { fontSize: 14, color: '#475569', textAlign: 'center', paddingHorizontal: 24 },
+  emptyCreateBtn:  { marginTop: 12, backgroundColor: '#1e1b4b', borderRadius: 9, paddingVertical: 9, paddingHorizontal: 16, borderWidth: 1, borderColor: '#4f46e5' },
+  emptyCreateText: { color: '#a5b4fc', fontSize: 14, fontWeight: '700' },
 });

@@ -21,6 +21,7 @@ import {
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
 import { isTaskCompleted } from '@/lib/taskCompletion';
+import { promptCreate } from '@/lib/ui/createPrompt';
 import { useRsvpVersion } from '@/lib/rsvpStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -198,8 +199,8 @@ export default function CalendarScreen() {
     navigation.setOptions({
       headerRight: officer
         ? () => (
-            <Pressable style={s.createBtn} onPress={() => router.push('/event/create' as any)}>
-              <Text style={s.createBtnText}>+ Create</Text>
+            <Pressable style={s.createBtn} onPress={() => promptCreate(r => router.push(r as any))}>
+              <Text style={s.createBtnText}>+ New</Text>
             </Pressable>
           )
         : undefined,
@@ -292,8 +293,8 @@ export default function CalendarScreen() {
         <View style={s.empty}>
           <Text style={s.emptyText}>Nothing scheduled</Text>
           {officer && (
-            <Pressable style={s.emptyCreateBtn} onPress={() => router.push('/event/create' as any)}>
-              <Text style={s.emptyCreateText}>+ Create event</Text>
+            <Pressable style={s.emptyCreateBtn} onPress={() => promptCreate(r => router.push(r as any))}>
+              <Text style={s.emptyCreateText}>+ New event or task</Text>
             </Pressable>
           )}
         </View>

@@ -39,6 +39,7 @@ import {
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { isTaskCompleted } from '@/lib/taskCompletion';
+import { promptCreate } from '@/lib/ui/createPrompt';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
@@ -724,7 +725,14 @@ export default function TodayScreen() {
             ))}
           </View>
         ) : (
-          <AllClearRow />
+          <>
+            <AllClearRow />
+            {isOfficerRole && (
+              <Pressable style={s.allClearCreate} onPress={() => promptCreate(r => router.push(r as any))}>
+                <Text style={s.allClearCreateText}>+ New event or task</Text>
+              </Pressable>
+            )}
+          </>
         )}
 
         {/* ── TODAY'S EVENTS ── */}
@@ -734,10 +742,10 @@ export default function TodayScreen() {
             <SLabel text="TODAY'S EVENTS" />
             {isOfficerRole && (
               <Pressable
-                onPress={() => router.push('/event/create' as any)}
+                onPress={() => promptCreate(r => router.push(r as any))}
                 style={s.createEventBtn}
               >
-                <Text style={s.createEventText}>+ Create</Text>
+                <Text style={s.createEventText}>+ New</Text>
               </Pressable>
             )}
           </View>
@@ -935,6 +943,8 @@ const s = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   createEventBtn:   { paddingHorizontal: 8, paddingVertical: 2 },
   createEventText:  { fontSize: 12, fontWeight: '600', color: '#818cf8' },
+  allClearCreate:     { alignSelf: 'center', marginTop: -8, marginBottom: 20, backgroundColor: '#1e1b4b', borderRadius: 9, paddingVertical: 9, paddingHorizontal: 16, borderWidth: 1, borderColor: '#4f46e5' },
+  allClearCreateText: { color: '#a5b4fc', fontSize: 14, fontWeight: '700' },
 
   // No events placeholder
   noEvents:     { paddingVertical: 16, alignItems: 'center' },
