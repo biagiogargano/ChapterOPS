@@ -3,26 +3,19 @@
  * PROTOTYPE ONLY (see SPEC_ONBOARDING_ORG_SETUP.md).
  *
  * ⚠️ MOCK / NON-FUNCTIONAL. No real invites sent, nothing persisted, no auth.
- * Just the first-run flow so we can feel whether it's intuitive: name the org →
- * who's in charge → pick a structure → invite a few people → done. Every step
- * after the first is skippable with sensible defaults. Dev-only; not linked from
- * phase-2, not wired into the alpha.
+ * Roles-first model: name the org → who's in charge → pick WHICH ROLES your org
+ * uses (from the org-type template) → invite people into those roles → done.
+ * NO org chart and NO "who reports to whom" here — committees and reporting lines
+ * are an optional follow-up in Settings → Roles & structure. Every step after the
+ * name is skippable. Dev-only; not linked from phase-2, not wired into the alpha.
  */
 
 import { useActiveTemplate } from '@/lib/orgTemplates/activeOrgTemplate';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-type Tier = { id: string; label: string; hint: string };
-const SUGGESTED_TIERS: Tier[] = [
-  { id: 'owner',   label: 'Owner / Main leader', hint: 'CEO · President — full control (just you for now)' },
-  { id: 'exec',    label: 'Top executives',       hint: 'e.g. VP / Pro Consul' },
-  { id: 'officer', label: 'Officers',             hint: 'Committee chairs' },
-  { id: 'member',  label: 'General members',      hint: 'Everyone else' },
-];
-
-interface Invite { name: string; tier: string }
+interface Invite { name: string; role: string }
 
 export default function SetupWizardScreen() {
   const navigation = useNavigation();
@@ -32,28 +25,48 @@ export default function SetupWizardScreen() {
 
   const [orgName, setOrgName]   = useState('');
   const [ownerMe, setOwnerMe]   = useState(true);
-  const [useTiers, setUseTiers] = useState(true);
+  // Which of the template's default roles this org actually uses (all on to start).
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(() => template.roles);
   const [invites, setInvites]   = useState<Invite[]>([]);
   const [draftName, setDraftName] = useState('');
-  const [draftTier, setDraftTier] = useState('exec');
+  const [draftRole, setDraftRole] = useState('');
+
+  // If the org type changes (via the org-type screen) reset the role selection to
+  // that template's defaults so step 3 reflects the chosen org type.
+  const tplIdRef = useRef(template.id);
+  useEffect(() => {
+    if (tplIdRef.current !== template.id) {
+      tplIdRef.current = template.id;
+      setSelectedRoles(template.roles);
+    }
+  }, [template.id, template.roles]);
 
   useEffect(() => { navigation.setOptions({ title: 'Set up your org' }); }, [navigation]);
 
-  const steps = ['Name', 'Who’s in charge', 'Structure', 'Invite', 'Done'];
+  const steps = ['Name', 'Who’s in charge', 'Roles', 'Invite', 'Done'];
   const last  = steps.length - 1;
   const canNext = step !== 0 || orgName.trim().length > 0;
 
+  // Default the invite role to a non-leader role the org actually uses.
+  const effectiveDraftRole = selectedRoles.includes(draftRole)
+    ? draftRole
+    : (selectedRoles[1] ?? selectedRoles[0] ?? '');
+
+  function toggleRole(r: string) {
+    setSelectedRoles(prev => (prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]));
+  }
+
   function addInvite() {
     const n = draftName.trim();
-    if (!n) return;
-    setInvites(prev => [...prev, { name: n, tier: draftTier }]);
+    if (!n || !effectiveDraftRole) return;
+    setInvites(prev => [...prev, { name: n, role: effectiveDraftRole }]);
     setDraftName('');
   }
 
   function finish() {
     Alert.alert(
       'Setup complete (prototype)',
-      `${orgName || 'Your org'} is set up.\nOwner: ${ownerMe ? 'you' : 'to be transferred'}.\nInvites drafted: ${invites.length}.\n\n(Mock — nothing was sent or saved.)`,
+      `${orgName || 'Your org'} is set up.\nOwner: ${ownerMe ? 'you' : 'to be transferred'}.\nRoles in use: ${selectedRoles.length}.\nInvites drafted: ${invites.length}.\n\n(Mock — nothing was sent or saved.)`,
       [{ text: 'OK', onPress: () => router.back() }],
     );
   }
@@ -63,7 +76,7 @@ export default function SetupWizardScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock setup, nothing saved</Text></View>
 
-        {/* Active org-type template — drives the defaults used below. */}
+        {/* Active org-type template — drives the suggested roles below. */}
         <View style={s.templateBanner}>
           <Text style={s.templateText}>{template.emoji}  Using {template.label} defaults — leader: {template.leaderTitle}</Text>
         </View>
@@ -105,49 +118,57 @@ export default function SetupWizardScreen() {
           </View>
         )}
 
-        {/* ── Step 2: Structure ── */}
+        {/* ── Step 2: Roles (who does what) — pick which template roles you use ── */}
         {step === 2 && (
           <View style={s.block}>
-            <Text style={s.q}>Pick a starting structure</Text>
-            <Pressable style={[s.choice, useTiers && s.choiceOn]} onPress={() => setUseTiers(true)}>
-              <Text style={[s.choiceTitle, useTiers && s.choiceTitleOn]}>Use the suggested tiers</Text>
-              {SUGGESTED_TIERS.map(t => (
-                <Text key={t.id} style={s.tierLine}>•  <Text style={s.bold}>{t.label}</Text> — {t.hint}</Text>
-              ))}
-              <Text style={s.choiceHint}>You can rename or remove any of these later.</Text>
-            </Pressable>
-            <Pressable style={[s.choice, !useTiers && s.choiceOn]} onPress={() => setUseTiers(false)}>
-              <Text style={[s.choiceTitle, !useTiers && s.choiceTitleOn]}>Start minimal</Text>
-              <Text style={s.choiceHint}>Just you + members. Add structure whenever you want.</Text>
-            </Pressable>
-            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/invite-link' as any)}>
-              <Text style={s.previewText}>Share an invite link, then build your tree ›</Text>
-            </Pressable>
+            <Text style={s.q}>Who does what?</Text>
+            <Text style={s.help}>
+              These are the {template.label} default roles. Keep the ones your org uses and turn
+              off the rest. This is just roles — committees, helpers, and reporting lines are
+              optional and can be added later in Settings → Roles &amp; structure.
+            </Text>
+            <View style={s.rolePickWrap}>
+              {template.roles.map(r => {
+                const on = selectedRoles.includes(r);
+                return (
+                  <Pressable key={r} style={[s.roleChip, on && s.roleChipOn]} onPress={() => toggleRole(r)}>
+                    <View style={[s.roleCheck, on && s.roleCheckOn]}>{on && <Text style={s.roleCheckMark}>✓</Text>}</View>
+                    <Text style={[s.roleChipText, on && s.roleChipTextOn]}>{r}</Text>
+                    {r === template.leaderTitle && <Text style={s.leaderTag}>leader</Text>}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={s.help}>{selectedRoles.length} role{selectedRoles.length === 1 ? '' : 's'} selected. You can add or rename roles anytime — no org chart required.</Text>
           </View>
         )}
 
-        {/* ── Step 3: Invite ── */}
+        {/* ── Step 3: Invite — place people into the roles you picked ── */}
         {step === 3 && (
           <View style={s.block}>
-            <Text style={s.q}>Invite a few key people (optional)</Text>
+            <Text style={s.q}>Invite people into roles (optional)</Text>
+            <Text style={s.help}>Invite-link first: share a link and people pick themselves up. Or add a few key people here. Either way you can finish without this.</Text>
+            <Pressable style={s.previewBtn} onPress={() => router.push('/setup/invite-link' as any)}>
+              <Text style={s.previewText}>Share an invite link ›</Text>
+            </Pressable>
             <View style={s.inviteRow}>
               <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder="Name or email" placeholderTextColor="#475569" value={draftName} onChangeText={setDraftName} onSubmitEditing={addInvite} />
               <Pressable style={s.addBtn} onPress={addInvite}><Text style={s.addBtnText}>Add</Text></Pressable>
             </View>
             <View style={s.tierPick}>
-              {SUGGESTED_TIERS.filter(t => t.id !== 'owner').map(t => (
-                <Pressable key={t.id} style={[s.tierChip, draftTier === t.id && s.tierChipOn]} onPress={() => setDraftTier(t.id)}>
-                  <Text style={[s.tierChipText, draftTier === t.id && s.tierChipTextOn]}>{t.label}</Text>
+              {selectedRoles.map(r => (
+                <Pressable key={r} style={[s.tierChip, effectiveDraftRole === r && s.tierChipOn]} onPress={() => setDraftRole(r)}>
+                  <Text style={[s.tierChipText, effectiveDraftRole === r && s.tierChipTextOn]}>{r}</Text>
                 </Pressable>
               ))}
             </View>
             {invites.length === 0 ? (
-              <Text style={s.help}>No invites yet — leaders can also invite their own committee members after setup. You can skip this entirely.</Text>
+              <Text style={s.help}>No invites yet — leaders can also invite their own people after setup. You can skip this entirely.</Text>
             ) : (
               invites.map((inv, i) => (
                 <View key={i} style={s.inviteItem}>
                   <Text style={s.inviteName}>{inv.name}</Text>
-                  <Text style={s.inviteTier}>{SUGGESTED_TIERS.find(t => t.id === inv.tier)?.label}</Text>
+                  <Text style={s.inviteTier}>{inv.role}</Text>
                 </View>
               ))
             )}
@@ -160,9 +181,9 @@ export default function SetupWizardScreen() {
             <Text style={s.q}>You’re ready 🎉</Text>
             <Text style={s.summary}><Text style={s.bold}>{orgName || 'Your org'}</Text></Text>
             <Text style={s.summaryLine}>Owner: {ownerMe ? 'you' : 'will be transferred to your invite'}</Text>
-            <Text style={s.summaryLine}>Structure: {useTiers ? 'suggested tiers' : 'minimal'}</Text>
+            <Text style={s.summaryLine}>Roles in use: {selectedRoles.length}</Text>
             <Text style={s.summaryLine}>Invites drafted: {invites.length}</Text>
-            <Text style={s.help}>After you finish, leaders can invite their own committees, and a quick walkthrough will show the basics.</Text>
+            <Text style={s.help}>Next: leaders can invite their own people, and committees / reporting lines can be set up later in Settings — none of it is required to start.</Text>
             <Pressable style={s.previewBtn} onPress={() => router.push('/invite' as any)}>
               <Text style={s.previewText}>Preview what an invitee sees ›</Text>
             </Pressable>
@@ -220,7 +241,17 @@ const s = StyleSheet.create({
   choiceTitle:   { fontSize: 15, fontWeight: '700', color: '#cbd5e1' },
   choiceTitleOn: { color: '#f1f5f9' },
   choiceHint:    { fontSize: 12, color: '#64748b', lineHeight: 17, marginTop: 2 },
-  tierLine:      { fontSize: 13, color: '#94a3b8', lineHeight: 20, marginTop: 2 },
+
+  // Role picker (step 2)
+  rolePickWrap: { gap: 8 },
+  roleChip:     { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, borderWidth: 1, borderColor: '#334155' },
+  roleChipOn:   { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  roleCheck:    { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
+  roleCheckOn:  { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  roleCheckMark:{ fontSize: 12, color: '#a5b4fc', fontWeight: '700', lineHeight: 14 },
+  roleChipText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#cbd5e1' },
+  roleChipTextOn:{ color: '#f1f5f9' },
+  leaderTag:    { fontSize: 10, fontWeight: '700', color: '#a5b4fc', backgroundColor: '#312e81', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
 
   inviteRow:   { flexDirection: 'row', gap: 8, alignItems: 'center' },
   addBtn:      { backgroundColor: '#1e3a5f', borderRadius: 10, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 12, paddingHorizontal: 16 },

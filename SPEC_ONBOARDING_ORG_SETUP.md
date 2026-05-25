@@ -17,30 +17,34 @@ them*, not "build it yourself from a blank grid." Simple > configurable.
 - They need to **build out the org**: add people, assign roles, form committees —
   but **intuitively**, in plain steps, not via a permissions matrix.
 
-## 2. Suggested structure (defaults, editable)
-Offer a ready-made tier structure the org can rename/trim — never force it:
-1. **Owner / Main leader** (CEO · President · Consul) — exactly one; full control;
-   transferable.
-2. **Top executives** (e.g. VP · Pro Consul) — small group.
-3. **Officers** (committee chairs).
-4. **General members.**
+## 2. Roles-first structure (REVISED DIRECTION — supersedes the tier/tree-in-setup model)
 
-Labels are org-customizable (CEO vs President vs Consul). An org can start minimal
-(just owner + members) and grow.
+> **Direction update (current):** Onboarding is **roles-first, not a hierarchy
+> builder.** During setup the owner just defines **who does what** so tasks can be
+> assigned intelligently. **Do NOT force a full org chart, and do NOT make
+> "who reports to whom?" the default flow.** Committees and reporting lines are an
+> **optional follow-up in Settings**, never required to finish setup.
 
-### 2a. Build the tree by ASKING, not a grid (preferred)
-Rather than drop a big org-chart grid in the owner's face, **build the hierarchy
-through questions**, top-down:
-1. "What's **your** role called?" → the root (owner).
-2. "**Who reports to** [role]? What are they called?" → add one or more child roles.
-3. Repeat the same question for each child, walking **down the chain** until a role
-   has no reports or is marked **General members** (a leaf bucket).
-4. Options along the way: add **General members** as a catch-all, mark "no one
-   reports to them," and (full version) "this role **also reports to** X" so a role
-   can have a second manager / roles can cross-link — without ever showing a graph
-   editor.
-This produces the same tree the Leadership prototype renders, but assembled by
-answering simple questions. The grid/graph is only a *result*, never the input.
+**Setup flow (the model):**
+1. **Choose org type.**
+2. App **suggests default roles** from that org-type template.
+3. Owner **selects which roles their org actually uses** (toggle the suggested
+   roles; rename/add later). This is the structure step — a role checklist, not a tree.
+4. Owner **places / invites people into those roles** (invite-link first; manual
+   entry is fallback).
+5. **More detailed committees / reporting lines can be edited later in Settings →
+   Roles & structure** — optional.
+
+Structure should feel like **"Roles & structure" / "Who does what"**, not a corporate
+hierarchy chart. The first version focuses on **roles**, not a full tree. An org can
+start minimal (owner + a couple roles) and grow.
+
+### 2a. Detailed reporting lines = OPTIONAL, advanced, later (not in setup)
+The "who reports to whom?" tree (`app/setup/tree.tsx`) is the **opt-in advanced
+editor**, reached from **Settings → Roles & structure** — **not** part of required
+onboarding. When an org genuinely wants committees/reporting lines, it can build them
+by placing people; otherwise picking roles in setup is enough. The graph is only ever
+a *result* of optional editing, never a required input.
 
 ## 3. Invite system (the core mechanic)
 - **Owner invites** people into top roles (e.g. "be our VP").

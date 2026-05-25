@@ -1,9 +1,10 @@
 /**
- * app/setup/tree.tsx — build the leadership tree by PLACING invited people.
- * PROTOTYPE / mock. After inviting people (name/email/position), build the
- * hierarchy by answering "who reports to X?" and picking from your roster — no
- * typing role names from scratch. Falls back to typing if nobody's invited.
- * Local state, nothing saved. Dev-only; not in phase-2 / the alpha.
+ * app/setup/tree.tsx — OPTIONAL detailed structure editor (reporting lines).
+ * PROTOTYPE / mock. This is the ADVANCED, opt-in "who reports to whom" view —
+ * NOT part of required onboarding. Setup is roles-first (app/setup/index.tsx);
+ * committees and reporting lines are an optional follow-up reached from
+ * Settings → Roles & structure. Build the hierarchy by placing invited people;
+ * local state, nothing saved. Dev-only; not in phase-2 / the alpha.
  */
 
 import { getInvited, useOrgBuildVersion, type Invitee } from '@/lib/orgBuild/mockOrgBuild';
@@ -76,6 +77,15 @@ export default function TreeBuilderScreen() {
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={s.protoBadge}><Text style={s.protoText}>PROTOTYPE · mock, nothing saved</Text></View>
 
+        {/* This screen is the optional, advanced structure editor — setup does not
+            require it. Make that explicit so it never feels like a mandatory chart. */}
+        <View style={s.optionalNote}>
+          <Text style={s.optionalNoteText}>
+            Optional — you don’t need this to finish setup. Reporting lines and committees
+            are an advanced add-on; most orgs just pick roles in setup and assign people.
+          </Text>
+        </View>
+
         {phase === 'asking' && current && (
           <View style={s.block}>
             <Text style={s.crumb}>Building under</Text>
@@ -146,6 +156,8 @@ const s = StyleSheet.create({
 
   protoBadge: { alignSelf: 'flex-start', backgroundColor: '#422006', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 18, borderWidth: 1, borderColor: '#92400e' },
   protoText:  { color: '#fbbf24', fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+  optionalNote:     { backgroundColor: '#0a1628', borderRadius: 10, borderWidth: 1, borderColor: '#1e293b', padding: 12, marginBottom: 18 },
+  optionalNoteText: { fontSize: 12, color: '#64748b', lineHeight: 18 },
 
   block: { gap: 12 },
   crumb: { fontSize: 12, fontWeight: '700', color: '#64748b', letterSpacing: 0.6 },

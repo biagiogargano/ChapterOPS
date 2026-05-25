@@ -18,10 +18,12 @@ These demonstrate features that map cleanly onto events / tasks / structured
 responses (see `PRODUCT_DIRECTION.md` §2).
 
 ## Onboarding & setup
-- **/setup** — guided first-run wizard (name → who's in charge → structure →
-  invite → done; only the name is required, rest skippable).
-- **/setup/tree** — build your org tree by **answering questions** ("who reports to
-  you?") instead of a grid.
+- **/setup** — guided first-run wizard, **roles-first** (name → who's in charge →
+  **pick which roles your org uses** → invite people into roles → done; only the
+  name is required, rest skippable). No org chart in setup.
+- **/setup/tree** — **OPTIONAL, advanced** reporting-lines editor reached from
+  Settings → Roles & structure; NOT part of required onboarding. Build committees /
+  "who reports to whom" by placing people, only if you want it.
 - **/invite** — what an invitee sees (role/committee, what accepting unlocks).
 - **/tutorial** — first-use welcome walkthrough.
 - **/org-settings** — rename org, **transfer ownership** (no-orphan confirm), links

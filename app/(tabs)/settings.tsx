@@ -58,7 +58,7 @@ export default function SettingsScreen() {
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>MEMBERS & ROLES</Text>
       <Row title="Members & positions" sub={`${memberCount} people · assign roles`} onPress={() => router.push('/roster' as any)} />
-      <Row title="Leadership structure" sub="Edit the tree (Q&A builder)" onPress={() => router.push('/setup/tree' as any)} />
+      <Row title="Roles & structure" sub="Which roles you use · committees & reporting lines (optional)" onPress={() => router.push('/setup/tree' as any)} />
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>TEMPLATES & AUTOMATION</Text>
       {isOfficer(role) && (
