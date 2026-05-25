@@ -66,8 +66,8 @@ export default function SettingsScreen() {
       )}
       <Row title="Event automation" sub="What each event type auto-creates" onPress={() => router.push('/event-defaults' as any)} />
 
-      <Text style={[s.sectionLabel, { marginTop: 22 }]}>REPORTS</Text>
-      <Row title="Report questions" sub="Structured responses officers submit each week" onPress={() => router.push('/report/weekly' as any)} />
+      <Text style={[s.sectionLabel, { marginTop: 22 }]}>REPORTS & STRUCTURED RESPONSES</Text>
+      <Row title="Report questions / response forms" sub="Structured responses officers submit each week" onPress={() => router.push('/report/weekly' as any)} />
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>NOTIFICATIONS</Text>
       <View style={s.toggleCard}>
