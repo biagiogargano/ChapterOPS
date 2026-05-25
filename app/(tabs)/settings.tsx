@@ -55,13 +55,19 @@ export default function SettingsScreen() {
 
       <Text style={s.sectionLabel}>ORGANIZATION</Text>
       <Row title="Org details & ownership" sub="Name, transfer ownership" onPress={() => router.push('/org-settings' as any)} />
+
+      <Text style={[s.sectionLabel, { marginTop: 22 }]}>MEMBERS & ROLES</Text>
       <Row title="Members & positions" sub={`${memberCount} people · assign roles`} onPress={() => router.push('/roster' as any)} />
       <Row title="Leadership structure" sub="Edit the tree (Q&A builder)" onPress={() => router.push('/setup/tree' as any)} />
-      <Row title="Report questions" sub="What officers report each week" onPress={() => router.push('/report/weekly' as any)} />
-      <Row title="Event automation" sub="What each event type auto-creates" onPress={() => router.push('/event-defaults' as any)} />
+
+      <Text style={[s.sectionLabel, { marginTop: 22 }]}>TEMPLATES & AUTOMATION</Text>
       {isOfficer(role) && (
-        <Row title="Manage event templates" sub="Build and edit the task workflows applied to events" onPress={() => router.push('/templates' as any)} />
+        <Row title="Event templates" sub="Build and edit the task workflows applied to events" onPress={() => router.push('/templates' as any)} />
       )}
+      <Row title="Event automation" sub="What each event type auto-creates" onPress={() => router.push('/event-defaults' as any)} />
+
+      <Text style={[s.sectionLabel, { marginTop: 22 }]}>REPORTS</Text>
+      <Row title="Report questions" sub="Structured responses officers submit each week" onPress={() => router.push('/report/weekly' as any)} />
 
       <Text style={[s.sectionLabel, { marginTop: 22 }]}>NOTIFICATIONS</Text>
       <View style={s.toggleCard}>
@@ -72,7 +78,14 @@ export default function SettingsScreen() {
         <View style={s.toggleRow}><Text style={s.toggleText}>Report nudges</Text><Switch value={notifReports} onValueChange={setNotifReports} trackColor={{ true: '#4f46e5', false: '#334155' }} thumbColor="#f1f5f9" /></View>
       </View>
 
-      <Text style={[s.sectionLabel, { marginTop: 22 }]}>YOU</Text>
+      {__DEV__ && (
+        <>
+          <Text style={[s.sectionLabel, { marginTop: 22 }]}>DEVELOPER / PROTOTYPES</Text>
+          <Row title="🧪 All prototypes" sub="Every feature preview in one place — mock data" onPress={() => router.push('/prototypes' as any)} />
+        </>
+      )}
+
+      <Text style={[s.sectionLabel, { marginTop: 22 }]}>ACCOUNT</Text>
       <View style={s.profileCard}>
         <View style={s.avatar}><Text style={s.avatarText}>{userName.split(' ').map(n => n[0]).join('').toUpperCase()}</Text></View>
         <View style={{ flex: 1 }}>
@@ -80,13 +93,7 @@ export default function SettingsScreen() {
           <Text style={s.profileRole}>{ROLE_LABELS[role]} · {orgName}</Text>
         </View>
       </View>
-
-      {__DEV__ && (
-        <>
-          <Text style={[s.sectionLabel, { marginTop: 22 }]}>PREVIEW</Text>
-          <Row title="🧪 All prototypes" sub="Every feature preview in one place" onPress={() => router.push('/prototypes' as any)} />
-        </>
-      )}
+      <Text style={s.accountHint}>Sign out from the Me tab.</Text>
 
       <Text style={s.footNote}>UI preview — several areas are mock until the schema/auth phase.</Text>
       <View style={{ height: 40 }} />
@@ -121,6 +128,7 @@ const s = StyleSheet.create({
   avatarText:  { color: '#fff', fontWeight: '800', fontSize: 15 },
   profileName: { fontSize: 16, fontWeight: '700', color: '#f8fafc' },
   profileRole: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  accountHint: { fontSize: 12, color: '#475569', marginTop: 8, marginLeft: 2 },
 
   footNote: { fontSize: 12, color: '#475569', marginTop: 18, lineHeight: 18 },
 });
