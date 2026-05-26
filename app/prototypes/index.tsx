@@ -11,59 +11,65 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 interface Item { title: string; sub: string; route: string }
 interface Group { label: string; items: Item[] }
 
+// Prototypes are tiered by product direction, not just theme:
+//   CORE  = the real direction (events/tasks model)
+//   LATER = planned, not built yet
+//   EXPERIMENTS = deferred; kept to explore, must be reframed to fit the model
+//   ARCHIVE = cut / not building soon (off the events-and-tasks path)
 const GROUPS: Group[] = [
   {
-    // Distinct onboarding screens. (Duplicates removed: /first-run now redirects
-    // to the tour; the old leadership-tree is replaced by /setup/tree below.)
-    label: 'ONBOARDING & SETUP',
+    label: 'CORE · onboarding & structure',
     items: [
-      { title: '🚀 Welcome tour',       sub: 'Annotated click-through of the app → flows into setup',  route: '/tutorial' },
-      { title: 'Org setup wizard',      sub: 'Name → org type → roles & tiers → invite',               route: '/setup' },
-      { title: 'Org type / templates',  sub: 'Pick org type → see default roles/events/report',        route: '/setup/org-type' },
-      { title: 'Invite link + join form', sub: 'Share a link; configure join questions (owner)',        route: '/setup/invite-link' },
+      { title: '🚀 Welcome tour',       sub: 'Annotated click-through → flows into setup',             route: '/tutorial' },
+      { title: 'Org setup wizard',      sub: 'Roles-first: org type → roles & tiers → invite',         route: '/setup' },
+      { title: 'Org type / templates',  sub: 'Pick org type → default roles/events/report',            route: '/setup/org-type' },
+      { title: 'Invite link + join form', sub: 'Invite-link-first; configure join questions',           route: '/setup/invite-link' },
       { title: 'Join via link (joiner)', sub: 'The self-join form people fill out',                     route: '/join' },
       { title: 'Add people manually (fallback)', sub: 'Type a few people in by hand',                  route: '/setup/invite-people' },
-      { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',      route: '/invite' },
-      { title: 'Org settings',          sub: 'Rename org · transfer ownership · customize',             route: '/org-settings' },
+      { title: 'Invitation (invitee)',  sub: 'What someone sees when invited',                          route: '/invite' },
+      { title: 'Org structure (tiers)', sub: 'Members by tier · selectable · owner edits lines',        route: '/setup/tree' },
+      { title: 'Members roster',        sub: 'Browse/search · assign positions',                        route: '/roster' },
+      { title: 'Org settings',          sub: 'Rename · transfer ownership · configure',                 route: '/org-settings' },
     ],
   },
   {
-    label: 'PEOPLE & STRUCTURE',
+    label: 'CORE · events, tasks & reports',
     items: [
-      { title: 'Org structure (tiers)', sub: 'Tap members by tier; owner edits reporting lines', route: '/setup/tree' },
-      { title: 'Delegate a task',  sub: 'Reassign down to a team member',              route: '/delegate' },
-      { title: 'My committee',     sub: "Your group's members, events, and tasks",     route: '/committee' },
-      { title: 'Members roster',   sub: 'Browse/search people · assign positions',     route: '/roster' },
+      { title: 'Event automation defaults', sub: 'Per-type: what an event auto-creates',    route: '/event-defaults' },
+      { title: 'RSVP settings',    sub: 'Required RSVP on optional events (event-linked)',   route: '/rsvp-optional' },
+      { title: 'Attendance (as tasks)', sub: 'Event-linked attendance tasks',                route: '/attendance' },
+      { title: 'Attendance check-in', sub: "Mark who's present at an event",                 route: '/checkin' },
+      { title: 'Availability picker', sub: 'Generated time-slots for scheduling',            route: '/availability' },
+      { title: 'Weekly report',     sub: 'Structured-response task (Weekly Officer Report)', route: '/report/weekly' },
+      { title: 'Reports review',    sub: 'Who submitted / who is missing',                   route: '/report/inbox' },
+      { title: 'Report detail',     sub: 'Read a submitted report (read-only)',              route: '/report/detail' },
+      { title: 'Meeting agenda',    sub: "Derived from this week's events/tasks",            route: '/agenda' },
     ],
   },
   {
-    label: 'REPORTS & MEETINGS',
+    // Planned and on-model, but the real version needs the schema phase.
+    label: 'LATER ROADMAP (planned, not built)',
     items: [
-      { title: 'Weekly report',     sub: 'Fill out & submit a questionnaire report', route: '/report/weekly' },
-      { title: 'Reports review',    sub: 'Annotator view: who submitted / missing',  route: '/report/inbox' },
-      { title: 'Report detail',     sub: 'Read a submitted report (read-only)',       route: '/report/detail' },
-      { title: 'Meeting agenda',    sub: "Auto-drafted from this week's events/tasks", route: '/agenda' },
+      { title: 'Teams / committees', sub: 'Lightweight group under a role for assignment & visibility (backlog #11)', route: '/committee' },
+      { title: 'Delegate a task',    sub: 'Reassign down to a team member',                  route: '/delegate' },
     ],
   },
   {
-    label: 'EVENTS',
+    // Deferred; kept to explore. Each must be reframed to fit events/tasks before
+    // it could become core (see copy).
+    label: 'EXPERIMENTS · deferred',
     items: [
-      { title: 'Event automation defaults', sub: 'Per-type: agenda/attendance/RSVP rules', route: '/event-defaults' },
-      { title: 'RSVP settings',    sub: 'Required RSVP on optional events (decoupled)', route: '/rsvp-optional' },
-      { title: 'Attendance (as tasks)', sub: 'Annotator tasks tied to mandatory meetings', route: '/attendance' },
-      { title: 'Attendance check-in', sub: "Mark who's present at an event",            route: '/checkin' },
-      { title: 'Availability picker', sub: 'Generated time-slots for scheduling',        route: '/availability' },
+      { title: 'Announcements',  sub: 'FUTURE: action-linked notice tied to an event/task — NOT a chat feed', route: '/announcements' },
+      { title: 'Quick poll',     sub: 'A poll = a one-question task template, not a standalone feature',       route: '/poll' },
     ],
   },
   {
-    // Per triage: NOT on the near-term roadmap. Kept as experiments only so we
-    // don't lose the idea — they don't fit the core events/tasks model.
-    label: 'EXPERIMENTS · deferred (not roadmap)',
+    // Off the events-and-tasks path. Not building soon — listed so the ideas
+    // aren't lost. (No-screen cut ideas noted below the list.)
+    label: 'ARCHIVE · cut / not building soon',
     items: [
-      { title: 'Announcements',        sub: 'Chapter notices feed + post',          route: '/announcements' },
-      { title: 'Quick poll',           sub: 'Lightweight chapter vote',             route: '/poll' },
-      { title: 'Points & leaderboard', sub: 'Participation points and rankings',    route: '/points' },
-      { title: 'Pinned tab',           sub: 'Customizable quick-access shortcuts',  route: '/pinned' },
+      { title: 'Points & leaderboard', sub: 'Gamification — not core',           route: '/points' },
+      { title: 'Pinned tab',           sub: 'Custom quick-access tab — deferred', route: '/pinned' },
     ],
   },
 ];
@@ -77,7 +83,7 @@ export default function PrototypesHub() {
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.protoBadge}><Text style={s.protoText}>DEV · feature-branch prototypes (mock, not in alpha)</Text></View>
       <Text style={s.heading}>Prototypes</Text>
-      <Text style={s.sub}>Early looks at where the app is headed. All mock data — nothing here is saved or live.</Text>
+      <Text style={s.sub}>Tiered by direction: CORE (the real model) · LATER (planned) · EXPERIMENTS (deferred) · ARCHIVE (cut). All mock — nothing is saved or live.</Text>
 
       {GROUPS.map(g => (
         <View key={g.label} style={s.group}>
@@ -93,6 +99,13 @@ export default function PrototypesHub() {
           ))}
         </View>
       ))}
+
+      <Text style={s.archiveNote}>
+        Also archived (no screen — ideas kept, not building soon): full permissions
+        grid · full org-tree builder (superseded by tiers) · general chat / messaging
+        (comms are action-linked only) · generic surveys/quizzes as a standalone
+        system · AI · complex per-committee customization.
+      </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -115,4 +128,6 @@ const s = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
   cardSub:   { fontSize: 12, color: '#64748b', marginTop: 2 },
   chevron:   { fontSize: 22, color: '#475569' },
+
+  archiveNote: { fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 6 },
 });
