@@ -433,6 +433,9 @@ export default function CreateEventScreen() {
   const prefillTime = useMemo(() => (existing ? parseTime(existing.time) : { hour: 8, minute: '00', ampm: 'PM' as const }), [existing]);
 
   const allowedKinds = ROLE_ALLOWED_KINDS[role] ?? [];
+  // An officer whose role has zero allowed event kinds cannot create an event.
+  // (Create mode only — editing an existing event keeps its own kind.)
+  const noEventKinds = !editing && allowedKinds.length === 0;
 
   // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
   const [title,       setTitle      ] = useState(existing?.title ?? '');
@@ -488,12 +491,19 @@ export default function CreateEventScreen() {
   }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit =
+    !noEventKinds &&
     title.trim().length > 0 &&
     dateString !== '' &&
     audience !== '' &&
     (editing || recurrence === 'none' || repeatUntil !== '');
 
   function handleSubmit() {
+    // Hard stop: roles with no allowed event kinds can never create an event
+    // (defense in depth so the hidden kind default is never persisted).
+    if (noEventKinds) {
+      setErrors(['Your role does not have any event types available yet.']);
+      return;
+    }
     const errs: string[] = [];
     if (!title.trim())                                     errs.push('Event name is required.');
     if (!dateString)                                       errs.push('Please pick a date.');
@@ -663,7 +673,7 @@ export default function CreateEventScreen() {
         </View>
 
         {/* ── Event Type ── */}
-        {allowedKinds.length > 0 && (
+        {allowedKinds.length > 0 ? (
           <View style={s.field}>
             <FieldLabel text="EVENT TYPE" />
             <KindSelector
@@ -672,7 +682,17 @@ export default function CreateEventScreen() {
               allowedKinds={allowedKinds}
             />
           </View>
-        )}
+        ) : !editing ? (
+          <View style={s.field}>
+            <FieldLabel text="EVENT TYPE" />
+            <View style={s.noEventKindsNote}>
+              <Text style={s.noEventKindsText}>
+                Your role does not have any event types available yet, so you can’t create
+                events with this role.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* ── Date ── */}
         <View style={s.field}>
@@ -893,6 +913,8 @@ const s = StyleSheet.create({
   previewFootnote:  { fontSize: 12, color: '#64748b', marginTop: 8 },
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
+  noEventKindsNote: { backgroundColor: '#1c1407', borderRadius: 10, borderWidth: 1, borderColor: '#854d0e', padding: 12 },
+  noEventKindsText: { fontSize: 13, color: '#fbbf24', lineHeight: 19 },
 
   // Text inputs
   textInput: {
