@@ -4,6 +4,7 @@ import { IdentityProvider } from '@/lib/identityStore';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { Stack } from 'expo-router';
 import DataBootstrap from '../components/DataBootstrap';
+import BackLabel from '../components/nav/BackLabel';
 
 // Auth/identity structure is mounted, gated by AUTH_ENABLED. While the flag is
 // false, AuthProvider serves a static fallback surface and IdentityProvider is
@@ -30,6 +31,11 @@ export default function RootLayout() {
                 headerTintColor: '#f8fafc',
                 headerTitleStyle: { fontWeight: '700' },
                 contentStyle: { backgroundColor: '#0f172a' },
+                // Contextual back button: shows the name of the screen you're
+                // returning to (e.g. "Today"/"Calendar") instead of "(tabs)".
+                // Per-screen headerLeft (e.g. a Cancel button) overrides this.
+                headerBackVisible: false,
+                headerLeft: () => <BackLabel />,
               }}
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
