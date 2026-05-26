@@ -19,7 +19,7 @@ import {
   type MockTask,
   type TaskUrgency,
 } from './mockTasks';
-import type { Role } from './roles';
+import { OFFICER_ROLES, type Role } from './roles';
 import { ORG_SCOPED_DATA } from './flags';
 
 // Re-export types so callers only need one import
@@ -63,13 +63,20 @@ export interface UserCreatedEvent {
 // ─── Role → allowed event kinds ───────────────────────────────────────────────
 
 export const ROLE_ALLOWED_KINDS: Record<Role, EventKind[]> = {
-  president:         ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
-  pro_consul:        ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
-  annotator:         ['chapter', 'eboard'],
-  social_chair:      ['social', 'philanthropy'],
-  risk_manager:      ['social', 'risk'],
-  recruitment_chair: ['recruitment'],
-  brother:           [],
+  president:          ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
+  pro_consul:         ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
+  annotator:          ['chapter', 'eboard'],
+  quaestor:           ['eboard'],
+  magister:           ['academic', 'chapter'],
+  kustos:             ['chapter', 'risk'],
+  tribune:            ['chapter'],
+  social_chair:       ['social', 'philanthropy'],
+  risk_manager:       ['social', 'risk'],
+  recruitment_chair:  ['recruitment'],
+  philanthropy_chair: ['philanthropy', 'social'],
+  scholarship_chair:  ['academic'],
+  house_manager:      ['chapter'],
+  brother:            [],
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -165,10 +172,9 @@ function generateRecurrenceDates(
 
 // ─── RSVP task generation ────────────────────────────────────────────────────
 
-const OFFICERS: Role[] = [
-  'president', 'pro_consul', 'annotator',
-  'risk_manager', 'social_chair', 'recruitment_chair',
-];
+// Derive from the single source of truth so new officer roles are automatically
+// included in officer-only event visibility (no drift from OFFICER_ROLES).
+const OFFICERS: Role[] = OFFICER_ROLES;
 
 /**
  * If the event is mandatory or officers-only AND falls within this week (dayOffset 0-6),
