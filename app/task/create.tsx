@@ -109,11 +109,14 @@ function buildTaskEditNotice(
 // Sentinel option id meaning "not linked to any event" in the event picker.
 const STANDALONE_OPTION = '__standalone__';
 
+// Display labels for the "what should they submit?" chips. Values reuse the
+// existing ProofType enum (no model change). "Any proof" is deferred to Proof v1
+// (needs a new enum value + the real upload pipeline).
 const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
-  { value: 'text',       label: 'Text' },
+  { value: 'text',       label: 'Text update' },
   { value: 'link',       label: 'Link' },
-  { value: 'document',   label: 'Document' },
-  { value: 'image',      label: 'Image' },
+  { value: 'image',      label: 'Photo' },
+  { value: 'document',   label: 'File' },
   { value: 'screenshot', label: 'Screenshot' },
 ];
 
@@ -594,36 +597,45 @@ export default function CreateTaskScreen() {
                 )}
               </View>
 
-              {/* Requires proof */}
+              {/* ── SUBMISSION & REVIEW — one cohesive section. Same fields
+                  underneath (requiresProof / proofType / requiresApproval /
+                  reviewerRole); presented as related decisions, not two systems. ── */}
               <View style={[s.field, reviewLocked && s.lockedField]}>
+                <Text style={s.subReviewLabel}>SUBMISSION &amp; REVIEW</Text>
+
+                {/* Submission required? */}
                 <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
                   <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
                     {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
                   </View>
-                  <Text style={s.toggleLabel}>Requires proof of completion</Text>
+                  <Text style={s.toggleLabel}>Requires a submission</Text>
                 </Pressable>
                 {requiresProof && (
-                  <View style={[s.chipWrap, { marginTop: 12 }]}>
-                    {PROOF_OPTIONS.map(({ value, label }) => {
-                      const on = proofType === value;
-                      return (
-                        <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
-                          <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  <>
+                    <Text style={s.subHint}>What should they submit?</Text>
+                    <View style={s.chipWrap}>
+                      {PROOF_OPTIONS.map(({ value, label }) => {
+                        const on = proofType === value;
+                        return (
+                          <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
+                            <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
                 )}
-              </View>
 
-              {/* Requires approval */}
-              <View style={[s.field, reviewLocked && s.lockedField]}>
-                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresApproval(v => !v)}>
-                  <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
-                    {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
-                  </View>
-                  <Text style={s.toggleLabel}>Requires approval</Text>
-                </Pressable>
+                {/* Review required? — a choice, framed as part of the same flow */}
+                <Text style={[s.subHint, { marginTop: 18 }]}>Review</Text>
+                <View style={s.chipWrap}>
+                  <Pressable style={[s.chip, !requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(false)}>
+                    <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just submit</Text>
+                  </Pressable>
+                  <Pressable style={[s.chip, requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(true)}>
+                    <Text style={[s.chipText, requiresApproval && s.chipTextOn]}>Needs review</Text>
+                  </Pressable>
+                </View>
                 {requiresApproval && (
                   <>
                     <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
@@ -642,6 +654,11 @@ export default function CreateTaskScreen() {
                     </View>
                   </>
                 )}
+
+                <Text style={s.subFootHint}>
+                  A submission can be just for records (no review), or you can require review —
+                  with or without something attached.
+                </Text>
               </View>
             </View>
           )}
@@ -736,6 +753,11 @@ const s = StyleSheet.create({
   advancedHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   advancedHeaderText: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   advancedChevron:    { fontSize: 13, color: '#64748b' },
+
+  // Submission & Review section
+  subReviewLabel: { fontSize: 12, fontWeight: '800', color: '#cbd5e1', letterSpacing: 0.6, marginBottom: 12 },
+  subHint:        { fontSize: 12, fontWeight: '700', color: '#64748b', letterSpacing: 0.4, marginTop: 12, marginBottom: 8 },
+  subFootHint:    { fontSize: 12, color: '#475569', lineHeight: 17, marginTop: 14 },
 
   // Toggle
   toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
