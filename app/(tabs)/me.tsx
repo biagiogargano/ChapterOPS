@@ -101,6 +101,7 @@ export default function MeScreen() {
       )}
 
       {/* ── User card ── */}
+      <SectionLabel text="ACCOUNT" />
       <View style={s.userCard}>
         <View style={s.avatar}>
           <Text style={s.avatarText}>{initials}</Text>
@@ -113,6 +114,15 @@ export default function MeScreen() {
           </View>
         </View>
       </View>
+
+      {/* Expectation-setting note for real testers: roster + role assignments are
+          managed by the chapter admin in the back office, not in-app. Only shown
+          when auth is live (the sandbox exposes the role switcher instead). */}
+      {AUTH_ENABLED && (
+        <Text style={s.adminNote}>
+          Your role and chapter are set by your chapter admin. Contact them to update your membership.
+        </Text>
+      )}
 
       {/* ── Org switcher (only for multi-org members; hidden in the single-org sandbox) ── */}
       {memberships.length > 1 && (
@@ -250,6 +260,14 @@ const s = StyleSheet.create({
     color: '#a5b4fc',
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  adminNote: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+    paddingHorizontal: 4,
+    marginTop: -4,
   },
 
   // Role switcher
