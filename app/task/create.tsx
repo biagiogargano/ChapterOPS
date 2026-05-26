@@ -120,6 +120,26 @@ const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
   { value: 'screenshot', label: 'Screenshot' },
 ];
 
+// ─── Task types (UI taxonomy over ONE core model) ─────────────────────────────
+// Selecting a type just presets/reveals the same task form (no new schema, no new
+// task-state). 'form' types are fully buildable here today (basic/submission/
+// review). 'info' types (report/rsvp/attendance/poll) explain how that type works
+// in the model and link to its real flow/prototype — they're not separate systems.
+type TaskTypeId = 'basic' | 'submission' | 'review' | 'report' | 'rsvp' | 'attendance' | 'poll';
+interface TaskTypeDef {
+  id: TaskTypeId; label: string; icon: string; blurb: string;
+  mode: 'form' | 'info'; link?: string; linkLabel?: string;
+}
+const TASK_TYPES: TaskTypeDef[] = [
+  { id: 'basic',      label: 'Basic',          icon: '✅', mode: 'form', blurb: 'A normal to-do assigned to a role or member.' },
+  { id: 'submission', label: 'Submission',     icon: '📎', mode: 'form', blurb: 'They submit something (text, link, photo, file) — optionally reviewed.' },
+  { id: 'review',     label: 'Review',         icon: '🔎', mode: 'form', blurb: 'Submitted for review, then approved or rejected by a reviewer.' },
+  { id: 'report',     label: 'Questionnaire / Report', icon: '📋', mode: 'info', link: '/report/weekly', linkLabel: 'Preview the report prototype', blurb: 'A structured-response task — e.g. the Weekly Officer Report. Officers fill in answers, then submit. (Form builder comes with Weekly Reports v1.)' },
+  { id: 'rsvp',       label: 'RSVP',           icon: '📅', mode: 'info', link: '/event/create', linkLabel: 'Create an event with RSVP', blurb: 'An event-linked RSVP — generated from an event, not created standalone.' },
+  { id: 'attendance', label: 'Attendance',     icon: '✋', mode: 'info', link: '/event/create', linkLabel: 'Set up on an event', blurb: 'An event-linked attendance task that opens at the event start.' },
+  { id: 'poll',       label: 'Poll / question', icon: '📊', mode: 'info', link: '/poll', linkLabel: 'Open the poll prototype', blurb: 'A one-question structured-response task to all brothers — a task template, not its own feature.' },
+];
+
 // ─── FieldLabel ───────────────────────────────────────────────────────────────
 
 function FieldLabel({ text, required }: { text: string; required?: boolean }) {
@@ -308,6 +328,24 @@ export default function CreateTaskScreen() {
   const [description,  setDescription ] = useState(existing?.description ?? '');
   const [errors,       setErrors      ] = useState<string[]>([]);
 
+  // Task type (UI taxonomy). On edit, infer from the existing flags. Selecting a
+  // 'form' type presets the same fields; 'info' types just explain + link out.
+  const [taskType, setTaskType] = useState<TaskTypeId>(
+    () => (existing?.requiresProof ? 'submission' : existing?.requiresApproval ? 'review' : 'basic'),
+  );
+  const selectedType = TASK_TYPES.find(t => t.id === taskType) ?? TASK_TYPES[0];
+
+  // Selecting a type presets the same form fields (no new model). 'submission'
+  // turns on a required submission; 'review' turns on review; 'basic' clears both.
+  function selectTaskType(t: TaskTypeDef) {
+    if (reviewLocked) return;   // don't re-preset a task already in review
+    setTaskType(t.id);
+    if (t.id === 'submission')      { setRequiresProof(true);  setAdvancedOpen(true); }
+    else if (t.id === 'review')     { setRequiresApproval(true); setAdvancedOpen(true); }
+    else if (t.id === 'basic')      { setRequiresProof(false); setRequiresApproval(false); }
+    // 'info' types (report/rsvp/attendance/poll) don't preset fields.
+  }
+
   // UI-only collapse state (presentation only; no effect on what gets submitted).
   // Event picker is collapsed by default; advanced options open only when an
   // edited task already uses them (so nothing configured is hidden on edit).
@@ -488,6 +526,29 @@ export default function CreateTaskScreen() {
           />
         </View>
 
+        {/* Task type — one core model, different presets. Makes important types
+            (Questionnaire/Report) visible instead of buried in prototypes. */}
+        <View style={s.field}>
+          <FieldLabel text="TASK TYPE" />
+          <View style={s.typeRow}>
+            {TASK_TYPES.map(t => {
+              const on = taskType === t.id;
+              return (
+                <Pressable key={t.id} style={[s.typeChip, on && s.typeChipOn]} disabled={reviewLocked} onPress={() => selectTaskType(t)}>
+                  <Text style={s.typeChipIcon}>{t.icon}</Text>
+                  <Text style={[s.typeChipText, on && s.typeChipTextOn]}>{t.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={s.typeBlurb}>{selectedType.blurb}</Text>
+          {selectedType.mode === 'info' && !!selectedType.link && (
+            <Pressable style={s.typeInfoBtn} onPress={() => router.push(selectedType.link as any)}>
+              <Text style={s.typeInfoBtnText}>{selectedType.linkLabel} ›</Text>
+            </Pressable>
+          )}
+        </View>
+
         {/* Locked notice — workflow fields are read-only once review has begun */}
         {reviewLocked && (
           <View style={s.lockedNote}>
@@ -572,8 +633,9 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Advanced options (time / proof / approval) — collapsed by default to
-            keep the common path short. Same controls, just grouped lower. */}
+        {/* Advanced options (time + Submission & Review) — only for form-type
+            tasks. Info types (report/rsvp/attendance/poll) use their own flow. */}
+        {selectedType.mode === 'form' && (
         <View style={s.field}>
           <Pressable style={s.advancedHeader} onPress={() => setAdvancedOpen(o => !o)}>
             <Text style={s.advancedHeaderText}>ADVANCED OPTIONS</Text>
@@ -663,6 +725,7 @@ export default function CreateTaskScreen() {
             </View>
           )}
         </View>
+        )}
 
         {/* Submit */}
         {missingHint !== '' && (
@@ -753,6 +816,17 @@ const s = StyleSheet.create({
   advancedHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   advancedHeaderText: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
   advancedChevron:    { fontSize: 13, color: '#64748b' },
+
+  // Task type selector
+  typeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
+  typeChipOn:     { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
+  typeChipIcon:   { fontSize: 14 },
+  typeChipText:   { fontSize: 13, fontWeight: '600', color: '#64748b' },
+  typeChipTextOn: { color: '#a5b4fc' },
+  typeBlurb:      { fontSize: 12, color: '#64748b', lineHeight: 17, marginTop: 10 },
+  typeInfoBtn:    { alignSelf: 'flex-start', marginTop: 12, backgroundColor: '#1e3a5f', borderRadius: 9, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 9, paddingHorizontal: 14 },
+  typeInfoBtnText:{ color: '#60a5fa', fontSize: 13, fontWeight: '700' },
 
   // Submission & Review section
   subReviewLabel: { fontSize: 12, fontWeight: '800', color: '#cbd5e1', letterSpacing: 0.6, marginBottom: 12 },
