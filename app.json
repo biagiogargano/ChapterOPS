@@ -36,6 +36,13 @@
     "scheme": "chapterops",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82cafda5-8c02-4974-b285-0db296cfaa19"
+      }
+    },
+    "owner": "biagiogargano"
   }
 }
