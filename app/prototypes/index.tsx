@@ -13,18 +13,25 @@ interface Group { label: string; items: Item[] }
 
 const GROUPS: Group[] = [
   {
-    // ONE intro experience — the guided tour flows into the setup wizard
-    // (org type → roles & tiers → invite). The individual steps below are reached
-    // inside that flow, not as separate competing prototypes.
-    label: 'GET STARTED',
+    // Distinct onboarding screens. (Duplicates removed: /first-run now redirects
+    // to the tour; the old leadership-tree is replaced by /setup/tree below.)
+    label: 'ONBOARDING & SETUP',
     items: [
-      { title: '🚀 Full intro & setup', sub: 'Guided click-through tour → org type → roles & tiers → invite. The whole first-run in one flow.', route: '/tutorial' },
+      { title: '🚀 Welcome tour',       sub: 'Annotated click-through of the app → flows into setup',  route: '/tutorial' },
+      { title: 'Org setup wizard',      sub: 'Name → org type → roles & tiers → invite',               route: '/setup' },
+      { title: 'Org type / templates',  sub: 'Pick org type → see default roles/events/report',        route: '/setup/org-type' },
+      { title: 'Invite link + join form', sub: 'Share a link; configure join questions (owner)',        route: '/setup/invite-link' },
+      { title: 'Join via link (joiner)', sub: 'The self-join form people fill out',                     route: '/join' },
+      { title: 'Add people manually (fallback)', sub: 'Type a few people in by hand',                  route: '/setup/invite-people' },
+      { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',      route: '/invite' },
+      { title: 'Org settings',          sub: 'Rename org · transfer ownership · customize',             route: '/org-settings' },
     ],
   },
   {
     label: 'PEOPLE & STRUCTURE',
     items: [
       { title: 'Org structure (tiers)', sub: 'Tap members by tier; owner edits reporting lines', route: '/setup/tree' },
+      { title: 'Delegate a task',  sub: 'Reassign down to a team member',              route: '/delegate' },
       { title: 'My committee',     sub: "Your group's members, events, and tasks",     route: '/committee' },
       { title: 'Members roster',   sub: 'Browse/search people · assign positions',     route: '/roster' },
     ],
