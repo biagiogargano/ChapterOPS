@@ -17,23 +17,27 @@ sandbox: **Me tab → 🧪 Prototype features** (the `/prototypes` hub).
 These demonstrate features that map cleanly onto events / tasks / structured
 responses (see `PRODUCT_DIRECTION.md` §2).
 
-## Onboarding & setup
-- **/setup** — guided first-run wizard, **roles-first** (name → who's in charge →
-  **pick which roles your org uses** → invite people into roles → done; only the
-  name is required, rest skippable). No org chart in setup.
-- **/setup/tree** — **OPTIONAL, advanced** reporting-lines editor reached from
-  Settings → Roles & structure; NOT part of required onboarding. Build committees /
-  "who reports to whom" by placing people, only if you want it.
-- **/invite** — what an invitee sees (role/committee, what accepting unlocks).
-- **/tutorial** — first-use welcome walkthrough.
-- **/org-settings** — rename org, **transfer ownership** (no-orphan confirm), links
-  to customize structure/members/reports.
+## Onboarding & setup — ONE intro experience
+There is a **single** intro prototype, not several competing ones:
+- **/tutorial** — the canonical entry: an **annotated click-through tour** (mock
+  screens with highlight rings, arrows, and callouts) that ends by flowing into…
+- **/setup** — the **roles-first** wizard (name → org type → who's in charge →
+  pick roles & order them into tiers → invite → done). Reached from the end of the
+  tour; only the name is required.
+- Steps reached **inside** that flow (not separate prototypes): `/setup/org-type`,
+  `/setup/invite-link`, `/join`, `/setup/invite-people`.
+- **/first-run** now just **redirects to /tutorial** (consolidated — no separate
+  first-run screen).
+- **/invite** — what an invitee sees; **/org-settings** — rename/transfer ownership
+  (these live in Settings, not the intro).
 
 ## People & structure
-- **/leadership** — leadership tree (reports-to + who-can-delegate), highlights you.
-- **/delegate** — delegate a task down the tree (uses the tree's delegation rule).
+- **/setup/tree** — the **canonical org structure** screen: members by tier
+  (color-coded, selectable), owner-only reporting-line editor. Replaces the old
+  separate leadership-tree prototype.
+- **/delegate** — delegate a task down to a team member.
 - **/committee** — a committee's group home (members, events, tasks).
-- **/roster** — browse/search members, add a member.
+- **/roster** — browse/search members, assign positions.
 
 ## Reports & meetings
 - **/report/weekly** — fill out & submit a weekly report (goal, value, %, select,

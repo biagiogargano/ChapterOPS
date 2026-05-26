@@ -13,27 +13,20 @@ interface Group { label: string; items: Item[] }
 
 const GROUPS: Group[] = [
   {
-    label: 'ONBOARDING & SETUP',
+    // ONE intro experience — the guided tour flows into the setup wizard
+    // (org type → roles & tiers → invite). The individual steps below are reached
+    // inside that flow, not as separate competing prototypes.
+    label: 'GET STARTED',
     items: [
-      { title: 'First-time experience ✨', sub: 'Empty chapter → guided → create your first event', route: '/first-run' },
-      { title: 'Org type / templates',  sub: 'Pick org type → see default roles/events/report',     route: '/setup/org-type' },
-      { title: 'Org setup wizard',      sub: 'Guided first-run: name, owner, structure, invites', route: '/setup' },
-      { title: 'Invite link + join form (default)', sub: 'Share a link; configure join questions (owner)', route: '/setup/invite-link' },
-      { title: 'Join via link (joiner)',  sub: 'The self-join form people fill out',                 route: '/join' },
-      { title: 'Add people manually (fallback)', sub: 'Type a few people in by hand',                route: '/setup/invite-people' },
-      { title: 'Build org tree',        sub: 'Place invited people into the hierarchy',             route: '/setup/tree' },
-      { title: 'Invitation (invitee)',  sub: 'What someone sees when invited to a role/committee',   route: '/invite' },
-      { title: 'Welcome walkthrough',   sub: 'First-use intro to the main surfaces',                 route: '/tutorial' },
-      { title: 'Org settings',          sub: 'Rename org · transfer ownership · customize',          route: '/org-settings' },
+      { title: '🚀 Full intro & setup', sub: 'Guided click-through tour → org type → roles & tiers → invite. The whole first-run in one flow.', route: '/tutorial' },
     ],
   },
   {
     label: 'PEOPLE & STRUCTURE',
     items: [
-      { title: 'Leadership tree',  sub: 'Who reports to whom · who can delegate down', route: '/leadership' },
-      { title: 'Delegate a task',  sub: 'Reassign down the tree (tree-driven rules)',  route: '/delegate' },
+      { title: 'Org structure (tiers)', sub: 'Tap members by tier; owner edits reporting lines', route: '/setup/tree' },
       { title: 'My committee',     sub: "Your group's members, events, and tasks",     route: '/committee' },
-      { title: 'Members roster',   sub: 'Browse/search people · add a member',         route: '/roster' },
+      { title: 'Members roster',   sub: 'Browse/search people · assign positions',     route: '/roster' },
     ],
   },
   {
