@@ -19,6 +19,7 @@ import {
   type TaskState,
 } from '@/lib/mockTasks';
 import { getRsvpEntry, refreshRsvpsFromSupabase, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
+import { isRsvpTaskExpired } from '@/lib/taskCompletion';
 import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
@@ -439,10 +440,20 @@ export default function TasksScreen() {
 
   // Use LIVE state (devTaskStore) so submit/approve/reject re-route the review
   // queue to the correct reviewer immediately, without requiring a reload.
-  const { mine, review, alert, reviewed } = getResponsibilityGroups(
+  const groups = getResponsibilityGroups(
     role,
     t => getStoredState(t.id, t.state),
   );
+
+  // Drop expired RSVP / date-name tasks (event already passed) from every bucket
+  // so the Tasks tab stops surfacing past-event RSVPs that can no longer be acted
+  // on. Answered RSVPs still appear with their state badge (handled by the
+  // status filter), but a passed event removes the task entirely.
+  const notExpired = (arr: MockTask[]) => arr.filter(t => !isRsvpTaskExpired(t));
+  const mine     = notExpired(groups.mine);
+  const review   = notExpired(groups.review);
+  const alert    = notExpired(groups.alert);
+  const reviewed = notExpired(groups.reviewed);
 
   const hasAny = mine.length + review.length + alert.length + reviewed.length > 0;
 

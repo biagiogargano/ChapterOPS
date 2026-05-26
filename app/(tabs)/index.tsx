@@ -42,7 +42,7 @@ import {
   type ReminderSeverity,
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
-import { isTaskCompleted } from '@/lib/taskCompletion';
+import { isTaskCompleted, isRsvpTaskExpired } from '@/lib/taskCompletion';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
@@ -608,9 +608,11 @@ export default function TodayScreen() {
   // Urgency from real due dates (falls back to stored urgency when no dueAt).
   // Completed tasks (answered RSVP, saved date name, approved) are hidden — Today
   // shows open work only.
-  const urgentMine = mine.filter(t => !isTaskCompleted(t, role) && (() => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; })());
-  const weekMine   = mine.filter(t => !isTaskCompleted(t, role) && urgencyOf(t) === 'week');
-  const reviewOpen = review.filter(t => !isTaskCompleted(t, role));
+  // Hide answered tasks AND expired RSVP/date tasks (event already passed).
+  const isOpen     = (t: typeof mine[number]) => !isTaskCompleted(t, role) && !isRsvpTaskExpired(t);
+  const urgentMine = mine.filter(t => isOpen(t) && (() => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; })());
+  const weekMine   = mine.filter(t => isOpen(t) && urgencyOf(t) === 'week');
+  const reviewOpen = review.filter(t => isOpen(t));
 
   // ── Live event lists — refresh whenever screen gains focus ──────────────────
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).

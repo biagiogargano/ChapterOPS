@@ -24,7 +24,7 @@ import {
   type MockTask,
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
-import { isTaskCompleted } from '@/lib/taskCompletion';
+import { isTaskCompleted, isRsvpTaskExpired } from '@/lib/taskCompletion';
 import { useRsvpVersion } from '@/lib/rsvpStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -249,7 +249,7 @@ export default function CalendarScreen() {
     const m = new Map<string, MockTask[]>();
     for (const t of filterTasksForRole(role)) {
       if (t.isWorkflowParent || !t.dueAt) continue;
-      if (isTaskCompleted(t, role)) continue;
+      if (isTaskCompleted(t, role) || isRsvpTaskExpired(t)) continue;
       const iso = t.dueAt.slice(0, 10);
       (m.get(iso) ?? m.set(iso, []).get(iso)!).push(t);
     }
