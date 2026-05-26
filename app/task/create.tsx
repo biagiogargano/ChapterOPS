@@ -12,6 +12,7 @@ import {
   type ProofType,
 } from '@/lib/mockTasks';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
@@ -321,16 +322,20 @@ export default function CreateTaskScreen() {
 
   // Picker options (soonest first) + a "standalone" sentinel. The searchable
   // picker handles filtering as the list grows.
+  // Only offer events whose kind this role may manage tasks for (president/
+  // pro_consul → all; each chair → their domain). Keeps the standalone-create
+  // picker from linking a task to an event the role can't manage.
   const eventPickerOptions = useMemo(() => [
     { id: STANDALONE_OPTION, label: 'None — standalone task' },
     ...[...events]
+      .filter(e => canManageEventTasks(role, e.kind))
       .sort((a, b) => a.dayOffset - b.dayOffset)
       .map(e => ({
         id:       e.id,
         label:    e.title,
         sublabel: `${getEventDate(e.dayOffset).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${e.time}`,
       })),
-  ], [events]);
+  ], [events, role]);
 
   // Launched from Event Detail ("+ Add Task") → the linked event is fixed to that
   // event; show a read-only summary instead of the full picker. Editing an
@@ -344,6 +349,13 @@ export default function CreateTaskScreen() {
   const selectedEventTitle = linkedEventId
     ? (events.find(e => e.id === linkedEventId)?.title ?? 'Selected event')
     : 'None — standalone task';
+
+  // Event-task permission gate: if this (new) task is linked to an event whose
+  // kind the role may not manage, block creation with a clear message. Mirrors
+  // Event Detail, where "+ Add Task" is hidden for such events. Edit mode is left
+  // to canManageTask (the existing per-task gate) so this only affects creation.
+  const linkedEventObj = linkedEventId ? events.find(e => e.id === linkedEventId) : undefined;
+  const blockedByEventKind = !editing && !!linkedEventObj && !canManageEventTasks(role, linkedEventObj.kind);
 
   // Reviewer options = leadership roles, excluding the assignee (a task can't
   // review itself). Recompute + reset when assignee changes (skip while locked).
@@ -375,6 +387,7 @@ export default function CreateTaskScreen() {
   }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit =
+    !blockedByEventKind &&
     title.trim().length > 0 &&
     dateString !== '' &&
     (!requiresProof    || !!proofType) &&
@@ -393,6 +406,11 @@ export default function CreateTaskScreen() {
         : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`} to ${editing ? 'save' : 'create'} this task.`;
 
   function handleSubmit() {
+    // Hard stop: never create a task linked to an event the role can't manage.
+    if (blockedByEventKind) {
+      setErrors(['Your role can’t manage tasks for this event’s type.']);
+      return;
+    }
     const errs: string[] = [];
     if (!title.trim())  errs.push('Task title is required.');
     if (!dateString)    errs.push('Please pick a due date.');
@@ -488,6 +506,16 @@ export default function CreateTaskScreen() {
             returnKeyType="next"
           />
         </View>
+
+        {/* Permission block — this task is linked to an event whose kind the
+            role can't manage. Submit is disabled; offer the way out. */}
+        {blockedByEventKind && (
+          <View style={s.blockedNote}>
+            <Text style={s.blockedNoteText}>
+              Your role can’t manage tasks for this event’s type. Link a different event or create a standalone task.
+            </Text>
+          </View>
+        )}
 
         {/* Locked notice — workflow fields are read-only once review has begun */}
         {reviewLocked && (
@@ -692,6 +720,8 @@ const s = StyleSheet.create({
 
   lockedNote:     { backgroundColor: '#1c1407', borderRadius: 10, borderWidth: 1, borderColor: '#854d0e', padding: 12, marginBottom: 24 },
   lockedNoteText: { fontSize: 12, color: '#fbbf24', lineHeight: 18 },
+  blockedNote:     { backgroundColor: '#2a0a0a', borderRadius: 10, borderWidth: 1, borderColor: '#7f1d1d', padding: 12, marginBottom: 24 },
+  blockedNoteText: { fontSize: 12, color: '#f87171', lineHeight: 18 },
   lockedField:    { opacity: 0.5 },
 
   field:         { marginBottom: 28 },

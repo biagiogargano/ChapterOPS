@@ -20,6 +20,7 @@ import {
   type RsvpStatus,
 } from '@/lib/rsvpStore';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
@@ -765,6 +766,10 @@ export default function EventDetailScreen() {
 
   // Role-gated officer sections
   const officer     = isOfficer(role);
+  // Task management (Apply template / + Add Task) follows event-kind permissions:
+  // a role may only manage tasks on events whose kind is in its allowed set.
+  // president/pro_consul → any kind; each chair → their domain; brother → none.
+  const canManageTasks = officer && canManageEventTasks(role, event.kind);
   const isBROAD     = role === 'president' || role === 'pro_consul';
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';
@@ -959,7 +964,7 @@ export default function EventDetailScreen() {
               {taskOps.total > 0 && (
                 <Text style={s.prepProgressText}>{taskOps.completed}/{taskOps.total} done</Text>
               )}
-              {officer && (
+              {canManageTasks && (
                 <>
                   <Pressable onPress={() => setTemplatePickerOpen(true)}>
                     <Text style={s.addTaskText}>Apply template</Text>
@@ -972,7 +977,7 @@ export default function EventDetailScreen() {
             </View>
           </View>
           {relatedTasks.length === 0 ? (
-            officer ? (
+            canManageTasks ? (
               <Text style={s.noRelatedText}>
                 No prep tasks yet. Tap “Apply template” to add a standard task set, or “+ Add Task” to create one.
               </Text>
