@@ -711,6 +711,11 @@ export default function TodayScreen() {
           </View>
         )}
 
+        {/* Quick access to the walkthrough */}
+        <Pressable style={s.tourPill} onPress={() => router.push('/tutorial' as any)} hitSlop={6}>
+          <Text style={s.tourPillText}>🧭  How it works</Text>
+        </Pressable>
+
         {/* Header */}
         <Text style={s.greeting}>Good morning, {firstName}</Text>
         <Text style={s.chapter}>
@@ -816,6 +821,9 @@ const s = StyleSheet.create({
   bellBtn:       { paddingHorizontal: 14, paddingVertical: 4 },
   bellBadge:     { position: 'absolute', top: -3, right: 8, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  tourPill:     { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e1b4b', borderRadius: 20, borderWidth: 1, borderColor: '#4f46e5', paddingHorizontal: 12, paddingVertical: 6, marginBottom: 14 },
+  tourPillText: { color: '#a5b4fc', fontSize: 12, fontWeight: '700' },
 
   greeting: { fontSize: 28, fontWeight: '800', color: '#f8fafc', marginBottom: 4 },
   chapter:  { fontSize: 12, color: '#6366f1', fontWeight: '700', letterSpacing: 0.5, marginBottom: 28 },
