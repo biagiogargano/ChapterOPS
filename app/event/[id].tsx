@@ -544,12 +544,15 @@ export default function EventDetailScreen() {
     if (fresh) setEvent(fresh);
   }, [id]));
 
-  // Related tasks for this event. Officers see ALL of the event's tasks (chapter-
-  // wide) so an applied template's generated tasks — which may be assigned to
-  // other officers and thus role-hidden — are fully visible here and the prep
-  // progress matches the Officer Overview. Non-officers stay role-scoped.
+  // Related tasks for this event. A user sees an event's tasks only when they can
+  // MANAGE that event's kind (president/pro_consul → any; the owning chair → their
+  // domain) — those see EVERY task on the event (incl. template-generated tasks
+  // assigned to others). Everyone else stays role-scoped (filterTasksForRole =
+  // only tasks assigned to them or that they review), so an unrelated officer
+  // (e.g. Kustos on a Social event) doesn't see foreign event tasks.
   // Match by linkedEventId when present (robust to a title edit), else by title.
-  const taskSource = isOfficer(role) ? getAllTasks() : filterTasksForRole(role);
+  const canManageThisEvent = event ? canManageEventTasks(role, event.kind) : false;
+  const taskSource = canManageThisEvent ? getAllTasks() : filterTasksForRole(role);
   const allRelatedTasks = taskSource.filter(t => {
     if (t.isWorkflowParent) return false;
     return t.linkedEventId ? t.linkedEventId === event?.id : t.linkedEvent === event?.title;
@@ -769,7 +772,8 @@ export default function EventDetailScreen() {
   // Task management (Apply template / + Add Task) follows event-kind permissions:
   // a role may only manage tasks on events whose kind is in its allowed set.
   // president/pro_consul → any kind; each chair → their domain; brother → none.
-  const canManageTasks = officer && canManageEventTasks(role, event.kind);
+  // Same predicate as the related-task visibility gate above.
+  const canManageTasks = canManageThisEvent;
   const isBROAD     = role === 'president' || role === 'pro_consul';
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';

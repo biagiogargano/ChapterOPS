@@ -30,6 +30,7 @@ import {
   type RsvpStatus,
 } from '@/lib/rsvpStore';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
+import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -85,7 +86,7 @@ function RsvpStatusBadge({ status }: { status: RsvpStatus }) {
 
 // ─── Responsibility context badge ────────────────────────────────────────────
 
-function ContextBadge({ isMine, isReviewer }: { isMine: boolean; isReviewer: boolean }) {
+function ContextBadge({ isMine, isReviewer, canSupervise }: { isMine: boolean; isReviewer: boolean; canSupervise: boolean }) {
   if (isMine && isReviewer) {
     return (
       <View style={[s.ctxBadge, { backgroundColor: '#1a2535' }]}>
@@ -107,6 +108,11 @@ function ContextBadge({ isMine, isReviewer }: { isMine: boolean; isReviewer: boo
       </View>
     );
   }
+  // Only claim supervision when the role can actually manage/supervise this task
+  // (its named supervisor, or a role that manages the linked event's kind). A
+  // role with no stake (e.g. a chair viewing another domain's task) gets no badge
+  // instead of a misleading "You're Supervising".
+  if (!canSupervise) return null;
   return (
     <View style={[s.ctxBadge, { backgroundColor: '#162032' }]}>
       <Text style={[s.ctxText, { color: '#64748b' }]}>You're Supervising</Text>
@@ -854,6 +860,14 @@ export default function TaskDetailScreen() {
   const isReviewer     = canApproveTask(task, role);
   const isReviewerOnly = isReviewer && !isAssignee;
 
+  // Supervision = this role's named supervisor, OR a role that can manage the
+  // linked event's kind (president/pro_consul → any; owning chair → their
+  // domain). Standalone tasks (no event) → only broad leadership supervises.
+  const isBroadLeader = role === 'president' || role === 'pro_consul';
+  const canSupervise  =
+    task.supervisorRole === role ||
+    (linkedEv ? canManageEventTasks(role, linkedEv.kind) : isBroadLeader);
+
   const showProofSubmit = task.type === 'structured' && task.requiresProof && isAssignee;
   // Approval-required tasks WITHOUT a proof requirement still need a submit path —
   // otherwise the assignee can't move it into review. Reuses the existing
@@ -899,7 +913,7 @@ export default function TaskDetailScreen() {
               </Text>
             </View>
           )}
-          <ContextBadge isMine={isAssignee} isReviewer={isReviewer} />
+          <ContextBadge isMine={isAssignee} isReviewer={isReviewer} canSupervise={canSupervise} />
         </View>
 
         {/* ── Title ── */}
