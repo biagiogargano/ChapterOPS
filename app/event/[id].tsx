@@ -291,12 +291,27 @@ function RelatedTaskCard({ task, onPress }: { task: MockTask; onPress: () => voi
   const statusColor = STATE_COLOR[state];
   const badge       = taskBadgeFor(state, overdue);
 
+  // Origin tag (presentational, derived from the id convention): template-applied
+  // prep tasks use deterministic `tmpl_` ids; officer-authored tasks use `tk_`
+  // ids (see mockTasks.addUserTask). Anything else (seed data) shows no tag.
+  const origin: 'auto' | 'added' | null =
+    task.id.startsWith('tmpl_') ? 'auto' : task.id.startsWith('tk_') ? 'added' : null;
+
   return (
     <Pressable style={[s.taskCard, overdue && s.taskCardOverdue]} onPress={onPress}>
       <View style={[s.taskStripe, { backgroundColor: overdue ? '#ef4444' : '#334155' }]} />
       <View style={s.taskBody}>
         <Text style={s.taskTitle} numberOfLines={1}>{task.title}</Text>
-        <Text style={[s.taskDue, overdue && s.taskDueRed]}>{dueLabelOf(task)}</Text>
+        <View style={s.taskMetaRow}>
+          {origin && (
+            <View style={origin === 'auto' ? s.originAuto : s.originAdded}>
+              <Text style={origin === 'auto' ? s.originAutoText : s.originAddedText}>
+                {origin === 'auto' ? 'AUTO' : 'ADDED'}
+              </Text>
+            </View>
+          )}
+          <Text style={[s.taskDue, overdue && s.taskDueRed]}>{dueLabelOf(task)}</Text>
+        </View>
       </View>
       <View style={[s.taskBadge, { backgroundColor: badge.bg }]}>
         <Text style={[s.taskBadgeText, { color: badge.color }]}>{badge.label}</Text>
@@ -957,7 +972,13 @@ export default function EventDetailScreen() {
             </View>
           </View>
           {relatedTasks.length === 0 ? (
-            <Text style={s.noRelatedText}>No related tasks yet.</Text>
+            officer ? (
+              <Text style={s.noRelatedText}>
+                No prep tasks yet. Tap “Apply template” to add a standard task set, or “+ Add Task” to create one.
+              </Text>
+            ) : (
+              <Text style={s.noRelatedText}>No related tasks yet.</Text>
+            )
           ) : (
             relatedTasks.map(task => (
               <RelatedTaskCard
@@ -1281,6 +1302,11 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: '#f1f5f9',
   },
+  taskMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   taskDue: {
     fontSize: 12,
     color: '#64748b',
@@ -1288,6 +1314,11 @@ const s = StyleSheet.create({
   taskDueRed: {
     color: '#f87171',
   },
+  // Origin tags (auto-generated from a template vs manually added)
+  originAuto:     { backgroundColor: '#1e293b', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: '#334155' },
+  originAutoText: { fontSize: 9, fontWeight: '800', color: '#94a3b8', letterSpacing: 0.4 },
+  originAdded:    { backgroundColor: '#1e1b4b', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: '#4f46e5' },
+  originAddedText:{ fontSize: 9, fontWeight: '800', color: '#a5b4fc', letterSpacing: 0.4 },
   taskBadge: {
     borderRadius: 6,
     paddingHorizontal: 8,
