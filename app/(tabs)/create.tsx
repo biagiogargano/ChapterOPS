@@ -21,10 +21,13 @@ const CORE_TILES: CreateTile[] = [
   { icon: '✅', title: 'Task',  sub: 'Assign work to a role or member',                          route: '/task/create',  accent: ENTITY_COLORS.task },
 ];
 
-// COMING LATER — lighter prototype concepts, deliberately de-emphasized.
+// COMING LATER — lighter prototype concepts, deliberately de-emphasized. Note:
+// there is no standalone "Announcements" feature — comms are action-linked. A
+// "Notice" is an update tied to an event/task, or an org notice only when it
+// truly belongs to neither (see backlog #9).
 const LATER_TILES: CreateTile[] = [
-  { icon: '📣', title: 'Announcement', sub: 'A notice tied to an event or task — not a chat feed', route: '/announcements', accent: ENTITY_COLORS.announcement },
-  { icon: '👥', title: 'Group',        sub: 'Loosely group members (early — not a full org system)', route: '/committee',   accent: ENTITY_COLORS.group },
+  { icon: '📣', title: 'Notice / Update', sub: 'An update on an event or task — or an org-wide notice. Not a feed or chat.', route: '/announcements', accent: ENTITY_COLORS.announcement },
+  { icon: '👥', title: 'Group',           sub: 'Loosely group members (early — not a full org system)',                    route: '/committee',     accent: ENTITY_COLORS.group },
 ];
 
 export default function CreateScreen() {
@@ -72,7 +75,7 @@ export default function CreateScreen() {
         ))}
       </View>
 
-      <Text style={s.footNote}>Event and Task are the real, core flows. Announcements and Groups are early prototypes coming later. A poll is just a task template — make one from Task.</Text>
+      <Text style={s.footNote}>Event and Task are the real, core flows. Notices/updates and Groups are early prototypes coming later — there's no standalone announcements feed; comms are tied to an event, task, or org notice. A poll is just a task template — make one from Task.</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );

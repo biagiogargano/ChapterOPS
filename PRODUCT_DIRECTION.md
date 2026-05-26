@@ -82,8 +82,11 @@ If something can't be expressed this way, that's a signal it may not belong in t
 - **NOT** a place for day-to-day work — no task lists or event feeds.
 
 ### Create (tab)
-- Single officer-gated entry point: **Event / Task** (real) + Announcement / Poll /
-  Group (prototype). Keeps "add anything" in one predictable place.
+- Single officer-gated entry point: **Event / Task** (real, CORE) + **Notice/Update**
+  & **Group** (prototype, coming later). Keeps "add anything" in one predictable
+  place. There is **no standalone Announcements feature** — a "Notice/Update" is
+  tied to an event/task, or an org notice only when it belongs to neither (#9).
+  Poll isn't a quadrant; it's a one-question task template.
 
 ## 4. Deferred / Experimental (NOT core, do not let these creep in)
 These are parked. They may return later as scoped checkpoints, but they are **not**

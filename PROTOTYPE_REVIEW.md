@@ -20,7 +20,8 @@ agnostic** (fraternity is template #1, not hardcoded). See `PRODUCT_DIRECTION.md
 - **Tasks** — one "My tasks" list, filter/sort, completed hidden w/ toggle.
 - **Calendar** — month grid + day detail; open tasks only.
 - **Create** — 2×2: **CORE = Event/Task** (full strength) vs **COMING LATER =
-  Announcement/Group** (dimmed, dashed, "PROTOTYPE" tag).
+  Notice/Update + Group** (dimmed, dashed, "PROTOTYPE" tag). No standalone
+  Announcements — a Notice is tied to an event/task or an org notice (#9).
 - **Me** — minimal: profile, org switcher, **Settings** (nested), sign out. Tap your
   **role** → org structure.
 - **Settings** — grouped: Organization / Members & Roles / Templates & Automation /

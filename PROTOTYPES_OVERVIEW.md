@@ -58,8 +58,10 @@ Distinct screens (duplicates removed — see note at the end):
 These are explicitly **not** part of the simplified core (`PRODUCT_DIRECTION.md`
 §4). They exist as throwaway mocks for feel only; they must not add tabs/sections
 to Today/Tasks/Events. Revisit later, if ever, as scoped checkpoints.
-- **/announcements** — chapter announcements feed + composer. *(Future: only as
-  action-linked notices tied to an event/task — backlog #9, never a general feed.)*
+- **/announcements** — **reframed as "Event/task updates & notices"** (no standalone
+  Announcements feature). Comms are action-linked: task comments, event updates, and
+  lightweight org notices only when they belong to no task/event (backlog #9). This
+  mock is kept to explore notices — **never a general feed/chat.**
 - **/poll** — quick chapter poll with live tallies. *(A poll is just a **task
   template** — a one-question task; not its own feature. This screen is a throwaway
   mock; the real poll = make a task from the Task flow.)*

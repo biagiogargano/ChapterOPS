@@ -59,7 +59,7 @@ const GROUPS: Group[] = [
     // it could become core (see copy).
     label: 'EXPERIMENTS · deferred',
     items: [
-      { title: 'Announcements',  sub: 'FUTURE: action-linked notice tied to an event/task — NOT a chat feed', route: '/announcements' },
+      { title: 'Event/task updates & notices', sub: 'Action-linked comments + org notices. NOT a standalone announcements feed or chat (backlog #9).', route: '/announcements' },
       { title: 'Quick poll',     sub: 'A poll = a one-question task template, not a standalone feature',       route: '/poll' },
     ],
   },

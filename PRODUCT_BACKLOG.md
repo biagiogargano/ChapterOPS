@@ -138,6 +138,21 @@ never a free-floating conversation.
 - **Announcement notices** tied to events/tasks (not a standalone wall).
 - **Reminders / notifications** that always link back to the relevant task/event.
 
+## DECISION: no standalone Announcements feature
+We do **not** need a standalone Announcements feature now — it risks becoming a
+separate feed/chat. **Replace it with action-linked comments & notices:**
+- **Task comment / clarification** — e.g. "Please upload the receipt."
+- **Event update / comment** — e.g. "Meeting moved to 7:30."
+- **Report follow-up comment** (later, depends on #6).
+- **Lightweight org-wide notice** — only when it truly belongs to no task/event,
+  e.g. "Dues deadline Friday."
+- **Push** associated with the relevant item — e.g. "Your task was rejected" (#10).
+
+The Create tab's old "Announcement" tile is now **"Notice / Update"** (tied to an
+event/task, or an org notice). The `/announcements` prototype is kept only to
+explore notices — **do not build a general feed/chat or a standalone announcements
+module.**
+
 ## Avoid for now (explicit non-goals)
 - General group chat
 - DMs
