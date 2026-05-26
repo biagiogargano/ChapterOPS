@@ -37,6 +37,10 @@ function todayIso(): string {
   const t = new Date();
   return isoDateFromParts(t.getFullYear(), t.getMonth(), t.getDate());
 }
+/** Friendly label for the collapsed due-date summary row. */
+function formatDueLabel(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
 const _now     = new Date();
 const _maxDate = new Date(_now.getFullYear(), _now.getMonth() + 12, _now.getDate());
 const MAX_ISO  = isoDateFromParts(_maxDate.getFullYear(), _maxDate.getMonth(), _maxDate.getDate());
@@ -306,6 +310,9 @@ export default function CreateTaskScreen() {
   // Event picker is collapsed by default; advanced options open only when an
   // edited task already uses them (so nothing configured is hidden on edit).
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  // Due-date calendar collapses to a summary row so it doesn't dominate the form;
+  // opens automatically in create mode when no date is set yet.
+  const [dateOpen, setDateOpen] = useState(() => !editing && !prefillDue.dateString);
   const [advancedOpen, setAdvancedOpen] = useState(
     () => editing && (!!existing?.requiresProof || !!existing?.requiresApproval || prefillDue.includeTime),
   );
@@ -528,17 +535,27 @@ export default function CreateTaskScreen() {
           )}
         </View>
 
-        {/* Due date */}
+        {/* Due date — collapses to a summary row so the calendar doesn't dominate */}
         <View style={s.field}>
           <FieldLabel text="DUE DATE" required />
           {errors.includes('Please pick a due date.') && (
             <Text style={s.errorMsg}>Please pick a due date.</Text>
           )}
-          <CalendarPicker
-            selected={dateString}
-            onSelect={d => { setDateString(d); setErrors([]); }}
-            maxIso={MAX_ISO}
-          />
+          <Pressable style={s.eventSelectRow} onPress={() => setDateOpen(o => !o)}>
+            <Text style={[s.eventSelectValue, !dateString && s.eventSelectPlaceholder]} numberOfLines={1}>
+              {dateString ? formatDueLabel(dateString) : 'Pick a due date'}
+            </Text>
+            <Text style={s.eventSelectChevron}>{dateOpen ? '▴' : '▾'}</Text>
+          </Pressable>
+          {dateOpen && (
+            <View style={{ marginTop: 12 }}>
+              <CalendarPicker
+                selected={dateString}
+                onSelect={d => { setDateString(d); setErrors([]); setDateOpen(false); }}
+                maxIso={MAX_ISO}
+              />
+            </View>
+          )}
         </View>
 
         {/* Description */}
@@ -603,14 +620,17 @@ export default function CreateTaskScreen() {
                 )}
               </View>
 
-              {/* Requires approval */}
+              {/* Review — does the response need approval? (orthogonal to proof) */}
               <View style={[s.field, reviewLocked && s.lockedField]}>
-                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresApproval(v => !v)}>
-                  <View style={[s.toggleBox, requiresApproval && s.toggleBoxOn]}>
-                    {requiresApproval && <Text style={s.toggleCheck}>✓</Text>}
-                  </View>
-                  <Text style={s.toggleLabel}>Requires approval</Text>
-                </Pressable>
+                <Text style={s.subReviewLabel}>REVIEW</Text>
+                <View style={s.chipWrap}>
+                  <Pressable style={[s.chip, !requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(false)}>
+                    <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just complete</Text>
+                  </Pressable>
+                  <Pressable style={[s.chip, requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(true)}>
+                    <Text style={[s.chipText, requiresApproval && s.chipTextOn]}>Needs review</Text>
+                  </Pressable>
+                </View>
                 {requiresApproval && (
                   <>
                     <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
@@ -629,6 +649,7 @@ export default function CreateTaskScreen() {
                     </View>
                   </>
                 )}
+                <Text style={s.subFootHint}>Proof of completion and review are separate choices — set proof above; review just decides if a reviewer approves the result.</Text>
               </View>
             </View>
           )}
@@ -715,8 +736,13 @@ const s = StyleSheet.create({
 
   // Collapsed standalone event selector (summary row + chevron)
   eventSelectRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  eventSelectValue:   { flex: 1, fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
-  eventSelectChevron: { fontSize: 13, color: '#64748b', marginLeft: 8 },
+  eventSelectValue:       { flex: 1, fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  eventSelectPlaceholder: { color: '#64748b', fontWeight: '500' },
+  eventSelectChevron:     { fontSize: 13, color: '#64748b', marginLeft: 8 },
+
+  // Review section (within Advanced options)
+  subReviewLabel: { fontSize: 12, fontWeight: '800', color: '#cbd5e1', letterSpacing: 0.6, marginBottom: 12 },
+  subFootHint:    { fontSize: 12, color: '#475569', lineHeight: 17, marginTop: 14 },
 
   // Advanced options disclosure header
   advancedHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
