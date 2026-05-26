@@ -57,11 +57,12 @@ agnostic** (fraternity is template #1, not hardcoded). See `PRODUCT_DIRECTION.md
   Coming Up, Create, roster, agenda, announcements, committee.
 
 **Task creation:**
-- **Task-type selector** at top: Basic / Submission / Review / Questionnaire-Report
-  / RSVP / Attendance / Poll — one core model. "Form" types preset fields; "info"
-  types (report/rsvp/attendance/poll) explain + link to their real flow.
-- **"Submission & Review"** consolidates the old separate "Requires proof" +
-  "Requires approval" toggles into one section (same underlying fields).
+- **3 task types = response formats** ("How is it completed?"): **Select an answer**
+  (covers mark-done / yes-no / RSVP / poll), **Text submission**, **File/photo
+  upload**. Everything fits in these three; they map onto the existing
+  requiresProof/proofType fields (no new schema). Multi-choice options + real upload
+  arrive with structured-response / Proof v1.
+- **Review** is a separate orthogonal choice (No review / Needs review → reviewer).
 - Due-date calendar collapses to a summary row; fields ordered what/who/when/event.
 
 **Navigation:** global back button now names the screen you're returning to
@@ -83,10 +84,11 @@ agnostic** (fraternity is template #1, not hardcoded). See `PRODUCT_DIRECTION.md
   (4) invite-link onboarding → (5) Weekly Reports v1.
 
 ## What I want ChatGPT to pressure-test
-1. Is the **task-type selector** the right call, or does surfacing types that aren't
-   buildable yet (report/rsvp/attendance/poll route out) confuse more than it helps?
-2. Is **"Submission & Review"** clearer than two toggles — and is the
-   proof-without-review / review-without-proof nuance still obvious?
+1. Are **3 response-format task types** (select-an-answer / text / file-photo) the
+   right reduction — does everything really fit, and is "mark done = select an
+   answer" intuitive?
+2. Is **Review as a separate orthogonal choice** (not bundled with submission)
+   clear?
 3. **Tiers vs reporting tree:** are 4 fixed tiers right, or too rigid? Should tiers
    be org-type-configurable?
 4. **Teams/committees (#11):** does "auto-populate the structure + many-to-many"

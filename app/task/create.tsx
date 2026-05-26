@@ -109,36 +109,24 @@ function buildTaskEditNotice(
 // Sentinel option id meaning "not linked to any event" in the event picker.
 const STANDALONE_OPTION = '__standalone__';
 
-// Display labels for the "what should they submit?" chips. Values reuse the
-// existing ProofType enum (no model change). "Any proof" is deferred to Proof v1
-// (needs a new enum value + the real upload pipeline).
-const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
-  { value: 'text',       label: 'Text update' },
-  { value: 'link',       label: 'Link' },
-  { value: 'image',      label: 'Photo' },
-  { value: 'document',   label: 'File' },
-  { value: 'screenshot', label: 'Screenshot' },
-];
-
-// ─── Task types (UI taxonomy over ONE core model) ─────────────────────────────
-// Selecting a type just presets/reveals the same task form (no new schema, no new
-// task-state). 'form' types are fully buildable here today (basic/submission/
-// review). 'info' types (report/rsvp/attendance/poll) explain how that type works
-// in the model and link to its real flow/prototype — they're not separate systems.
-type TaskTypeId = 'basic' | 'submission' | 'review' | 'report' | 'rsvp' | 'attendance' | 'poll';
-interface TaskTypeDef {
-  id: TaskTypeId; label: string; icon: string; blurb: string;
-  mode: 'form' | 'info'; link?: string; linkLabel?: string;
-}
+// ─── Task types = how a task is completed (3 response formats, ONE core model) ──
+// Everything fits in three: a task is completed by selecting an answer (incl.
+// "mark done", yes/no, RSVP, poll), submitting text, or uploading a file/photo.
+// Each maps onto the existing fields (requiresProof/proofType) — no new schema,
+// no new task-state. Multi-choice options + real upload arrive with the
+// structured-response / Proof v1 work.
+type TaskTypeId = 'choice' | 'text' | 'file';
+interface TaskTypeDef { id: TaskTypeId; label: string; icon: string; blurb: string }
 const TASK_TYPES: TaskTypeDef[] = [
-  { id: 'basic',      label: 'Basic',          icon: '✅', mode: 'form', blurb: 'A normal to-do assigned to a role or member.' },
-  { id: 'submission', label: 'Submission',     icon: '📎', mode: 'form', blurb: 'They submit something (text, link, photo, file) — optionally reviewed.' },
-  { id: 'review',     label: 'Review',         icon: '🔎', mode: 'form', blurb: 'Submitted for review, then approved or rejected by a reviewer.' },
-  { id: 'report',     label: 'Questionnaire / Report', icon: '📋', mode: 'info', link: '/report/weekly', linkLabel: 'Preview the report prototype', blurb: 'A structured-response task — e.g. the Weekly Officer Report. Officers fill in answers, then submit. (Form builder comes with Weekly Reports v1.)' },
-  { id: 'rsvp',       label: 'RSVP',           icon: '📅', mode: 'info', link: '/event/create', linkLabel: 'Create an event with RSVP', blurb: 'An event-linked RSVP — generated from an event, not created standalone.' },
-  { id: 'attendance', label: 'Attendance',     icon: '✋', mode: 'info', link: '/event/create', linkLabel: 'Set up on an event', blurb: 'An event-linked attendance task that opens at the event start.' },
-  { id: 'poll',       label: 'Poll / question', icon: '📊', mode: 'info', link: '/poll', linkLabel: 'Open the poll prototype', blurb: 'A one-question structured-response task to all brothers — a task template, not its own feature.' },
+  { id: 'choice', label: 'Select an answer',   icon: '🔘', blurb: 'They complete it by choosing — e.g. mark done, yes/no, RSVP, or a poll option.' },
+  { id: 'text',   label: 'Text submission',    icon: '📝', blurb: 'They write a short text update or response.' },
+  { id: 'file',   label: 'File / photo upload', icon: '📎', blurb: 'They upload a photo or file — receipt, flyer, screenshot, sheet. (Real upload arrives with Proof v1.)' },
 ];
+/** Map a stored proofType back to one of the 3 response formats (for edit prefill). */
+function typeOf(requiresProof?: boolean, proofType?: ProofType): TaskTypeId {
+  if (!requiresProof) return 'choice';
+  return proofType === 'image' || proofType === 'document' || proofType === 'screenshot' ? 'file' : 'text';
+}
 
 // ─── FieldLabel ───────────────────────────────────────────────────────────────
 
@@ -328,22 +316,19 @@ export default function CreateTaskScreen() {
   const [description,  setDescription ] = useState(existing?.description ?? '');
   const [errors,       setErrors      ] = useState<string[]>([]);
 
-  // Task type (UI taxonomy). On edit, infer from the existing flags. Selecting a
-  // 'form' type presets the same fields; 'info' types just explain + link out.
-  const [taskType, setTaskType] = useState<TaskTypeId>(
-    () => (existing?.requiresProof ? 'submission' : existing?.requiresApproval ? 'review' : 'basic'),
-  );
+  // Task type = response format. On edit, infer from the existing fields.
+  const [taskType, setTaskType] = useState<TaskTypeId>(() => typeOf(existing?.requiresProof, existing?.proofType));
   const selectedType = TASK_TYPES.find(t => t.id === taskType) ?? TASK_TYPES[0];
 
-  // Selecting a type presets the same form fields (no new model). 'submission'
-  // turns on a required submission; 'review' turns on review; 'basic' clears both.
+  // Selecting a type maps onto the same fields (no new model): choice = no
+  // attachment (completed by answering / mark-done); text = text submission;
+  // file = photo/file upload. Review is a separate choice below.
   function selectTaskType(t: TaskTypeDef) {
     if (reviewLocked) return;   // don't re-preset a task already in review
     setTaskType(t.id);
-    if (t.id === 'submission')      { setRequiresProof(true);  setAdvancedOpen(true); }
-    else if (t.id === 'review')     { setRequiresApproval(true); setAdvancedOpen(true); }
-    else if (t.id === 'basic')      { setRequiresProof(false); setRequiresApproval(false); }
-    // 'info' types (report/rsvp/attendance/poll) don't preset fields.
+    if (t.id === 'choice')    { setRequiresProof(false); }
+    else if (t.id === 'text') { setRequiresProof(true); setProofType('text'); }
+    else if (t.id === 'file') { setRequiresProof(true); setProofType('image'); }
   }
 
   // UI-only collapse state (presentation only; no effect on what gets submitted).
@@ -526,10 +511,10 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Task type — one core model, different presets. Makes important types
-            (Questionnaire/Report) visible instead of buried in prototypes. */}
-        <View style={s.field}>
-          <FieldLabel text="TASK TYPE" />
+        {/* Task type = how it's completed. Three response formats cover everything:
+            select an answer (incl. mark done) · text · file/photo. */}
+        <View style={[s.field, reviewLocked && s.lockedField]}>
+          <FieldLabel text="HOW IS IT COMPLETED?" />
           <View style={s.typeRow}>
             {TASK_TYPES.map(t => {
               const on = taskType === t.id;
@@ -542,11 +527,6 @@ export default function CreateTaskScreen() {
             })}
           </View>
           <Text style={s.typeBlurb}>{selectedType.blurb}</Text>
-          {selectedType.mode === 'info' && !!selectedType.link && (
-            <Pressable style={s.typeInfoBtn} onPress={() => router.push(selectedType.link as any)}>
-              <Text style={s.typeInfoBtnText}>{selectedType.linkLabel} ›</Text>
-            </Pressable>
-          )}
         </View>
 
         {/* Locked notice — workflow fields are read-only once review has begun */}
@@ -633,9 +613,8 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Advanced options (time + Submission & Review) — only for form-type
-            tasks. Info types (report/rsvp/attendance/poll) use their own flow. */}
-        {selectedType.mode === 'form' && (
+        {/* Advanced options (specific time + review). The response format is the
+            task type above; review is the only other decision. */}
         <View style={s.field}>
           <Pressable style={s.advancedHeader} onPress={() => setAdvancedOpen(o => !o)}>
             <Text style={s.advancedHeaderText}>ADVANCED OPTIONS</Text>
@@ -659,40 +638,13 @@ export default function CreateTaskScreen() {
                 )}
               </View>
 
-              {/* ── SUBMISSION & REVIEW — one cohesive section. Same fields
-                  underneath (requiresProof / proofType / requiresApproval /
-                  reviewerRole); presented as related decisions, not two systems. ── */}
+              {/* ── REVIEW — does the response need approval? (orthogonal to the
+                  response format chosen above). ── */}
               <View style={[s.field, reviewLocked && s.lockedField]}>
-                <Text style={s.subReviewLabel}>SUBMISSION &amp; REVIEW</Text>
-
-                {/* Submission required? */}
-                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
-                  <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
-                    {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
-                  </View>
-                  <Text style={s.toggleLabel}>Requires a submission</Text>
-                </Pressable>
-                {requiresProof && (
-                  <>
-                    <Text style={s.subHint}>What should they submit?</Text>
-                    <View style={s.chipWrap}>
-                      {PROOF_OPTIONS.map(({ value, label }) => {
-                        const on = proofType === value;
-                        return (
-                          <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
-                            <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </>
-                )}
-
-                {/* Review required? — a choice, framed as part of the same flow */}
-                <Text style={[s.subHint, { marginTop: 18 }]}>Review</Text>
+                <Text style={s.subReviewLabel}>REVIEW</Text>
                 <View style={s.chipWrap}>
                   <Pressable style={[s.chip, !requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(false)}>
-                    <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just submit</Text>
+                    <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just complete</Text>
                   </Pressable>
                   <Pressable style={[s.chip, requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(true)}>
                     <Text style={[s.chipText, requiresApproval && s.chipTextOn]}>Needs review</Text>
@@ -716,16 +668,11 @@ export default function CreateTaskScreen() {
                     </View>
                   </>
                 )}
-
-                <Text style={s.subFootHint}>
-                  A submission can be just for records (no review), or you can require review —
-                  with or without something attached.
-                </Text>
+                <Text style={s.subFootHint}>The response (answer, text, or file/photo) is set by the task type above. Review just decides if a reviewer approves it.</Text>
               </View>
             </View>
           )}
         </View>
-        )}
 
         {/* Submit */}
         {missingHint !== '' && (
