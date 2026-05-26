@@ -106,7 +106,20 @@ approval, org-preference landing on default after re-login, cosmetic issues.
   and `EXPO_PUBLIC_AUTH_ENABLED=true`, `EXPO_PUBLIC_ORG_SCOPED_DATA=true`. Committed
   flags stay `false`; this file is never committed (`.env*.local` is gitignored).
 - **Run (first tiny alpha):** copy that profile to `.env.local`, then `npx expo start -c --tunnel`; testers use **Expo Go** + the QR.
-- **Later (durable):** EAS preview build with the four `EXPO_PUBLIC_*` vars baked in (iOS installable builds need Apple Developer + TestFlight).
+- **Durable (TestFlight) — `eas.json` is scaffolded (phase-2):**
+  - Profiles: `development` (dev client), `preview` (internal/ad-hoc, flag-on),
+    `alpha` (store → TestFlight, flag-on, `autoIncrement` buildNumber).
+  - The two **flag vars are baked into the profile `env`** (`EXPO_PUBLIC_AUTH_ENABLED`
+    / `EXPO_PUBLIC_ORG_SCOPED_DATA` = `"true"`). Committed `lib/flags.ts` stays `false`.
+  - The **alpha Supabase `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+    are NOT committed** — set them as **EAS environment variables** for the build
+    (`eas env:create` or the EAS dashboard) so no key lands in git.
+  - `app.json` carries `ios.bundleIdentifier` = `com.biagiogargano.chapterops` +
+    `ios.buildNumber`; `eas.json` `appVersionSource: "local"` so `autoIncrement` bumps it.
+  - **Interactive steps (you, with Apple 2FA), not yet run:** `eas login` →
+    `eas init` / `eas build:configure` (writes `extra.eas.projectId`) →
+    `eas build -p ios --profile alpha` → create the App Store Connect app + add
+    Internal Testers → `eas submit -p ios --profile alpha`. Do NOT run these until approved.
 - Confirm the running build is flag-on: login required, real identity shows, **no "DEV MODE · auth bypassed"** badge, no mock/demo data.
 
 ## 10. Rollback plan
@@ -122,6 +135,9 @@ Flags are env/build-only and committed `false`, so rollback needs **no code/git 
 - [ ] **Email auth on**; **RLS + claim RPCs live** on the alpha project.
 - [ ] Flag-on build verified: login required, real identity, **no auth-bypassed badge**, no mock/demo data.
 - [ ] Committed flags still `false`; `git status` clean; `.env*.local` not tracked.
+- [ ] **EAS:** `eas.json` `alpha` profile present (flag-on env); Supabase URL/key set
+      as **EAS env vars** (not committed); `bundleIdentifier` set; `eas init` has
+      written `extra.eas.projectId` before building.
 - [ ] `npx tsc --noEmit && npm run test:pure` green on the build commit.
 - [ ] Limitations (§8) sent to testers; point of contact + issue-reporting method agreed.
 - [ ] Rollback path confirmed (stop server / don't promote build).
