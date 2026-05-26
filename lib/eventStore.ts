@@ -62,20 +62,24 @@ export interface UserCreatedEvent {
 
 // ─── Role → allowed event kinds ───────────────────────────────────────────────
 
+// Officers may create only the event kinds that match their true domain. Roles
+// whose real domains have no event kind yet (kustos=ritual, tribune=comms,
+// house_manager=facility) get [] for now — they're still recognized officers,
+// they just can't create events until those kinds exist (Option B, later).
 export const ROLE_ALLOWED_KINDS: Record<Role, EventKind[]> = {
   president:          ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
   pro_consul:         ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
   annotator:          ['chapter', 'eboard'],
   quaestor:           ['eboard'],
-  magister:           ['academic', 'chapter'],
-  kustos:             ['chapter', 'risk'],
-  tribune:            ['chapter'],
-  social_chair:       ['social', 'philanthropy'],
+  magister:           ['academic'],
+  kustos:             [],
+  tribune:            [],
+  social_chair:       ['social'],
   risk_manager:       ['social', 'risk'],
   recruitment_chair:  ['recruitment'],
-  philanthropy_chair: ['philanthropy', 'social'],
+  philanthropy_chair: ['philanthropy'],
   scholarship_chair:  ['academic'],
-  house_manager:      ['chapter'],
+  house_manager:      [],
   brother:            [],
 };
 
