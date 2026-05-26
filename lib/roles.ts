@@ -31,7 +31,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   philanthropy_chair: 'Philanthropy Chair',
   scholarship_chair:  'Scholarship Chair',
   house_manager:      'House Manager',
-  brother:            'Brother',
+  brother:            'All Brothers',
 };
 
 export const OFFICER_ROLES: Role[] = [

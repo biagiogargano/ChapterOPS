@@ -62,24 +62,28 @@ export interface UserCreatedEvent {
 
 // ─── Role → allowed event kinds ───────────────────────────────────────────────
 
-// Officers may create only the event kinds that match their true domain. Roles
-// whose real domains have no event kind yet (kustos=ritual, tribune=comms,
-// house_manager=facility) get [] for now — they're still recognized officers,
-// they just can't create events until those kinds exist (Option B, later).
+// Officers may create only the event kinds that match their true domain. Now
+// that every officer domain has a real event kind, each officer gets exactly the
+// kind(s) they own; only general members (brother) cannot create events.
+const ALL_KINDS: EventKind[] = [
+  'chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk',
+  'finance', 'education', 'ritual', 'communications', 'facility',
+];
+
 export const ROLE_ALLOWED_KINDS: Record<Role, EventKind[]> = {
-  president:          ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
-  pro_consul:         ['chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy', 'risk'],
+  president:          ALL_KINDS,
+  pro_consul:         ALL_KINDS,
   annotator:          ['chapter', 'eboard'],
-  quaestor:           ['eboard'],
-  magister:           ['academic'],
-  kustos:             [],
-  tribune:            [],
+  quaestor:           ['finance'],
+  magister:           ['education'],
+  kustos:             ['ritual'],
+  tribune:            ['communications'],
   social_chair:       ['social'],
-  risk_manager:       ['social', 'risk'],
+  risk_manager:       ['risk'],
   recruitment_chair:  ['recruitment'],
   philanthropy_chair: ['philanthropy'],
   scholarship_chair:  ['academic'],
-  house_manager:      [],
+  house_manager:      ['facility'],
   brother:            [],
 };
 

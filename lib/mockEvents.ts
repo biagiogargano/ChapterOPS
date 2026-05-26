@@ -5,7 +5,12 @@ export type EventKind =
   | 'academic'      // Study hours, scholarship
   | 'recruitment'   // Recruitment events, Mission 365, hangouts
   | 'philanthropy'  // Service / philanthropy
-  | 'risk';         // Risk/safety events
+  | 'risk'          // Risk/safety events
+  | 'finance'       // Budget, dues, fundraising (Quaestor)
+  | 'education'     // New-member / pledge education (Magister)
+  | 'ritual'        // Ritual / initiation (Kustos)
+  | 'communications'// Communications / alumni / announcements (Tribune)
+  | 'facility';     // House / facility / workday (House Manager)
 // Attendance + RSVP requirement, encoded in one field (no schema change):
 //   all          — mandatory attendance (RSVP required)
 //   officers     — officers only, attendance + RSVP required
@@ -96,6 +101,11 @@ export const KIND_LABELS: Record<EventKind, string> = {
   recruitment: 'Recruitment',
   philanthropy:'Philanthropy',
   risk:        'Risk/Safety',
+  finance:     'Finance',
+  education:   'Education',
+  ritual:      'Ritual',
+  communications: 'Communications',
+  facility:    'Facility',
 };
 
 export const KIND_COLORS: Record<EventKind, string> = {
@@ -106,6 +116,11 @@ export const KIND_COLORS: Record<EventKind, string> = {
   recruitment: '#f97316',
   philanthropy:'#a855f7',
   risk:        '#ef4444',
+  finance:     '#14b8a6',
+  education:   '#0ea5e9',
+  ritual:      '#7c3aed',
+  communications: '#3b82f6',
+  facility:    '#65a30d',
 };
 
 export const KIND_BG: Record<EventKind, string> = {
@@ -116,6 +131,11 @@ export const KIND_BG: Record<EventKind, string> = {
   recruitment: '#1c0a00',
   philanthropy:'#1a0a2e',
   risk:        '#1a0505',
+  finance:     '#042f2e',
+  education:   '#082f49',
+  ritual:      '#2e1065',
+  communications: '#172554',
+  facility:    '#1a2e05',
 };
 
 export const AUDIENCE_LABEL: Record<EventAudience, string> = {
