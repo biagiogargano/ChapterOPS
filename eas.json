@@ -18,6 +18,7 @@
     },
     "alpha": {
       "autoIncrement": true,
+      "environment": "production",
       "ios": { "simulator": false },
       "env": {
         "EXPO_PUBLIC_AUTH_ENABLED": "true",
