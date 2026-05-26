@@ -11,6 +11,7 @@ import {
   KIND_COLORS,
   KIND_LABELS,
   getEventDate,
+  type EventKind,
   type MockEvent,
 } from '@/lib/mockEvents';
 import {
@@ -23,6 +24,8 @@ import {
   type MockTask,
 } from '@/lib/mockTasks';
 import { isOfficer } from '@/lib/roles';
+import { isTaskCompleted } from '@/lib/taskCompletion';
+import { useRsvpVersion } from '@/lib/rsvpStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -46,13 +49,13 @@ function isoFromParts(y: number, m0: number, d: number): string {
 // ─── Month grid ─────────────────────────────────────────────────────────────
 
 function MonthGrid({
-  year, month, todayIso, selectedIso, eventDays, taskDays, onSelect,
+  year, month, todayIso, selectedIso, eventKinds, taskDays, onSelect,
 }: {
   year:        number;
   month:       number;
   todayIso:    string;
   selectedIso: string;
-  eventDays:   Set<string>;
+  eventKinds:  Map<string, EventKind[]>;   // distinct event kinds per day → colored dots
   taskDays:    Set<string>;
   onSelect:    (iso: string) => void;
 }) {
@@ -78,7 +81,7 @@ function MonthGrid({
             const iso     = isoFromParts(year, month, day);
             const isToday = iso === todayIso;
             const isSel   = iso === selectedIso;
-            const hasEv   = eventDays.has(iso);
+            const kinds   = eventKinds.get(iso) ?? [];
             const hasTask = taskDays.has(iso);
             return (
               <Pressable
@@ -88,7 +91,10 @@ function MonthGrid({
               >
                 <Text style={[s.cellNum, isSel && s.cellNumSel, isToday && !isSel && s.cellNumToday]}>{day}</Text>
                 <View style={s.dotRow}>
-                  {hasEv   && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : '#818cf8' }]} />}
+                  {/* One colored dot per distinct event kind (up to 3), then a task dot. */}
+                  {kinds.slice(0, 3).map((k, idx) => (
+                    <View key={idx} style={[s.dot, { backgroundColor: isSel ? '#fff' : KIND_COLORS[k] }]} />
+                  ))}
                   {hasTask && <View style={[s.dot, { backgroundColor: isSel ? '#fff' : '#fbbf24' }]} />}
                 </View>
               </Pressable>
@@ -154,6 +160,7 @@ export default function CalendarScreen() {
   const officer    = isOfficer(role);
 
   useTaskStateVersion();   // re-render when task state changes (badges/dots)
+  useRsvpVersion();        // re-render when an RSVP/date answer changes (completion)
 
   const today    = new Date();
   const todayIso = isoOf(today);
@@ -233,19 +240,33 @@ export default function CalendarScreen() {
     return m;
   }, [events]);
 
-  // Role-visible tasks with a due date, keyed by due day.
-  const tasksByDate = useMemo(() => {
+  // Role-visible OPEN tasks with a due date, keyed by due day. Completed tasks
+  // (answered RSVPs, saved date names, approved tasks) are hidden — consistent
+  // with Today/Tasks; the calendar shows what still needs doing. Not memoized so
+  // it reflects task/RSVP completion immediately (component re-renders via the
+  // version hooks above).
+  const tasksByDate = (() => {
     const m = new Map<string, MockTask[]>();
     for (const t of filterTasksForRole(role)) {
       if (t.isWorkflowParent || !t.dueAt) continue;
+      if (isTaskCompleted(t, role)) continue;
       const iso = t.dueAt.slice(0, 10);
       (m.get(iso) ?? m.set(iso, []).get(iso)!).push(t);
     }
     return m;
-  }, [role, events]);   // `events` dep also nudges recompute on focus refresh
+  })();
 
-  const eventDays = useMemo(() => new Set(eventsByDate.keys()), [eventsByDate]);
-  const taskDays  = useMemo(() => new Set(tasksByDate.keys()),  [tasksByDate]);
+  // Distinct event kinds per day, preserving first-seen order → colored dots.
+  const eventKindsByDate = useMemo(() => {
+    const m = new Map<string, EventKind[]>();
+    for (const [iso, evs] of eventsByDate) {
+      const seen: EventKind[] = [];
+      for (const e of evs) if (!seen.includes(e.kind)) seen.push(e.kind);
+      m.set(iso, seen);
+    }
+    return m;
+  }, [eventsByDate]);
+  const taskDays  = new Set(tasksByDate.keys());
 
   function goMonth(delta: number) {
     let m = viewMonth + delta;
@@ -287,7 +308,7 @@ export default function CalendarScreen() {
         month={viewMonth}
         todayIso={todayIso}
         selectedIso={selectedIso}
-        eventDays={eventDays}
+        eventKinds={eventKindsByDate}
         taskDays={taskDays}
         onSelect={setSelectedIso}
       />
