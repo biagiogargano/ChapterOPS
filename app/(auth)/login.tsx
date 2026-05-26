@@ -60,6 +60,13 @@ export default function LoginScreen() {
         <Text style={s.title}>ChapterOPS</Text>
         <Text style={s.subtitle}>Sign in to your account.</Text>
 
+        <View style={s.firstTimeNote}>
+          <Text style={s.firstTimeText}>
+            First time here? Tap <Text style={s.firstTimeBold}>Sign Up</Text> and use the email
+            your chapter admin added for you.
+          </Text>
+        </View>
+
         <TextInput
           style={s.input}
           placeholder="Email"
@@ -96,7 +103,10 @@ const s = StyleSheet.create({
   container:      { flex: 1, backgroundColor: '#0f172a' },
   inner:          { flex: 1, justifyContent: 'center', paddingHorizontal: 32, gap: 14 },
   title:          { fontSize: 36, fontWeight: '800', color: '#f8fafc', textAlign: 'center', marginBottom: 2 },
-  subtitle:       { fontSize: 15, color: '#94a3b8', textAlign: 'center', marginBottom: 20 },
+  subtitle:       { fontSize: 15, color: '#94a3b8', textAlign: 'center', marginBottom: 12 },
+  firstTimeNote:  { backgroundColor: '#1e1b4b', borderRadius: 10, borderWidth: 1, borderColor: '#4f46e5', padding: 12, marginBottom: 12 },
+  firstTimeText:  { color: '#c7d2fe', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  firstTimeBold:  { fontWeight: '800', color: '#a5b4fc' },
   input:          { backgroundColor: '#1e293b', color: '#f8fafc', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, borderWidth: 1, borderColor: '#334155' },
   error:          { color: '#f87171', fontSize: 13, textAlign: 'center' },
   button:         { backgroundColor: '#6366f1', borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginTop: 6 },

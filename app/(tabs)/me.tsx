@@ -326,12 +326,11 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1e293b',
-    opacity: 0.4,
+    borderColor: '#7f1d1d',
   },
   signOutText: {
-    color: '#94a3b8',
-    fontWeight: '600',
+    color: '#f87171',
+    fontWeight: '700',
     fontSize: 15,
   },
 });

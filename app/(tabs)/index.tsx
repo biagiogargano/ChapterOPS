@@ -747,7 +747,7 @@ export default function TodayScreen() {
         )}
 
         {/* Header */}
-        <Text style={s.greeting}>Good morning, {firstName}</Text>
+        <Text style={s.greeting}>Welcome, {firstName}</Text>
         <Text style={s.chapter}>
           {orgName} · {ROLE_LABELS[role].toUpperCase()}
         </Text>
