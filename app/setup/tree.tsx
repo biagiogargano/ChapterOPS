@@ -26,10 +26,13 @@ const ROLE_DESC: Record<string, string> = {
   president:         'Top leader / owner — full oversight; runs setup and owns the org structure.',
   pro_consul:        'Second-in-command — reviews and approves submitted work.',
   annotator:         'Secretary — minutes, attendance, and records.',
+  quaestor:          'Treasurer — dues, budgets, and reimbursements.',
+  magister:          'New-member educator — runs the education program.',
+  kustos:            'Sergeant-at-arms — property, decorum, and order.',
+  tribune:           'Member advocate — represents the brothers.',
   risk_manager:      'Owns risk & safety tasks and event compliance.',
   social_chair:      'Plans socials and related events.',
   recruitment_chair: 'Runs recruitment events and the pipeline.',
-  treasurer:         'Manages dues, budgets, and reimbursements.',
   brother:           'General member — assigned tasks, RSVPs, attendance.',
 };
 

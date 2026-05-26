@@ -28,7 +28,7 @@ export const ORG_TEMPLATES: OrgTemplate[] = [
     label: 'Fraternity',
     emoji: '🏛️',
     leaderTitle: 'President (Consul)',
-    roles: ['President (Consul)', 'VP (Pro Consul)', 'Secretary (Annotator)', 'Treasurer (Quaestor)', 'Risk Manager', 'Social Chair', 'Recruitment Chair', 'Member (Brother)'],
+    roles: ['President (Consul)', 'VP (Pro Consul)', 'Secretary (Annotator)', 'Quaestor (Treasurer)', 'Magister', 'Kustos', 'Tribune', 'Risk Manager', 'Social Chair', 'Recruitment Chair', 'Member (Brother)'],
     eventKinds: ['Chapter meeting', 'E-board meeting', 'Social', 'Recruitment', 'Philanthropy', 'Risk'],
     defaultReport: true,
     reportName: 'Weekly Officer Report',
