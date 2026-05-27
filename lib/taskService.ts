@@ -344,6 +344,71 @@ export async function updateTaskState(id: string, patch: TaskStatePatch): Promis
   }
 }
 
+// ─── Proof v1A: task_submissions (text/link proof) via SECURITY DEFINER RPCs ──
+// The submission row is an access-controlled primitive distinct from
+// tasks.proof_content (which we still dual-write for build-8 read compatibility).
+// These RPCs do NOT touch tasks.state — workflow state stays owned by
+// updateTaskState / devTaskStore.
+
+export interface TaskSubmission {
+  proofText: string;
+  proofLink: string;
+}
+
+/**
+ * Write (insert/update) the text/link proof submission for a task via the
+ * upsert_task_submission RPC. Returns true on success. Empty link is sent as
+ * NULL (the RPC rejects a non-URL, non-null link). No-op (false) when Supabase
+ * is unconfigured. Never throws. Does NOT change tasks.state.
+ */
+export async function upsertTaskSubmission(
+  taskId: string,
+  proofText: string,
+  proofLink: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const link = proofLink.trim();
+    const { error } = await supabase.rpc('upsert_task_submission', {
+      p_task_id:    taskId,
+      p_proof_text: proofText ?? '',
+      p_proof_link: link.length > 0 ? link : null,   // '' would fail the link CHECK
+    });
+    if (error) {
+      console.warn('[taskService] upsert_task_submission error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[taskService] upsert_task_submission threw:', err);
+    return false;
+  }
+}
+
+/**
+ * Read the proof submission for a task via the get_task_submission RPC. Returns
+ * null when there is no row OR the caller isn't authorized (the RPC returns an
+ * empty set in both cases — callers fall back to tasks.proof_content). No-op
+ * (null) when Supabase is unconfigured. Never throws.
+ */
+export async function getTaskSubmission(taskId: string): Promise<TaskSubmission | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_task_submission', { p_task_id: taskId });
+    if (error) {
+      console.warn('[taskService] get_task_submission error:', error.message);
+      return null;
+    }
+    const row = (Array.isArray(data) ? data[0] : data) as
+      { proof_text?: string | null; proof_link?: string | null } | undefined;
+    if (!row) return null;
+    return { proofText: row.proof_text ?? '', proofLink: row.proof_link ?? '' };
+  } catch (err) {
+    console.warn('[taskService] get_task_submission threw:', err);
+    return null;
+  }
+}
+
 /** Delete a task by id (cascades to workflow children + event-linked tasks). */
 export async function removeTask(id: string): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;

@@ -20,7 +20,9 @@ import {
   type ProofType,
   type TaskState,
 } from '@/lib/mockTasks';
-import { removeTask } from '@/lib/taskService';
+import { getTaskSubmission, removeTask, upsertTaskSubmission, type TaskSubmission } from '@/lib/taskService';
+import { AUTH_ENABLED, ORG_SCOPED_DATA } from '@/lib/flags';
+import { isSupabaseConfigured } from '@/lib/memberService';
 import { emitUpdateNotice } from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
@@ -573,12 +575,16 @@ function ProofSubmitSection({
   proofContent,
   setProofContent,
   onSubmit,
+  submitError,
+  submitting,
 }: {
   task:            MockTask;
   taskState:       TaskState;
   proofContent:    string;
   setProofContent: (v: string) => void;
   onSubmit:        () => void;
+  submitError?:    string | null;
+  submitting?:     boolean;
 }) {
   if (!task.requiresProof || !task.proofType) return null;
 
@@ -626,13 +632,16 @@ function ProofSubmitSection({
           {badLink && (
             <Text style={s.proofLinkWarn}>Links must start with http:// or https://</Text>
           )}
+          {submitError && (
+            <Text style={s.proofSubmitError}>{submitError}</Text>
+          )}
 
           <Pressable
-            style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
+            style={[s.submitBtn, (!canSubmit || submitting) && s.submitBtnDisabled]}
             onPress={onSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || !!submitting}
           >
-            <Text style={s.submitBtnText}>Submit for Review</Text>
+            <Text style={s.submitBtnText}>{submitting ? 'Submitting…' : 'Submit for Review'}</Text>
           </Pressable>
         </View>
       )}
@@ -789,6 +798,13 @@ export default function TaskDetailScreen() {
   const [proofContent, _setProofContent] = useState         (_init?.proofContent  ?? '');
   const [rejNote,      _setRejNote     ] = useState         (_init?.rejectionNote ?? '');
   const [reminderSent, setReminderSent ] = useState(false);
+  const [proofError,   setProofError   ] = useState<string | null>(null);
+  const [submitting,   setSubmitting   ] = useState(false);
+  const [remoteProof,  setRemoteProof  ] = useState<TaskSubmission | null>(null);
+
+  // Real flag-on persistence mode (the alpha): proof submissions go through the
+  // RPC-backed task_submissions primitive. Flag-off sandbox stays in-memory.
+  const proofSyncRequired = AUTH_ENABLED && ORG_SCOPED_DATA && isSupabaseConfigured();
 
   function setTaskState(s: TaskState) {
     _setTaskState(s);
@@ -802,6 +818,34 @@ export default function TaskDetailScreen() {
     _setRejNote(v);
     if (task) saveTaskState(task.id, { rejectionNote: v });
   }
+
+  // Submit proof. In flag-on mode write the access-controlled submission row
+  // FIRST; only on success mark the task submitted (which keeps dual-writing
+  // proof_content via saveTaskState). If the submission write fails, do NOT
+  // mark submitted. Flag-off: skip the RPC, behave exactly as before (in-memory).
+  async function handleProofSubmit() {
+    if (!task || submitting) return;
+    if (proofSyncRequired) {
+      const isLink  = task.proofType === 'link';
+      const content = proofContent.trim();
+      setSubmitting(true);
+      const ok = await upsertTaskSubmission(task.id, isLink ? '' : content, isLink ? content : '');
+      setSubmitting(false);
+      if (!ok) { setProofError('Couldn’t submit proof. Please try again.'); return; }
+    }
+    setProofError(null);
+    setTaskState('submitted');
+  }
+
+  // Reviewer read: prefer the access-controlled submission row; fall back to
+  // proofContent (proof made on build 8 / flag-off). Fetch once in flag-on mode.
+  useEffect(() => {
+    if (!proofSyncRequired || !task) return;
+    let cancelled = false;
+    void getTaskSubmission(task.id).then(sub => { if (!cancelled && sub) setRemoteProof(sub); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, proofSyncRequired]);
 
   useEffect(() => {
     if (!task) return;
@@ -1005,7 +1049,9 @@ export default function TaskDetailScreen() {
               taskState={taskState}
               proofContent={proofContent}
               setProofContent={setProofContent}
-              onSubmit={() => setTaskState('submitted')}
+              onSubmit={() => { void handleProofSubmit(); }}
+              submitError={proofError}
+              submitting={submitting}
             />
           </>
         )}
@@ -1040,7 +1086,13 @@ export default function TaskDetailScreen() {
             <Divider />
             <ProofReviewSection
               proofType={task.proofType}
-              proofContent={proofContent}
+              proofContent={
+                remoteProof
+                  ? (task.proofType === 'link'
+                      ? (remoteProof.proofLink || remoteProof.proofText)
+                      : (remoteProof.proofText || remoteProof.proofLink))
+                  : proofContent
+              }
               reviewerLabel={ROLE_LABELS[role]}
               onApprove={() => setTaskState('approved')}
               onReject={handleReject}
@@ -1222,6 +1274,7 @@ const s = StyleSheet.create({
   proofHint:       { fontSize: 13, color: '#64748b', lineHeight: 18 },
   proofInput:      { backgroundColor: '#0f172a', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 14, padding: 12 },
   proofLinkWarn:   { fontSize: 12, color: '#fbbf24', marginTop: 6 },
+  proofSubmitError:{ fontSize: 12, color: '#f87171', marginTop: 6 },
   uploadBtn:       { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center' },
   uploadBtnText:   { fontSize: 14, color: '#64748b', fontWeight: '500' },
   submitBtn:         { backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
