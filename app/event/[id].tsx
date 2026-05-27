@@ -507,7 +507,7 @@ function AgendaSection({ agenda, onOpen }: { agenda: Agenda; onOpen: (item: Agen
     { label: 'Old business',  items: agenda.oldBusiness },
     { label: 'New business',  items: agenda.newBusiness },
     { label: 'Open tasks',    items: agenda.unresolved },
-    { label: 'Chapter-wide',  items: agenda.brotherWide },
+    { label: 'Everyone',      items: agenda.brotherWide },
   ].filter(g => g.items.length > 0);
 
   return (
