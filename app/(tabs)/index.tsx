@@ -147,12 +147,21 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
   const entry  = useRsvpEntry(eventId, role);
   const status = entry.status;
 
-  function markAttending() {
-    setRsvpEntry(eventId, role, { status: 'attending', excuse: '', covering: '' });
-    // _notify() fires inside setRsvpEntry — no setStatus needed
-  }
+  // Local, NOT-yet-persisted selection for an unanswered event. Starts null so
+  // nothing is pre-selected — opening Today never implies "Attending". Only the
+  // explicit Save button below writes to the store.
+  const [draft, setDraft] = useState<RsvpStatus | null>(null);
+
   function clearAttending() {
     setRsvpEntry(eventId, role, { status: 'no_response' });
+  }
+  function saveDraft() {
+    if (draft === 'attending') {
+      setRsvpEntry(eventId, role, { status: 'attending', excuse: '', covering: '' });
+    } else if (draft === 'not_attending') {
+      setRsvpEntry(eventId, role, { status: 'not_attending' });
+    }
+    setDraft(null);
   }
 
   // Tapping the title/meta opens the full Event Detail hub (quick buttons stay).
@@ -199,30 +208,41 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
     );
   }
 
-  // no_response — show buttons
+  // no_response — choose a response (local), then Save. Nothing persists until
+  // the user taps Save; neither option is pre-selected.
   return (
     <View style={[s.qaCard, isUrgent && s.qaCardUrgent]}>
       <View style={[s.qaStripe, { backgroundColor: isUrgent ? '#dc2626' : '#334155' }]} />
       <View style={s.qaBody}>
         {header}
+        <Text style={s.qaNoResponseText}>No response yet</Text>
         <View style={s.qaBtnRow}>
-          <Pressable style={s.qaBtnYes} onPress={markAttending}>
-            <Text style={s.qaBtnYesText}>✓  Attending</Text>
+          <Pressable
+            style={[s.qaRsvpChoice, draft === 'attending' && s.qaRsvpChoiceYesOn]}
+            onPress={() => setDraft('attending')}
+          >
+            <Text style={[s.qaRsvpChoiceText, draft === 'attending' && s.qaRsvpChoiceTextOn]}>Attending</Text>
           </Pressable>
           <Pressable
-            style={s.qaBtnNo}
+            style={[s.qaRsvpChoice, draft === 'not_attending' && s.qaRsvpChoiceNoOn]}
             onPress={() => {
-              if (needsDetail) {
-                openEventDetail();
-              } else {
-                setRsvpEntry(eventId, role, { status: 'not_attending' });
-                // _notify() re-renders this component automatically
-              }
+              // Not-attending on a mandatory/covering event needs an excuse/covering
+              // officer → send the user to Event Detail to complete it there. Other
+              // events just stage the local selection.
+              if (needsDetail) openEventDetail();
+              else             setDraft('not_attending');
             }}
           >
-            <Text style={s.qaBtnNoText}>Not Attending</Text>
+            <Text style={[s.qaRsvpChoiceText, draft === 'not_attending' && s.qaRsvpChoiceTextOn]}>Not Attending</Text>
           </Pressable>
         </View>
+        <Pressable
+          style={[s.qaSaveBtn, !draft && s.qaSaveBtnDisabled]}
+          onPress={saveDraft}
+          disabled={!draft}
+        >
+          <Text style={[s.qaSaveBtnText, !draft && s.qaSaveBtnTextDisabled]}>Save RSVP</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -896,6 +916,19 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   qaBtnNoText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+
+  // Select-then-save RSVP (Today): neutral choices, accent only when selected.
+  // (Save uses the existing qaSaveBtn* styles below.)
+  qaNoResponseText: { fontSize: 12, color: '#64748b', fontWeight: '500', marginBottom: 8 },
+  qaRsvpChoice: {
+    flex: 1, paddingVertical: 10, borderRadius: 9,
+    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
+    alignItems: 'center',
+  },
+  qaRsvpChoiceYesOn: { backgroundColor: '#052e16', borderColor: '#166534' },
+  qaRsvpChoiceNoOn:  { backgroundColor: '#1c1407', borderColor: '#854d0e' },
+  qaRsvpChoiceText:   { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
+  qaRsvpChoiceTextOn: { color: '#f1f5f9', fontWeight: '700' },
 
   // Inline input
   qaInputRow:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
