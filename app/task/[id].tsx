@@ -37,6 +37,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -581,11 +582,16 @@ function ProofSubmitSection({
 }) {
   if (!task.requiresProof || !task.proofType) return null;
 
-  const icon     = PROOF_ICON[task.proofType];
-  const label    = PROOF_LABEL[task.proofType];
-  const isBinary = task.proofType === 'image' || task.proofType === 'screenshot' || task.proofType === 'document';
-  const canEdit  = taskState === 'assigned' || taskState === 'overdue'
+  const icon    = PROOF_ICON[task.proofType];
+  const isLink  = task.proofType === 'link';
+  const canEdit = taskState === 'assigned' || taskState === 'overdue'
     || taskState === 'escalated' || taskState === 'rejected';
+
+  // Alpha supports text + link proof only (file upload is Proof v1, not built).
+  const trimmed = proofContent.trim();
+  const linkOk  = /^https?:\/\//i.test(trimmed);
+  const badLink = isLink && trimmed.length > 0 && !linkOk;
+  const canSubmit = trimmed.length > 0 && (!isLink || linkOk);
 
   return (
     <View>
@@ -597,30 +603,34 @@ function ProofSubmitSection({
 
       {canEdit && (
         <View style={s.proofInputBlock}>
-          <Text style={s.proofHint}>{icon}  {label} required</Text>
+          <Text style={s.proofHint}>
+            {icon}  {isLink
+              ? 'Paste a link (starting with https://) as your proof.'
+              : 'Write a short update describing what you completed.'}
+          </Text>
 
-          {!isBinary ? (
-            <TextInput
-              style={[s.proofInput, task.proofType === 'text' && { minHeight: 90 }]}
-              placeholder={task.proofType === 'link' ? 'https://…' : 'Type your response…'}
-              placeholderTextColor="#475569"
-              value={proofContent}
-              onChangeText={setProofContent}
-              multiline={task.proofType === 'text'}
-              numberOfLines={task.proofType === 'text' ? 4 : 1}
-              textAlignVertical={task.proofType === 'text' ? 'top' : 'center'}
-              autoCapitalize="none"
-              keyboardType={task.proofType === 'link' ? 'url' : 'default'}
-            />
-          ) : (
-            <Pressable style={s.uploadBtn}>
-              <Text style={s.uploadBtnText}>{icon}  Upload {label}</Text>
-            </Pressable>
+          <TextInput
+            style={[s.proofInput, !isLink && { minHeight: 90 }]}
+            placeholder={isLink ? 'https://…' : 'Describe what you completed…'}
+            placeholderTextColor="#475569"
+            value={proofContent}
+            onChangeText={setProofContent}
+            multiline={!isLink}
+            numberOfLines={!isLink ? 4 : 1}
+            textAlignVertical={!isLink ? 'top' : 'center'}
+            autoCapitalize={isLink ? 'none' : 'sentences'}
+            autoCorrect={!isLink}
+            keyboardType={isLink ? 'url' : 'default'}
+          />
+
+          {badLink && (
+            <Text style={s.proofLinkWarn}>Links must start with http:// or https://</Text>
           )}
 
           <Pressable
-            style={[s.submitBtn, !proofContent && !isBinary && s.submitBtnDisabled]}
+            style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
             onPress={onSubmit}
+            disabled={!canSubmit}
           >
             <Text style={s.submitBtnText}>Submit for Review</Text>
           </Pressable>
@@ -647,7 +657,9 @@ function ProofReviewSection({
 }) {
   const [showReject, setShowReject] = useState(false);
   const [rejNote,    setRejNote   ] = useState('');
-  const isBinary = proofType === 'image' || proofType === 'screenshot' || proofType === 'document';
+  const trimmed = proofContent.trim();
+  const isLink  = proofType === 'link';
+  const linkOk  = /^https?:\/\//i.test(trimmed);
 
   return (
     <View>
@@ -656,12 +668,14 @@ function ProofReviewSection({
         {proofType && (
           <Text style={s.proofDisplayType}>{PROOF_ICON[proofType]}  {PROOF_LABEL[proofType]}</Text>
         )}
-        {!isBinary && proofContent ? (
-          <Text style={s.proofDisplayContent}>{proofContent}</Text>
-        ) : (
-          <Text style={s.proofDisplayEmpty}>
-            {isBinary ? 'Binary file attached' : 'No content provided'}
+        {trimmed.length === 0 ? (
+          <Text style={s.proofDisplayEmpty}>No content provided</Text>
+        ) : isLink && linkOk ? (
+          <Text style={s.proofDisplayLink} onPress={() => { void Linking.openURL(trimmed); }}>
+            {trimmed}
           </Text>
+        ) : (
+          <Text style={s.proofDisplayContent}>{proofContent}</Text>
         )}
       </View>
 
@@ -1205,8 +1219,9 @@ const s = StyleSheet.create({
 
   // Proof submit
   proofInputBlock: { gap: 10 },
-  proofHint:       { fontSize: 13, color: '#64748b' },
+  proofHint:       { fontSize: 13, color: '#64748b', lineHeight: 18 },
   proofInput:      { backgroundColor: '#0f172a', borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#f1f5f9', fontSize: 14, padding: 12 },
+  proofLinkWarn:   { fontSize: 12, color: '#fbbf24', marginTop: 6 },
   uploadBtn:       { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center' },
   uploadBtnText:   { fontSize: 14, color: '#64748b', fontWeight: '500' },
   submitBtn:         { backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
@@ -1217,6 +1232,7 @@ const s = StyleSheet.create({
   proofDisplay:        { backgroundColor: '#1e293b', borderRadius: 10, padding: 14, gap: 8, marginBottom: 20 },
   proofDisplayType:    { fontSize: 12, color: '#64748b', fontWeight: '500' },
   proofDisplayContent: { fontSize: 14, color: '#f1f5f9', lineHeight: 20 },
+  proofDisplayLink:    { fontSize: 14, color: '#818cf8', lineHeight: 20, textDecorationLine: 'underline' },
   proofDisplayEmpty:   { fontSize: 13, color: '#334155', fontStyle: 'italic' },
 
   reviewBlock:    { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 14 },
