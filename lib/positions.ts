@@ -12,7 +12,7 @@
  * on roles they don't recognize.
  */
 
-import { type Role, ROLES, OFFICER_ROLES } from './roles';
+import { type Role, ROLES, OFFICER_ROLES, FLOOR_ROLE } from './roles';
 import type { Position } from '../types';
 
 /**
@@ -66,7 +66,7 @@ export function deriveActingRole(positions: Position[]): Role {
   for (const r of ROLE_PRECEDENCE) {
     if (roles.includes(r)) return r;
   }
-  return ROLES.BROTHER;
+  return FLOOR_ROLE;
 }
 
 /**
@@ -75,7 +75,7 @@ export function deriveActingRole(positions: Position[]): Role {
  */
 export function availableRoles(positions: Position[]): Role[] {
   const present = new Set<Role>(activeKnownRoles(positions));
-  present.add(ROLES.BROTHER);
+  present.add(FLOOR_ROLE);
   return ROLE_PRECEDENCE.filter(r => present.has(r));
 }
 

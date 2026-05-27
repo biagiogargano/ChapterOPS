@@ -39,7 +39,7 @@ import {
   type IdentityPhase,
 } from './identityResolution';
 import type { Role } from './roles';
-import { ROLES } from './roles';
+import { FLOOR_ROLE } from './roles';
 import { getPreferredOrg, setPreferredOrg, clearPreferredOrg } from './orgPreference';
 import type { Membership, Organization, Member, Position } from '@/types';
 
@@ -91,8 +91,8 @@ const DEFAULT_VALUE: IdentityValue = {
   organization:   null,
   member:         null,
   positions:      [],
-  actingRole:     ROLES.BROTHER,
-  availableRoles: [ROLES.BROTHER],
+  actingRole:     FLOOR_ROLE,
+  availableRoles: [FLOOR_ROLE],
   isFallback:     false,
   errorReason:    null,
   devRoleOverride:    null,

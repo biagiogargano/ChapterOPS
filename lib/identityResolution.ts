@@ -7,7 +7,7 @@
  * decision logic is unit-testable in isolation.
  */
 
-import { type Role, ROLES } from './roles';
+import { type Role, FLOOR_ROLE } from './roles';
 import { deriveActingRole } from './positions';
 import { DEMO_USER, DEMO_CHAPTER } from './demoUser';
 import type { Membership, Organization, Member, Position } from '../types';
@@ -95,7 +95,7 @@ export function actingRoleFor(opts: {
 }): Role {
   const { phase, allowOverride, positions, override } = opts;
   const resolvedLike = phase === 'resolved' || phase === 'fallback';
-  if (!resolvedLike) return ROLES.BROTHER;
+  if (!resolvedLike) return FLOOR_ROLE;
   if (allowOverride && override) return override;
   return deriveActingRole(positions);
 }

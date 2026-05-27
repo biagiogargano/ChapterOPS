@@ -19,7 +19,7 @@ import {
   useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
+import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { buildAgenda, isAgendaEmpty, type Agenda, type AgendaItem } from '@/lib/buildAgenda';
 import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
@@ -869,7 +869,7 @@ export default function EventDetailScreen() {
       }
     }
     // Affected roles for a cancellation: officer events → officers; otherwise everyone.
-    const recipients: Role[] = ev.audience === 'officers' ? OFFICER_ROLES : [...OFFICER_ROLES, 'brother'];
+    const recipients: Role[] = ev.audience === 'officers' ? OFFICER_ROLES : [...OFFICER_ROLES, FLOOR_ROLE];
     function notifyCancelled() {
       emitUpdateNotice({
         entityType:    'event',

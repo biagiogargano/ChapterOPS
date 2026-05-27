@@ -23,7 +23,7 @@ import {
   type EventKind,
   type MockEvent,
 } from '@/lib/mockEvents';
-import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
 import { NO_TEMPLATE, DEFAULT_TEMPLATE_BY_KIND } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
@@ -107,7 +107,7 @@ function buildEventEditNotice(
   const summary  =
     `${input.title} was updated: ${joinNatural(changes.map(c => c.label))} changed. ` +
     `Your RSVP is still saved, but please review the update and change your response if needed.`;
-  const audience = input.audience === 'officers' ? [...OFFICER_ROLES] : [...OFFICER_ROLES, 'brother' as Role];
+  const audience = input.audience === 'officers' ? [...OFFICER_ROLES] : [...OFFICER_ROLES, FLOOR_ROLE];
   return { summary, severity, audience };
 }
 

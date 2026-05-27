@@ -11,7 +11,7 @@ import {
   type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
-import { LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
+import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
@@ -286,7 +286,7 @@ export default function CreateTaskScreen() {
   // themselves. (Brothers are assignable — they receive and complete tasks too.)
   const isBroad         = isLeadershipRole(role);
   const assignableRoles = useMemo<Role[]>(
-    () => (isBroad ? [...OFFICER_ROLES, 'brother' as Role] : [role]),
+    () => (isBroad ? [...OFFICER_ROLES, FLOOR_ROLE] : [role]),
     [isBroad, role],
   );
 
