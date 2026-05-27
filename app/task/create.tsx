@@ -110,12 +110,13 @@ function buildTaskEditNotice(
 // Sentinel option id meaning "not linked to any event" in the event picker.
 const STANDALONE_OPTION = '__standalone__';
 
+// Alpha exposes ONLY the proof types that actually work end-to-end: Text and
+// Link. Document/Image/Screenshot require file upload + private Storage (Proof
+// v1, not built), and would otherwise render a dead "Upload" button + fake
+// "Binary file attached" state in Task Detail. They return when Proof v1 ships.
 const PROOF_OPTIONS: { value: ProofType; label: string }[] = [
-  { value: 'text',       label: 'Text' },
-  { value: 'link',       label: 'Link' },
-  { value: 'document',   label: 'Document' },
-  { value: 'image',      label: 'Image' },
-  { value: 'screenshot', label: 'Screenshot' },
+  { value: 'text', label: 'Text' },
+  { value: 'link', label: 'Link' },
 ];
 
 // ─── FieldLabel ───────────────────────────────────────────────────────────────

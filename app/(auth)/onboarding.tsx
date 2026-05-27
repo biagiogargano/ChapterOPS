@@ -1,6 +1,7 @@
 import { useAuth } from '@/lib/auth';
 import { useIdentity } from '@/lib/identityStore';
 import { useRouteTarget } from '@/lib/useRouteTarget';
+import { AUTH_ENABLED } from '@/lib/flags';
 import { Redirect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Splash from '../../components/auth/Splash';
@@ -33,14 +34,24 @@ export default function OnboardingScreen() {
   return (
     <View style={s.root}>
       <Text style={s.title}>Welcome to ChapterOPS</Text>
-      <Text style={s.body}>You’re signed in. Join your organization or create a new one.</Text>
+      {AUTH_ENABLED ? (
+        <Text style={s.body}>We couldn’t find you on a roster. Contact your chapter admin to be added.</Text>
+      ) : (
+        <Text style={s.body}>You’re signed in. Join your organization or create a new one.</Text>
+      )}
 
-      <Pressable style={s.primary} onPress={() => router.push('/(auth)/join' as any)}>
-        <Text style={s.primaryText}>Join an organization</Text>
+      {/* Join-by-code is a real RPC; kept but de-emphasized in alpha (admin-seeded). */}
+      <Pressable style={AUTH_ENABLED ? s.secondary : s.primary} onPress={() => router.push('/(auth)/join' as any)}>
+        <Text style={AUTH_ENABLED ? s.secondaryText : s.primaryText}>Join with a code</Text>
       </Pressable>
-      <Pressable style={s.secondary} onPress={() => router.push('/(auth)/create' as any)}>
-        <Text style={s.secondaryText}>Create a new organization</Text>
-      </Pressable>
+
+      {/* Self-serve org creation is dev/flag-off only — alpha is admin-seeded, so
+          offering it here would risk junk orgs. Hidden when auth is live. */}
+      {!AUTH_ENABLED && (
+        <Pressable style={s.secondary} onPress={() => router.push('/(auth)/create' as any)}>
+          <Text style={s.secondaryText}>Create a new organization</Text>
+        </Pressable>
+      )}
 
       <Pressable style={s.signOut} onPress={() => { void signOut(); }}>
         <Text style={s.signOutText}>Sign Out</Text>
