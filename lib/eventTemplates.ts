@@ -22,6 +22,7 @@
 import { deriveDueMeta, deriveVisibleTo, type MockTask } from './mockTasks';
 import { ROLE_LABELS, type Role } from './roles';
 import type { ProofType } from './mockTasks';
+import type { EventKind } from './mockEvents';
 
 /** Minimal event shape a template needs (structural subset of a created event). */
 export interface EventTemplateInput {
@@ -234,6 +235,19 @@ export const EVENT_TEMPLATE_OPTIONS: { id: string; label: string }[] = [
 export function getEventTemplate(templateId: string): EventTaskTemplate | undefined {
   return EVENT_TEMPLATES.find(t => t.id === templateId);
 }
+
+/**
+ * Recommended built-in template per event kind. Used to PRE-SELECT a sensible
+ * prep workflow when an officer creates an event of that kind — they still see
+ * the preview and can switch templates or choose None. Only kinds with a clearly
+ * matching built-in template are mapped; every other kind defaults to no
+ * template. Pure data — reuses the existing template engine, no schema/RLS, no
+ * mock generation. Extend as more built-in templates are added.
+ */
+export const DEFAULT_TEMPLATE_BY_KIND: Partial<Record<EventKind, string>> = {
+  social:      'date_party',
+  recruitment: 'recruitment',
+};
 
 // ─── Date math ────────────────────────────────────────────────────────────────
 

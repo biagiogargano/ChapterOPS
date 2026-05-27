@@ -5,11 +5,13 @@
  */
 
 import {
+  DEFAULT_TEMPLATE_BY_KIND,
   EVENT_TEMPLATES,
   EVENT_TEMPLATE_OPTIONS,
   NO_TEMPLATE,
   allTemplateTaskIdsForEvent,
   buildTasksFromTemplate,
+  getEventTemplate,
   templateTaskId,
   type EventTemplateInput,
 } from './eventTemplates';
@@ -77,6 +79,13 @@ check('cascade ids include venue',   allIds.includes(templateTaskId('date_party'
 // Determinism: same input → identical output.
 const again = buildTasksFromTemplate('date_party', ev);
 check('deterministic build', JSON.stringify(tasks) === JSON.stringify(again));
+
+// Kind → recommended template defaults (create-time pre-selection).
+check('social → date_party default',      DEFAULT_TEMPLATE_BY_KIND.social === 'date_party');
+check('recruitment → recruitment default', DEFAULT_TEMPLATE_BY_KIND.recruitment === 'recruitment');
+check('mapped defaults resolve to real templates',
+  Object.values(DEFAULT_TEMPLATE_BY_KIND).every(id => !!id && !!getEventTemplate(id)));
+check('unmapped kind has no default (chapter)', DEFAULT_TEMPLATE_BY_KIND.chapter === undefined);
 
 console.log(`\neventTemplates.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

@@ -25,7 +25,7 @@ import {
 } from '@/lib/mockEvents';
 import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
-import { NO_TEMPLATE } from '@/lib/eventTemplates';
+import { NO_TEMPLATE, DEFAULT_TEMPLATE_BY_KIND } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
 import SearchablePicker from '@/components/SearchablePicker';
 import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
@@ -454,6 +454,9 @@ export default function CreateEventScreen() {
   const [repeatUntil, setRepeatUntil] = useState('');
   const [requiresDateNames, setRequiresDateNames] = useState(existing?.requiresDateNames ?? false);
   const [templateId,  setTemplateId ] = useState<string>(NO_TEMPLATE);
+  // True once the officer manually picks a template — after that we stop
+  // auto-suggesting one from the event kind (so we never override their choice).
+  const [templateTouched, setTemplateTouched] = useState(false);
   const [errors,      setErrors     ] = useState<string[]>([]);
   const [saving,      setSaving      ] = useState(false);   // create-path sync in flight
 
@@ -467,6 +470,16 @@ export default function CreateEventScreen() {
   const previewSpecs = templateId !== NO_TEMPLATE
     ? (getTemplateById(templateId)?.taskSpecs ?? [])
     : [];
+
+  // Pre-select the recommended prep template for the chosen event kind (create
+  // mode only). Follows kind changes until the officer manually picks a template
+  // (templateTouched). Editing never auto-applies — template generation only runs
+  // on create anyway. Uses the existing built-in templates + real generator; the
+  // preview below shows exactly what will be created, and "None" is always available.
+  useEffect(() => {
+    if (editing || templateTouched) return;
+    setTemplateId(DEFAULT_TEMPLATE_BY_KIND[kind] ?? NO_TEMPLATE);
+  }, [kind, editing, templateTouched]);
 
   // Reset kind when role changes to one that disallows it (create mode only —
   // never mutate the kind of an event being edited).
@@ -905,7 +918,7 @@ export default function CreateEventScreen() {
         searchPlaceholder="Filter templates…"
         options={templateOptions}
         selectedId={templateId}
-        onSelect={(id) => { setTemplateId(id); setTemplatePickerOpen(false); }}
+        onSelect={(id) => { setTemplateId(id); setTemplateTouched(true); setTemplatePickerOpen(false); }}
         onClose={() => setTemplatePickerOpen(false)}
       />
     </KeyboardAvoidingView>
