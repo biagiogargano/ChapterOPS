@@ -51,9 +51,9 @@ check('riskplan due −5 days',   byKey('riskplan')?.dueAt === '2030-05-05');
 check('monitors due −1 day',    byKey('monitors')?.dueAt === '2030-05-09');
 check('incident due +1 day',    byKey('incident')?.dueAt === '2030-05-11');
 
-// Assignees (guest list + risk plan are Risk Manager).
+// Assignees (Social Chair owns venue + guest/date list; Risk Manager owns the risk plan).
 check('venue → social_chair',     byKey('venue')?.assignedRole === 'social_chair');
-check('guestlist → risk_manager', byKey('guestlist')?.assignedRole === 'risk_manager');
+check('guestlist → social_chair', byKey('guestlist')?.assignedRole === 'social_chair');
 check('riskplan → risk_manager',  byKey('riskplan')?.assignedRole === 'risk_manager');
 
 // Approval: everything goes through Pro Consul.

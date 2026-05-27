@@ -82,7 +82,7 @@ export const EVENT_TEMPLATES: EventTaskTemplate[] = [
         key:           'guestlist',
         title:         'Finalize guest / date list for {event}',
         description:   'Collect and finalize the guest/date list for {event}.',
-        assignedRole:  'risk_manager',
+        assignedRole:  'social_chair',
         dueOffsetDays: -3,
         requiresApproval: true,
         reviewerRole:  'pro_consul',
