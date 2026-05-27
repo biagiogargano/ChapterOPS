@@ -11,7 +11,7 @@ import {
   type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
-import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
@@ -284,7 +284,7 @@ export default function CreateTaskScreen() {
 
   // BROAD officers can assign to any officer role OR a brother; others only to
   // themselves. (Brothers are assignable — they receive and complete tasks too.)
-  const isBroad         = role === 'president' || role === 'pro_consul';
+  const isBroad         = isLeadershipRole(role);
   const assignableRoles = useMemo<Role[]>(
     () => (isBroad ? [...OFFICER_ROLES, 'brother' as Role] : [role]),
     [isBroad, role],
@@ -361,7 +361,7 @@ export default function CreateTaskScreen() {
   // Reviewer options = leadership roles, excluding the assignee (a task can't
   // review itself). Recompute + reset when assignee changes (skip while locked).
   const reviewerOptions = useMemo<Role[]>(
-    () => (['president', 'pro_consul'] as Role[]).filter(r => r !== assignedRole),
+    () => LEADERSHIP_ROLES.filter(r => r !== assignedRole),
     [assignedRole],
   );
   useEffect(() => {

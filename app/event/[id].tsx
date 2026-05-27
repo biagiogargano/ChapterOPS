@@ -19,7 +19,7 @@ import {
   useRsvpVersion,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { buildAgenda, isAgendaEmpty, type Agenda, type AgendaItem } from '@/lib/buildAgenda';
 import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
@@ -824,7 +824,7 @@ export default function EventDetailScreen() {
         todayOffset: (new Date().getDay() + 6) % 7,   // Mon=0 … Sun=6
       })
     : null;
-  const isBROAD     = role === 'president' || role === 'pro_consul';
+  const isBROAD     = isLeadershipRole(role);
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';
 

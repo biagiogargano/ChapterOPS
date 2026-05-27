@@ -32,7 +32,7 @@
  *   • seed linkedEventId uses mock ids ('e1'..) requiring resolveEventId mapping.
  *   • dynamic RSVP-task generation is client-side and coupled to eventStore.
  */
-import { OFFICER_ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
+import { LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, type Role } from '@/lib/roles';
 import { ORG_SCOPED_DATA } from '@/lib/flags';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ export type LightweightKind = 'rsvp' | 'name_submission' | 'acknowledgment' | 'y
 
 // ─── Visibility helpers ───────────────────────────────────────────────────────
 
-const BROAD:    Role[] = ['president', 'pro_consul'];
+const BROAD:    Role[] = LEADERSHIP_ROLES;
 const DOCS:     Role[] = [...BROAD, 'annotator'];
 // Dedup: same membership as the canonical OFFICER_ROLES in roles.ts. Used only
 // with .includes() (visibleTo checks), so element order is irrelevant.
@@ -450,7 +450,7 @@ export function isTaskAssignee(task: MockTask, role: Role): boolean {
 /** True if this role can approve/reject this task. */
 export function canApproveTask(task: MockTask, role: Role): boolean {
   if (!task.requiresApproval) return false;
-  if (role === 'president' || role === 'pro_consul') return true;
+  if (isLeadershipRole(role)) return true;
   return task.reviewerRole === role;
 }
 
@@ -488,7 +488,7 @@ export function removeDynamicTaskById(id: string): void {
 
 const _userTasks: MockTask[] = [];
 
-const BROAD_ROLES: Role[] = ['president', 'pro_consul'];
+const BROAD_ROLES: Role[] = LEADERSHIP_ROLES;
 
 /** Stable, collision-free id for a created task (distinct from seed 'tk3' ids). */
 function _taskUuid(): string {
@@ -637,7 +637,7 @@ export function isEditableTask(task: MockTask): boolean {
 export function canManageTask(task: MockTask, role: Role): boolean {
   if (!isEditableTask(task)) return false;
   if (task.createdByRole === role) return true;            // creator
-  const isBroad = role === 'president' || role === 'pro_consul';
+  const isBroad = isLeadershipRole(role);
   return isBroad && task.assignedRole !== role;            // oversight, not as assignee
 }
 
@@ -825,7 +825,7 @@ export function getTaskBucket(
   const isNamedReviewer =
     !!task.requiresApproval && !isMine && (
       task.reviewerRole === role ||
-      (!task.reviewerRole && (role === 'president' || role === 'pro_consul'))
+      (!task.reviewerRole && isLeadershipRole(role))
     );
 
   if (isMine) return 'mine';

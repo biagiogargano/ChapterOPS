@@ -29,7 +29,7 @@ import {
   type RsvpEntry,
   type RsvpStatus,
 } from '@/lib/rsvpStore';
-import { ROLE_LABELS, type Role } from '@/lib/roles';
+import { ROLE_LABELS, isLeadershipRole, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -877,7 +877,7 @@ export default function TaskDetailScreen() {
   // Supervision = this role's named supervisor, OR a role that can manage the
   // linked event's kind (president/pro_consul → any; owning chair → their
   // domain). Standalone tasks (no event) → only broad leadership supervises.
-  const isBroadLeader = role === 'president' || role === 'pro_consul';
+  const isBroadLeader = isLeadershipRole(role);
   const canSupervise  =
     task.supervisorRole === role ||
     (linkedEv ? canManageEventTasks(role, linkedEv.kind) : isBroadLeader);

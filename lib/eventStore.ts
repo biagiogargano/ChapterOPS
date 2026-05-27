@@ -19,7 +19,7 @@ import {
   type MockTask,
   type TaskUrgency,
 } from './mockTasks';
-import { OFFICER_ROLES, type Role } from './roles';
+import { OFFICER_ROLES, isLeadershipRole, type Role } from './roles';
 import { ORG_SCOPED_DATA } from './flags';
 
 // Re-export types so callers only need one import
@@ -482,7 +482,7 @@ export function isUserCreatedEvent(id: string): boolean {
  */
 export function canManageEvent(event: MockEvent, role: Role): boolean {
   if (!isUserCreatedEvent(event.id)) return false;
-  if (role === 'president' || role === 'pro_consul') return true;
+  if (isLeadershipRole(role)) return true;
   return event.createdByRole === role;
 }
 
