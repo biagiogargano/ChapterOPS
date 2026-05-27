@@ -101,9 +101,9 @@ check('empty → not officer',       isOfficerMember([]) === false);
   }
 }
 
-// sanity: precedence list shape
-check('precedence has 7 roles ending in brother',
-  ROLE_PRECEDENCE.length === 7 && ROLE_PRECEDENCE[6] === 'brother');
+// sanity: precedence list shape — full officer catalog, brother as the floor.
+check('precedence has 14 roles ending in brother',
+  ROLE_PRECEDENCE.length === 14 && ROLE_PRECEDENCE[ROLE_PRECEDENCE.length - 1] === 'brother');
 
 console.log(`\npositions.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
