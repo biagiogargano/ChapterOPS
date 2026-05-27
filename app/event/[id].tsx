@@ -559,6 +559,11 @@ export default function EventDetailScreen() {
   });
   // Hide RSVP tasks from the list — RSVP is already surfaced by RsvpSection above
   const relatedTasks = allRelatedTasks.filter(t => t.lightweightKind !== 'rsvp');
+  // True when any related task was generated from an event template (deterministic
+  // `tmpl_` id — same signal the per-card AUTO tag uses). Drives a clearer "PREP
+  // TASKS" label + a small "generated from template" caption. Pure read of real
+  // task data — no preview, no generation.
+  const hasGeneratedTasks = relatedTasks.some(t => t.id.startsWith('tmpl_'));
 
   // Re-render when any task interaction state changes so the prep-progress strip
   // and the per-task badges stay in sync with the Task Detail state machine.
@@ -963,7 +968,7 @@ export default function EventDetailScreen() {
         <>
           <View style={s.divider} />
           <View style={s.relatedHeader}>
-            <SectionLabel text="RELATED TASKS" />
+            <SectionLabel text={hasGeneratedTasks ? 'PREP TASKS' : 'RELATED TASKS'} />
             <View style={s.relatedHeaderRight}>
               {taskOps.total > 0 && (
                 <Text style={s.prepProgressText}>{taskOps.completed}/{taskOps.total} done</Text>
@@ -980,6 +985,9 @@ export default function EventDetailScreen() {
               )}
             </View>
           </View>
+          {hasGeneratedTasks && (
+            <Text style={s.generatedHint}>Generated from this event’s template</Text>
+          )}
           {relatedTasks.length === 0 ? (
             canManageTasks ? (
               <Text style={s.noRelatedText}>
@@ -1153,6 +1161,7 @@ const s = StyleSheet.create({
   prepProgressText:   { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 12 },
   addTaskText:   { fontSize: 13, fontWeight: '600', color: '#818cf8', marginBottom: 12 },
   noRelatedText: { fontSize: 13, color: '#475569', marginBottom: 4 },
+  generatedHint: { fontSize: 12, color: '#64748b', marginTop: -4, marginBottom: 10 },
 
   // Header edit button
   editHdrBtn:    { paddingHorizontal: 12, paddingVertical: 4 },
