@@ -23,9 +23,9 @@ const toPosix  = p => p.split(path.sep).join('/');
 
 // The suites that must run (matches the lib/*.test.ts set we maintain).
 const EXPECTED = [
-  'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTemplates', 'generatedTasks',
-  'identityResolution', 'initRoute', 'mockTasks', 'orgPreference', 'orgScope', 'positions',
-  'routeTarget',
+  'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions', 'eventTemplates',
+  'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks', 'orgPreference', 'orgScope',
+  'positions', 'routeTarget', 'taskCompletion',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────
@@ -80,6 +80,13 @@ Module._load = function (request, parent, isMain) {
       setItem:    async (k, v) => { store[k] = String(v); },
       removeItem: async k => { delete store[k]; },
     } };
+  }
+  // Stub the Supabase client: lib/supabase.ts calls createClient() at module load
+  // (pulled in transitively via taskService/eventService). Pure tests never make
+  // network calls — service helpers guard on isSupabaseConfigured() (false with no
+  // EXPO_PUBLIC_* env) — so a no-op client is enough to let the chain load.
+  if (request === '@supabase/supabase-js') {
+    return { __esModule: true, createClient: () => ({}) };
   }
   if (request.startsWith('@/lib/')) return origLoad(path.join(outLib, request.slice('@/lib/'.length)), parent, isMain);
   if (request.startsWith('@/'))     return origLoad(path.join(outDir, request.slice(2)), parent, isMain);

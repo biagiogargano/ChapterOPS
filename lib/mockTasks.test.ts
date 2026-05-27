@@ -6,7 +6,7 @@
  * Scope: only the deterministic-id optimistic-add contract (dedup + tombstone).
  */
 
-import { addGeneratedTask, deleteUserTask, type MockTask } from './mockTasks';
+import { addGeneratedTask, deleteUserTask, deriveVisibleTo, type MockTask } from './mockTasks';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
 
@@ -53,6 +53,27 @@ check('different id inserts', other?.id === 'task_rsvpreview_evt-2');
 deleteUserTask('task_rsvpreview_evt-2');
 const resurrect = addGeneratedTask(makeTask('task_rsvpreview_evt-2'));
 check('deleted id is not resurrected', resurrect === undefined);
+
+// ── Task visibility (regression) ──────────────────────────────────────────────
+// A task's visibleTo (used by filterTasksForRole) must include the assignee, the
+// reviewer, and broad leadership — and NOT unrelated officers. This is the data
+// layer behind "an unrelated officer can't see another domain's event tasks"
+// (commit 07ebb76). The "event manager sees all of their event-kind's tasks"
+// half of the rule is covered by eventTaskPermissions.test.ts.
+{
+  const vt = deriveVisibleTo('quaestor', 'pro_consul');   // assignee quaestor, reviewer pro_consul
+  const visibleTo = (r: string) => vt.includes(r as any);
+  check('visible to assignee (quaestor)',          visibleTo('quaestor'));
+  check('visible to reviewer (pro_consul)',        visibleTo('pro_consul'));
+  check('visible to broad leadership (president)', visibleTo('president'));
+  check('NOT visible to unrelated officer (kustos)',        !visibleTo('kustos'));
+  check('NOT visible to unrelated officer (social_chair)',  !visibleTo('social_chair'));
+
+  // No reviewer → still visible to assignee + broad, but not unrelated officers.
+  const vtNoRev = deriveVisibleTo('magister');
+  check('no-reviewer · visible to assignee (magister)', vtNoRev.includes('magister' as any));
+  check('no-reviewer · NOT visible to tribune',         !vtNoRev.includes('tribune' as any));
+}
 
 console.log(`\nmockTasks.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

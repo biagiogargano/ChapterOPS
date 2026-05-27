@@ -101,6 +101,22 @@ check('empty → not officer',       isOfficerMember([]) === false);
   }
 }
 
+// 8 — newly added officer roles resolve as THEMSELVES (regression: ROLE_PRECEDENCE
+//     once omitted these, so KNOWN_ROLES dropped them and a member holding only one
+//     resolved to 'brother' in flag-on builds — see commit cad8cfd).
+{
+  const NEW_OFFICERS = [
+    'quaestor', 'magister', 'kustos', 'tribune',
+    'philanthropy_chair', 'scholarship_chair', 'house_manager',
+  ] as const;
+  for (const r of NEW_OFFICERS) {
+    const ps = [pos(r)];
+    check(`new officer ${r} → acting ${r} (NOT brother)`, deriveActingRole(ps) === r);
+    check(`new officer ${r} → is officer`,                 isOfficerMember(ps) === true);
+    check(`new officer ${r} → available [${r}, brother]`,  eqArr(availableRoles(ps), [r, 'brother']));
+  }
+}
+
 // sanity: precedence list shape — full officer catalog, brother as the floor.
 check('precedence has 14 roles ending in brother',
   ROLE_PRECEDENCE.length === 14 && ROLE_PRECEDENCE[ROLE_PRECEDENCE.length - 1] === 'brother');
