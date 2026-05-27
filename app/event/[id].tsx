@@ -21,7 +21,6 @@ import {
 } from '@/lib/rsvpStore';
 import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
-import { buildAgenda, isAgendaEmpty, type Agenda, type AgendaItem } from '@/lib/buildAgenda';
 import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import {
   STATE_COLOR,
@@ -500,37 +499,6 @@ function RsvpResponsesSection({ eventId, label }: { eventId: string; label: stri
   );
 }
 
-// ─── Meeting agenda (read-only, derived from real events + tasks) ─────────────
-
-function AgendaSection({ agenda, onOpen }: { agenda: Agenda; onOpen: (item: AgendaItem) => void }) {
-  const groups: { label: string; items: AgendaItem[] }[] = [
-    { label: 'Old business',  items: agenda.oldBusiness },
-    { label: 'New business',  items: agenda.newBusiness },
-    { label: 'Open tasks',    items: agenda.unresolved },
-    { label: 'Everyone',      items: agenda.brotherWide },
-  ].filter(g => g.items.length > 0);
-
-  return (
-    <>
-      <Text style={s.agendaHint}>Auto-built from this week’s events and open tasks.</Text>
-      {groups.map(g => (
-        <View key={g.label} style={s.agendaGroup}>
-          <Text style={s.agendaGroupLabel}>{g.label}</Text>
-          {g.items.map(it => (
-            <Pressable key={`${it.kind}_${it.id}`} style={s.agendaItem} onPress={() => onOpen(it)}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.agendaItemTitle} numberOfLines={1}>{it.title}</Text>
-                <Text style={s.agendaItemMeta} numberOfLines={1}>{it.meta}</Text>
-              </View>
-              <Text style={s.agendaChevron}>›</Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
-    </>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function EventDetailScreen() {
@@ -812,18 +780,10 @@ export default function EventDetailScreen() {
   // Same predicate as the related-task visibility gate above.
   const canManageTasks = canManageThisEvent;
 
-  // Read-only meeting agenda — only for officers on chapter/eboard meeting events.
-  // Pure derivation from this week's real events (excluding this meeting itself)
-  // and open tasks; recomputed on task-state changes via useTaskStateVersion().
+  // Read-only meeting agenda lives on its own screen (app/agenda/[eventId]); here
+  // we only decide whether to show the "Open agenda" card — officers on a
+  // chapter/eboard meeting event.
   const isMeetingEvent = event.kind === 'chapter' || event.kind === 'eboard';
-  const agenda = officer && isMeetingEvent
-    ? buildAgenda({
-        events:      getAllEvents().filter(e => e.id !== event.id),
-        tasks:       getAllTasks(),
-        stateOf:     t => getStoredState(t.id, t.state),
-        todayOffset: (new Date().getDay() + 6) % 7,   // Mon=0 … Sun=6
-      })
-    : null;
   const isBROAD     = isLeadershipRole(role);
   const canSeeRsvps = isBROAD || role === 'annotator';
   const canSeeDates = isBROAD || role === 'risk_manager' || role === 'social_chair';
@@ -1054,18 +1014,17 @@ export default function EventDetailScreen() {
       )}
 
       {/* ── Meeting agenda (chapter/eboard meetings · officers · read-only) ── */}
-      {agenda && !isAgendaEmpty(agenda) && (
+      {officer && isMeetingEvent && (
         <>
           <View style={s.divider} />
           <SectionLabel text="MEETING AGENDA" />
-          <AgendaSection
-            agenda={agenda}
-            onOpen={(it) => router.push(
-              it.kind === 'event'
-                ? `/event/${it.id}` as any
-                : `/task/${it.id}?fromEventId=${event.id}` as any,
-            )}
-          />
+          <Pressable style={s.agendaCard} onPress={() => router.push(`/agenda/${event.id}` as any)}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.agendaCardTitle}>Open agenda</Text>
+              <Text style={s.agendaCardSub}>Auto-built from this week’s events and open tasks.</Text>
+            </View>
+            <Text style={s.agendaCardChevron}>›</Text>
+          </Pressable>
         </>
       )}
 
@@ -1224,14 +1183,11 @@ const s = StyleSheet.create({
   noRelatedText: { fontSize: 13, color: '#475569', marginBottom: 4 },
   generatedHint: { fontSize: 12, color: '#64748b', marginTop: -4, marginBottom: 10 },
 
-  // Meeting agenda (read-only)
-  agendaHint:       { fontSize: 12, color: '#64748b', marginTop: -4, marginBottom: 12 },
-  agendaGroup:      { marginBottom: 12 },
-  agendaGroupLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.6, marginBottom: 6 },
-  agendaItem:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 6, gap: 8 },
-  agendaItemTitle:  { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
-  agendaItemMeta:   { fontSize: 12, color: '#64748b', marginTop: 1 },
-  agendaChevron:    { fontSize: 18, color: '#475569' },
+  // Meeting agenda — "Open agenda" card (the agenda itself is a dedicated screen)
+  agendaCard:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  agendaCardTitle:   { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  agendaCardSub:     { fontSize: 12, color: '#64748b', marginTop: 2 },
+  agendaCardChevron: { fontSize: 22, color: '#475569' },
 
   // Header edit button
   editHdrBtn:    { paddingHorizontal: 12, paddingVertical: 4 },
