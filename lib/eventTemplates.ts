@@ -223,6 +223,71 @@ export const EVENT_TEMPLATES: EventTaskTemplate[] = [
       },
     ],
   },
+  {
+    // Manual-apply only (intentionally NOT in DEFAULT_TEMPLATE_BY_KIND): meetings
+    // recur, so auto-generating prep tasks every occurrence would be noise. Light
+    // set owned by the Annotator (Secretary); only the agenda is review-gated.
+    // "File minutes" uses the working link-proof flow (paste the minutes-doc URL)
+    // — NOT an in-app minutes system.
+    id:    'chapter_meeting',
+    label: 'Chapter Meeting',
+    taskSpecs: [
+      {
+        key:           'agenda',
+        title:         'Prepare the agenda for {event}',
+        description:   'Draft and circulate the agenda for {event}.',
+        assignedRole:  'annotator',
+        dueOffsetDays: -2,
+        requiresApproval: true,
+        reviewerRole:  'president',
+      },
+      {
+        key:           'reminder',
+        title:         'Send meeting reminder to everyone',
+        description:   'Remind the chapter about {event} (time, place, what to bring).',
+        assignedRole:  'annotator',
+        dueOffsetDays: -1,
+        requiresApproval: false,
+      },
+      {
+        key:           'minutes',
+        title:         'File minutes for {event}',
+        description:   'Post the minutes for {event} and attach the link.',
+        assignedRole:  'annotator',
+        dueOffsetDays: 1,
+        requiresProof:    true,
+        proofType:        'link',
+        requiresApproval: false,
+      },
+    ],
+  },
+  {
+    // Manual-apply only (see chapter_meeting note). Leaner than the chapter
+    // template — officers are expected to attend, so no chapter-wide reminder.
+    id:    'eboard_meeting',
+    label: 'E-Board Meeting',
+    taskSpecs: [
+      {
+        key:           'agenda',
+        title:         'Prepare the e-board agenda for {event}',
+        description:   'Draft the executive-board agenda for {event}.',
+        assignedRole:  'annotator',
+        dueOffsetDays: -2,
+        requiresApproval: true,
+        reviewerRole:  'president',
+      },
+      {
+        key:           'minutes',
+        title:         'File e-board minutes for {event}',
+        description:   'Post the e-board minutes for {event} and attach the link.',
+        assignedRole:  'annotator',
+        dueOffsetDays: 1,
+        requiresProof:    true,
+        proofType:        'link',
+        requiresApproval: false,
+      },
+    ],
+  },
 ];
 
 /** Picker options: a "None" sentinel followed by every registered template. */

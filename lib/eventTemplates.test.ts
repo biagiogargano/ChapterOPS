@@ -87,5 +87,45 @@ check('mapped defaults resolve to real templates',
   Object.values(DEFAULT_TEMPLATE_BY_KIND).every(id => !!id && !!getEventTemplate(id)));
 check('unmapped kind has no default (chapter)', DEFAULT_TEMPLATE_BY_KIND.chapter === undefined);
 
+// ── Meeting templates (manual-apply only) ─────────────────────────────────────
+const cm = buildTasksFromTemplate('chapter_meeting', ev);
+const eb = buildTasksFromTemplate('eboard_meeting', ev);
+const cmBy = (k: string) => cm.find(t => t.id.endsWith(`_${k}`));
+const ebBy = (k: string) => eb.find(t => t.id.endsWith(`_${k}`));
+
+check('chapter_meeting builds 3 tasks', cm.length === 3);
+check('eboard_meeting builds 2 tasks',  eb.length === 2);
+check('meeting templates in picker',
+  ['chapter_meeting', 'eboard_meeting'].every(id => EVENT_TEMPLATE_OPTIONS.some(o => o.id === id)));
+
+// Manual-apply only: NOT wired into kind defaults.
+check('chapter NOT auto-defaulted', DEFAULT_TEMPLATE_BY_KIND.chapter === undefined);
+check('eboard NOT auto-defaulted',  DEFAULT_TEMPLATE_BY_KIND.eboard === undefined);
+
+// Chapter Meeting specs.
+check('cm agenda → annotator/-2/review by president',
+  cmBy('agenda')?.assignedRole === 'annotator' && cmBy('agenda')?.dueAt === '2030-05-08' &&
+  cmBy('agenda')?.requiresApproval === true && cmBy('agenda')?.reviewerRole === 'president');
+check('cm reminder → annotator/-1/no review',
+  cmBy('reminder')?.assignedRole === 'annotator' && cmBy('reminder')?.dueAt === '2030-05-09' &&
+  cmBy('reminder')?.requiresApproval === false);
+check('cm minutes → annotator/+1/link proof/no review',
+  cmBy('minutes')?.assignedRole === 'annotator' && cmBy('minutes')?.dueAt === '2030-05-11' &&
+  cmBy('minutes')?.requiresProof === true && cmBy('minutes')?.proofType === 'link' &&
+  cmBy('minutes')?.requiresApproval === false);
+
+// E-Board Meeting specs.
+check('eb agenda → annotator/-2/review by president',
+  ebBy('agenda')?.assignedRole === 'annotator' && ebBy('agenda')?.dueAt === '2030-05-08' &&
+  ebBy('agenda')?.requiresApproval === true && ebBy('agenda')?.reviewerRole === 'president');
+check('eb minutes → annotator/+1/link proof/no review',
+  ebBy('minutes')?.assignedRole === 'annotator' && ebBy('minutes')?.dueAt === '2030-05-11' &&
+  ebBy('minutes')?.requiresProof === true && ebBy('minutes')?.proofType === 'link' &&
+  ebBy('minutes')?.requiresApproval === false);
+
+// Meeting templates carry no binary proof types (alpha = text/link only).
+check('meeting proof types are link-only',
+  [...cm, ...eb].every(t => !t.requiresProof || t.proofType === 'link'));
+
 console.log(`\neventTemplates.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
