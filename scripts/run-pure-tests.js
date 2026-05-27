@@ -23,9 +23,9 @@ const toPosix  = p => p.split(path.sep).join('/');
 
 // The suites that must run (matches the lib/*.test.ts set we maintain).
 const EXPECTED = [
-  'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions', 'eventTemplates',
-  'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks', 'orgPreference', 'orgScope',
-  'positions', 'routeTarget', 'taskCompletion',
+  'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
+  'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
+  'orgPreference', 'orgScope', 'positions', 'routeTarget', 'taskCompletion',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────
