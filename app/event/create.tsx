@@ -5,12 +5,14 @@ import {
   ROLE_ALLOWED_KINDS,
   addUserEvent,
   canManageEvent,
+  deleteEvent,
   findEventById,
   updateUserEvent,
   updateUserEventSeries,
   type RecurrenceType,
   type UpdateEventInput,
 } from '@/lib/eventStore';
+import { isSupabaseConfigured } from '@/lib/memberService';
 import {
   KIND_BG,
   KIND_COLORS,
@@ -452,6 +454,7 @@ export default function CreateEventScreen() {
   const [requiresDateNames, setRequiresDateNames] = useState(existing?.requiresDateNames ?? false);
   const [templateId,  setTemplateId ] = useState<string>(NO_TEMPLATE);
   const [errors,      setErrors     ] = useState<string[]>([]);
+  const [saving,      setSaving      ] = useState(false);   // create-path sync in flight
 
   // Merged built-in + custom templates for the picker (reactive to edits).
   useCustomTemplatesVersion();
@@ -497,7 +500,8 @@ export default function CreateEventScreen() {
     audience !== '' &&
     (editing || recurrence === 'none' || repeatUntil !== '');
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (saving) return;   // guard against a double-tap while a create sync is in flight
     // Hard stop: roles with no allowed event kinds can never create an event
     // (defense in depth so the hidden kind default is never persisted).
     if (noEventKinds) {
@@ -582,6 +586,7 @@ export default function CreateEventScreen() {
     }
 
     // ── Create new event ───────────────────────────────────────────────────────
+    setSaving(true);
     // Local optimistic write (also generates RSVP tasks). Returns all instances
     // (recurring series → one per date), each with a client-generated UUID id.
     const created = addUserEvent({
@@ -598,9 +603,23 @@ export default function CreateEventScreen() {
       requiresDateNames: kind === 'social' ? requiresDateNames : false,
     });
 
-    // Persist each instance to Supabase (fire-and-forget; no-ops if unconfigured,
-    // preserving the local-only fallback). Same UUIDs are used in both places.
-    created.forEach(e => { void insertEvent(e); });
+    // Persist each instance to Supabase. In flag-on mode (Supabase configured)
+    // the server write is authoritative: await every instance, and if ANY fails
+    // to sync, roll back the optimistic local copies, surface a clear error, and
+    // stay on the form — never pretend a non-synced event saved (it would vanish
+    // on the next refetch). In flag-off/local mode insertEvent no-ops, so we keep
+    // the fire-and-forget local-only behavior unchanged. Same UUIDs both places.
+    if (isSupabaseConfigured()) {
+      const results = await Promise.all(created.map(e => insertEvent(e)));
+      if (results.some(r => r === undefined)) {
+        created.forEach(e => deleteEvent(e.id));   // undo optimistic add — no phantom event
+        setErrors(['This event could not sync. Please try again.']);
+        setSaving(false);
+        return;
+      }
+    } else {
+      created.forEach(e => { void insertEvent(e); });
+    }
 
     // MVP P3: when RSVP is enabled (audience !== 'optional'), generate ONE
     // "Review RSVP list for [event name]" task for the PRIMARY created event
@@ -640,6 +659,7 @@ export default function CreateEventScreen() {
       });
     }
 
+    setSaving(false);
     router.replace(`/event/${primary.id}` as any);
   }
 
@@ -857,12 +877,12 @@ export default function CreateEventScreen() {
 
         {/* ── Submit ── */}
         <Pressable
-          style={[s.createBtn, !canSubmit && s.createBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
+          style={[s.createBtn, (!canSubmit || saving) && s.createBtnDisabled]}
+          onPress={() => { void handleSubmit(); }}
+          disabled={!canSubmit || saving}
         >
-          <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>
-            {editing ? 'Save Changes' : 'Create Event'}
+          <Text style={[s.createBtnText, (!canSubmit || saving) && s.createBtnTextDisabled]}>
+            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Event'}
           </Text>
         </Pressable>
 
