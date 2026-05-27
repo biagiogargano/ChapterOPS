@@ -13,6 +13,7 @@ import {
   type UpdateEventInput,
 } from '@/lib/eventStore';
 import { isSupabaseConfigured } from '@/lib/memberService';
+import { AUTH_ENABLED, ORG_SCOPED_DATA } from '@/lib/flags';
 import {
   KIND_BG,
   KIND_COLORS,
@@ -603,13 +604,21 @@ export default function CreateEventScreen() {
       requiresDateNames: kind === 'social' ? requiresDateNames : false,
     });
 
-    // Persist each instance to Supabase. In flag-on mode (Supabase configured)
-    // the server write is authoritative: await every instance, and if ANY fails
-    // to sync, roll back the optimistic local copies, surface a clear error, and
-    // stay on the form — never pretend a non-synced event saved (it would vanish
-    // on the next refetch). In flag-off/local mode insertEvent no-ops, so we keep
-    // the fire-and-forget local-only behavior unchanged. Same UUIDs both places.
-    if (isSupabaseConfigured()) {
+    // Persist each instance to Supabase. Only the REAL flag-on persistence mode
+    // (the alpha build: AUTH_ENABLED && ORG_SCOPED_DATA, with Supabase
+    // configured) treats the server write as authoritative — await every
+    // instance, and if ANY fails to sync, roll back the optimistic local copies,
+    // surface a clear error, and stay on the form (never pretend a non-synced
+    // event saved; it would vanish on the next refetch).
+    //
+    // The flag-OFF local/dev sandbox keeps the fire-and-forget, local-in-memory
+    // behavior — even when Supabase env vars happen to be present (e.g. a dev
+    // running the sandbox against a configured project): without AUTH_ENABLED +
+    // ORG_SCOPED_DATA we are not in real-persistence mode, so a failed/absent
+    // remote write must NOT block creation or roll back the local event.
+    // Same UUIDs are used in both places.
+    const syncRequired = AUTH_ENABLED && ORG_SCOPED_DATA && isSupabaseConfigured();
+    if (syncRequired) {
       const results = await Promise.all(created.map(e => insertEvent(e)));
       if (results.some(r => r === undefined)) {
         created.forEach(e => deleteEvent(e.id));   // undo optimistic add — no phantom event
