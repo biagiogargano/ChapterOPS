@@ -1105,8 +1105,17 @@ export default function TaskDetailScreen() {
                 <Text style={s.actionDoneText}>✓  Completed</Text>
               </View>
             ) : (
-              <Pressable style={s.submitBtn} onPress={() => setTaskState('approved')}>
-                <Text style={s.submitBtnText}>Mark Complete</Text>
+              <Pressable
+                style={s.submitBtn}
+                onPress={() => {
+                  // Save completion, then return to wherever the user came from
+                  // (Today / Tasks / Event Detail). The list re-reads on focus, so
+                  // the task drops out of To Do immediately.
+                  setTaskState('approved');
+                  router.back();
+                }}
+              >
+                <Text style={s.submitBtnText}>Save &amp; Complete</Text>
               </Pressable>
             )}
           </>
