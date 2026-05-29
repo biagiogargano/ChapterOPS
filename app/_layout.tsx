@@ -5,6 +5,7 @@ import { AUTH_ENABLED } from '@/lib/flags';
 import { Stack } from 'expo-router';
 import DataBootstrap from '../components/DataBootstrap';
 import BackLabel from '../components/nav/BackLabel';
+import RecoveryLinkHandler from '../components/auth/RecoveryLinkHandler';
 
 // Auth/identity structure is mounted, gated by AUTH_ENABLED. While the flag is
 // false, AuthProvider serves a static fallback surface and IdentityProvider is
@@ -25,6 +26,7 @@ export default function RootLayout() {
       <IdentityProvider configuredOverride={AUTH_ENABLED ? undefined : false}>
         <DevRoleProvider>
           <DataBootstrap>
+            <RecoveryLinkHandler />
             <Stack
               screenOptions={{
                 headerStyle: { backgroundColor: '#0f172a' },
@@ -40,6 +42,8 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
               <Stack.Screen name="event/[id]" options={{ title: 'Event', presentation: 'card' }} />
               <Stack.Screen name="task/[id]"  options={{ title: 'Task',  presentation: 'card' }} />
             </Stack>

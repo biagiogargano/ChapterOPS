@@ -91,6 +91,10 @@ export default function LoginScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.buttonText}>Sign In</Text>}
         </Pressable>
 
+        <Pressable style={s.linkRow} onPress={() => router.push('/(auth)/forgot-password' as any)}>
+          <Text style={s.linkText}>Forgot your <Text style={s.linkAccent}>password?</Text></Text>
+        </Pressable>
+
         <Pressable style={s.linkRow} onPress={() => router.push('/(auth)/signup' as any)}>
           <Text style={s.linkText}>No account? <Text style={s.linkAccent}>Sign up</Text></Text>
         </Pressable>

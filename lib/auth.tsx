@@ -15,6 +15,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import * as Linking from 'expo-linking';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { AUTH_ENABLED } from './flags';
@@ -25,14 +26,29 @@ export interface AuthActionResult {
 }
 
 export interface AuthContextType {
-  initialized:        boolean;
-  session:            Session | null;
-  user:               User | null;
-  signInWithOtp:      (email: string) => Promise<AuthActionResult>;
-  signInWithPassword: (email: string, password: string) => Promise<AuthActionResult>;
-  signUp:             (email: string, password: string) => Promise<AuthActionResult>;
-  signOut:            () => Promise<void>;
+  initialized:          boolean;
+  session:              Session | null;
+  user:                 User | null;
+  signInWithOtp:        (email: string) => Promise<AuthActionResult>;
+  signInWithPassword:   (email: string, password: string) => Promise<AuthActionResult>;
+  signUp:               (email: string, password: string) => Promise<AuthActionResult>;
+  signOut:              () => Promise<void>;
+  /** Send a password-recovery email; link returns to the app via deep link. */
+  resetPasswordForEmail: (email: string) => Promise<AuthActionResult>;
+  /** Update the signed-in (recovery-session) user's password. */
+  updatePassword:        (password: string) => Promise<AuthActionResult>;
+  /** Establish a session from deep-link recovery/confirmation tokens. */
+  setSessionFromTokens:  (accessToken: string, refreshToken: string) => Promise<AuthActionResult>;
 }
+
+/**
+ * Deep-link redirect target for all auth emails (confirmation + recovery). Built
+ * from the app scheme via Linking.createURL so it resolves to
+ * `chapterops://auth/callback` in a standalone/TestFlight build (and the
+ * exp://.../--/auth/callback dev-client equivalent). The matching URL(s) must be
+ * allowlisted in Supabase Auth → URL Configuration → Redirect URLs.
+ */
+export const AUTH_REDIRECT_URL = Linking.createURL('/auth/callback');
 
 const AUTH_DISABLED = 'Authentication is disabled.';
 
@@ -43,13 +59,16 @@ const AUTH_DISABLED = 'Authentication is disabled.';
  * touching Supabase.
  */
 const fallbackAuthSurface: AuthContextType = {
-  initialized:        true,
-  session:            null,
-  user:               null,
-  signInWithOtp:      async () => ({ error: AUTH_DISABLED }),
-  signInWithPassword: async () => ({ error: AUTH_DISABLED }),
-  signUp:             async () => ({ error: AUTH_DISABLED }),
-  signOut:            async () => {},
+  initialized:           true,
+  session:               null,
+  user:                  null,
+  signInWithOtp:         async () => ({ error: AUTH_DISABLED }),
+  signInWithPassword:    async () => ({ error: AUTH_DISABLED }),
+  signUp:                async () => ({ error: AUTH_DISABLED }),
+  signOut:               async () => {},
+  resetPasswordForEmail: async () => ({ error: AUTH_DISABLED }),
+  updatePassword:        async () => ({ error: AUTH_DISABLED }),
+  setSessionFromTokens:  async () => ({ error: AUTH_DISABLED }),
 };
 
 const AuthContext = createContext<AuthContextType>(fallbackAuthSurface);
@@ -90,13 +109,42 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<AuthActionResult> => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    // emailRedirectTo brings the confirmation link back into the app (deep link)
+    // instead of the project Site URL (which is localhost → blank page).
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: AUTH_REDIRECT_URL },
+    });
     return { error: error?.message ?? null };
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
+
+  const resetPasswordForEmail = useCallback(async (email: string): Promise<AuthActionResult> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: AUTH_REDIRECT_URL,
+    });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const updatePassword = useCallback(async (password: string): Promise<AuthActionResult> => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const setSessionFromTokens = useCallback(
+    async (accessToken: string, refreshToken: string): Promise<AuthActionResult> => {
+      const { error } = await supabase.auth.setSession({
+        access_token:  accessToken,
+        refresh_token: refreshToken,
+      });
+      return { error: error?.message ?? null };
+    },
+    [],
+  );
 
   const value = useMemo<AuthContextType>(() => ({
     initialized,
@@ -106,7 +154,11 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     signInWithPassword,
     signUp,
     signOut,
-  }), [initialized, session, signInWithOtp, signInWithPassword, signUp, signOut]);
+    resetPasswordForEmail,
+    updatePassword,
+    setSessionFromTokens,
+  }), [initialized, session, signInWithOtp, signInWithPassword, signUp, signOut,
+       resetPasswordForEmail, updatePassword, setSessionFromTokens]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
