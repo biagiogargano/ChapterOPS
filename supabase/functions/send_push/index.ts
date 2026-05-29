@@ -13,8 +13,15 @@
 // → active members in the org → their Expo push tokens (read with the
 // SERVICE-ROLE key, bypassing RLS), exclude the actor, POST to the Expo Push API.
 //
-// SECRETS: read from env at runtime (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
-// NONE are hardcoded here or committed anywhere.
+// SECRETS: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are AUTO-INJECTED by the
+// Supabase Edge runtime — do NOT `supabase secrets set` them (the SUPABASE_
+// prefix is reserved/rejected). No secrets command is needed for V1. The only
+// future secret is EXPO_ACCESS_TOKEN, and only if Expo "enhanced push security"
+// is enabled later (off by default). Nothing is hardcoded or committed here.
+//
+// AUTH: deploy with JWT verification ON (the default). The app invokes this as an
+// authenticated user (supabase.functions.invoke attaches the user JWT). Never
+// deploy with --no-verify-jwt; use it only as a throwaway local debug step.
 //
 // NOTE FOR REVIEWERS: this scaffold establishes the contract + control flow. The
 // member/role → token resolution query is written against the identity tables
@@ -64,7 +71,12 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(supabaseUrl, serviceKey);
 
   // Exclude the actor's role from the audience so people aren't pushed their own
-  // action. (Per-user actor exclusion can be refined later via auth_user_id.)
+  // action.
+  // TODO (known limitation): this is ROLE-level, not person-level. If the actor
+  // shares a role with real recipients (e.g. two co-Social-Chairs), legitimate
+  // recipients can be dropped; and the actor could still be notified under a
+  // different role they hold. Refine to exclude by auth_user_id / member_id once
+  // the client safely sends the actor's identity.
   const recipientRoles = audience_roles.filter(r => r && r !== actor_role);
   if (recipientRoles.length === 0) {
     return new Response(JSON.stringify({ sent: 0, reason: 'only_actor' }), { status: 200 });
