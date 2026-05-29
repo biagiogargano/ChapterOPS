@@ -14,12 +14,13 @@ import {
   getResponsibilityGroups,
   isOverdue,
   setSupabaseTaskCache,
-  sortByUrgency,
+  sortTasks,
   type MockTask,
   type TaskState,
+  type TaskSortBy,
 } from '@/lib/mockTasks';
 import { getRsvpEntry, refreshRsvpsFromSupabase, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
-import { isRsvpTaskExpired } from '@/lib/taskCompletion';
+import { isRsvpTaskExpired, isTaskCompleted } from '@/lib/taskCompletion';
 import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,54 +28,28 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-// ─── Summary bar helpers ──────────────────────────────────────────────────────
+// ─── Summary status line ──────────────────────────────────────────────────────
 
-function computeSummary(tasks: MockTask[], role: string): { done: number; reviewing: number; todo: number } {
-  let done = 0, reviewing = 0, todo = 0;
+function computeSummary(tasks: MockTask[], role: string): { done: number; todo: number } {
+  let done = 0, todo = 0;
   for (const t of tasks) {
-    if (t.lightweightKind === 'rsvp' && t.linkedEvent) {
-      // RSVP tasks: key by instance ID so recurring events don't share state
-      const status = getRsvpEntry(resolveEventId(t.linkedEventId ?? t.linkedEvent), role).status;
-      if (status === 'attending')     done++;
-      else if (status === 'not_attending') reviewing++;
-      else                            todo++;
-    } else {
-      const eff = getStoredState(t.id, t.state);
-      if (eff === 'approved')         done++;
-      else if (eff === 'submitted')   reviewing++;
-      else                            todo++;
-    }
+    if (isTaskCompleted(t, role)) done++;
+    else                          todo++;
   }
-  return { done, reviewing, todo };
+  return { done, todo };
 }
 
-function SummaryBar({ tasks, role }: { tasks: MockTask[]; role: string }) {
+/** Plain status text (not a button) summarizing the user's personal tasks. */
+function SummaryStatus({ tasks, role }: { tasks: MockTask[]; role: string }) {
   useRsvpVersion(); // re-render whenever any RSVP changes so counts stay accurate
-  const { done, reviewing, todo } = computeSummary(tasks, role);
+  const { done, todo } = computeSummary(tasks, role);
   if (tasks.length === 0) return null;
 
-  return (
-    <View style={s.summaryBar}>
-      {done > 0 && (
-        <View style={s.summaryChip}>
-          <View style={[s.summaryDot, { backgroundColor: '#22c55e' }]} />
-          <Text style={s.summaryText}>{done} done</Text>
-        </View>
-      )}
-      {reviewing > 0 && (
-        <View style={s.summaryChip}>
-          <View style={[s.summaryDot, { backgroundColor: '#f59e0b' }]} />
-          <Text style={s.summaryText}>{reviewing} in review</Text>
-        </View>
-      )}
-      {todo > 0 && (
-        <View style={s.summaryChip}>
-          <View style={[s.summaryDot, { backgroundColor: '#64748b' }]} />
-          <Text style={s.summaryText}>{todo} to do</Text>
-        </View>
-      )}
-    </View>
-  );
+  const parts: string[] = [];
+  parts.push(`${todo} to do`);
+  if (done > 0) parts.push(`${done} done`);
+
+  return <Text style={s.summaryStatus}>{parts.join('  ·  ')}</Text>;
 }
 
 // ─── Task cards ───────────────────────────────────────────────────────────────
@@ -305,54 +280,50 @@ function SectionHeader({
 
 // ─── Filter + sort ────────────────────────────────────────────────────────────
 
-type StatusFilter = 'all' | 'todo' | 'inreview' | 'done' | 'overdue';
-type SortBy       = 'due' | 'urgency';
+type StatusFilter = 'todo' | 'done' | 'all';
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: 'all',      label: 'All' },
-  { id: 'todo',     label: 'To do' },
-  { id: 'inreview', label: 'In review' },
-  { id: 'done',     label: 'Done' },
-  { id: 'overdue',  label: 'Overdue' },
+  { id: 'todo', label: 'To Do' },
+  { id: 'done', label: 'Done' },
+  { id: 'all',  label: 'All' },
 ];
 
-const SORTS: { id: SortBy; label: string }[] = [
-  { id: 'due',     label: 'Due date' },
-  { id: 'urgency', label: 'Urgency' },
+const SORTS: { id: TaskSortBy; label: string }[] = [
+  { id: 'due',   label: 'Due date' },
+  { id: 'event', label: 'Event' },
+  { id: 'type',  label: 'Type' },
 ];
 
-/** Does a task's effective state match the chosen status filter? */
-function matchesStatus(t: MockTask, filter: StatusFilter): boolean {
+/**
+ * Does a task match the chosen status filter? "Done" uses the single source of
+ * truth (isTaskCompleted: approved / answered RSVP / saved date name). "To Do"
+ * is simply everything not done — so overdue + rejected + waiting-on-review all
+ * stay actionable. "All" shows both.
+ */
+function matchesStatus(t: MockTask, filter: StatusFilter, role: string): boolean {
   if (filter === 'all') return true;
-  const st      = getStoredState(t.id, t.state);
-  const overdue = isOverdue(t.dueAt, st) || st === 'escalated';
-  switch (filter) {
-    case 'overdue':  return overdue;
-    case 'done':     return st === 'approved';
-    case 'inreview': return st === 'submitted';
-    case 'todo':     return !overdue && (st === 'assigned' || st === 'rejected');
-  }
+  const done = isTaskCompleted(t, role);
+  return filter === 'done' ? done : !done;
 }
 
 /** Apply the active search + filter + sort to a bucket's tasks (pure). */
-function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: SortBy, query: string): MockTask[] {
+function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: TaskSortBy, query: string, role: string): MockTask[] {
   const q = query.trim().toLowerCase();
   const filtered = tasks.filter(t =>
-    matchesStatus(t, filter) &&
+    matchesStatus(t, filter, role) &&
     (q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q)),
   );
-  if (sortBy === 'urgency') return sortByUrgency(filtered);
-  return [...filtered].sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'));
+  return sortTasks(filtered, sortBy);
 }
 
 function FilterSortBar({
   status, sortBy, query, onStatus, onSort, onQuery,
 }: {
   status:   StatusFilter;
-  sortBy:   SortBy;
+  sortBy:   TaskSortBy;
   query:    string;
   onStatus: (s: StatusFilter) => void;
-  onSort:   (s: SortBy) => void;
+  onSort:   (s: TaskSortBy) => void;
   onQuery:  (q: string) => void;
 }) {
   return (
@@ -459,14 +430,18 @@ export default function TasksScreen() {
 
   // Filter + sort (session-only). Applied within each existing bucket so the
   // responsibility grouping is preserved.
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sortBy, setSortBy] = useState<SortBy>('due');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todo');
+  const [sortBy, setSortBy] = useState<TaskSortBy>('due');
   const [taskQuery, setTaskQuery] = useState('');
 
-  const viewAlert    = applyView(alert,    statusFilter, sortBy, taskQuery);
-  const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery);
-  const viewReview   = applyView(review,   statusFilter, sortBy, taskQuery);
-  const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery);
+  // "Needs My Review" + "Chapter Alerts" are actions on OTHERS' work — they
+  // belong with what I need to act on (To Do / All), never under Done.
+  const showActionSections = statusFilter !== 'done';
+
+  const viewAlert    = showActionSections ? applyView(alert,  statusFilter, sortBy, taskQuery, role) : [];
+  const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery, role);
+  const viewReview   = showActionSections ? applyView(review, statusFilter, sortBy, taskQuery, role) : [];
+  const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery, role);
   const hasAnyView   = viewAlert.length + viewMine.length + viewReview.length + viewReviewed.length > 0;
 
   /**
@@ -498,14 +473,8 @@ export default function TasksScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#818cf8" colors={['#818cf8']} />
       }
     >
-      {/* Role indicator */}
-      <View style={s.roleBar}>
-        <View style={s.roleDot} />
-        <Text style={s.roleBarText}>Filtered for {roleLabel}</Text>
-      </View>
-
-      {/* Summary bar — only shown when there are personal tasks */}
-      {mine.length > 0 && <SummaryBar tasks={mine} role={role} />}
+      {/* Summary status line — only shown when there are personal tasks */}
+      {mine.length > 0 && <SummaryStatus tasks={mine} role={role} />}
 
       {/* Filter + sort controls — only when there are tasks to act on */}
       {hasAny && (
@@ -598,26 +567,11 @@ const s = StyleSheet.create({
   sortChipText:    { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
   sortChipTextOn:  { color: '#a5b4fc' },
 
-  // Role bar
-  roleBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    marginBottom: 12, paddingHorizontal: 4,
+  // Summary status line (plain text, not a button)
+  summaryStatus: {
+    fontSize: 13, fontWeight: '600', color: '#94a3b8',
+    marginBottom: 16, paddingHorizontal: 4,
   },
-  roleDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6366f1' },
-  roleBarText: { fontSize: 12, color: '#475569', fontWeight: '500' },
-
-  // Summary bar
-  summaryBar: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    marginBottom: 20, paddingHorizontal: 4,
-  },
-  summaryChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#1e293b', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  summaryDot:  { width: 6, height: 6, borderRadius: 3 },
-  summaryText: { fontSize: 11, fontWeight: '600', color: '#94a3b8' },
 
   // Section
   section: { marginBottom: 16 },

@@ -906,6 +906,50 @@ export function sortByUrgency(tasks: MockTask[]): MockTask[] {
 }
 
 /**
+ * Tasks-tab sort modes. Pure, presentation-only ordering applied within each
+ * responsibility section — no state machine or schema involvement.
+ *   • 'due'   — soonest due date first (overdue floats up naturally by date)
+ *   • 'event' — grouped by linked event title (A→Z), standalone tasks last
+ *   • 'type'  — grouped by task type/kind, then by due date within a group
+ */
+export type TaskSortBy = 'due' | 'event' | 'type';
+
+/** Stable due-date comparator (missing dueAt sorts last). */
+function _cmpDue(a: MockTask, b: MockTask): number {
+  return (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999');
+}
+
+/** A coarse type/kind key for the "by type" grouping. */
+function _typeKey(t: MockTask): string {
+  if (t.type === 'lightweight') return `1_${t.lightweightKind ?? 'other'}`;
+  return '0_structured';
+}
+
+export function sortTasks(tasks: MockTask[], sortBy: TaskSortBy): MockTask[] {
+  const arr = [...tasks];
+  if (sortBy === 'event') {
+    return arr.sort((a, b) => {
+      const ae = (a.linkedEvent ?? '').toLowerCase();
+      const be = (b.linkedEvent ?? '').toLowerCase();
+      // Standalone tasks (no event) sort after event-linked ones.
+      if (ae === '' && be !== '') return 1;
+      if (ae !== '' && be === '') return -1;
+      if (ae !== be) return ae.localeCompare(be);
+      return _cmpDue(a, b);
+    });
+  }
+  if (sortBy === 'type') {
+    return arr.sort((a, b) => {
+      const ak = _typeKey(a), bk = _typeKey(b);
+      if (ak !== bk) return ak.localeCompare(bk);
+      return _cmpDue(a, b);
+    });
+  }
+  // 'due'
+  return arr.sort(_cmpDue);
+}
+
+/**
  * Get all tasks for a role, split into responsibility buckets.
  *
  * `getState` (optional) resolves the LIVE state for a task (e.g. from
