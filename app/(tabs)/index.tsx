@@ -43,6 +43,7 @@ import {
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { isTaskCompleted, isRsvpTaskExpired } from '@/lib/taskCompletion';
+import { usePushRegistration } from '@/lib/usePushRegistration';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
@@ -152,6 +153,10 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
   // explicit Save button below writes to the store.
   const [draft, setDraft] = useState<RsvpStatus | null>(null);
 
+  // Push v1: saving an RSVP is a "first meaningful action" — try to register
+  // for push (no-op unless flag-on + real member + device; deduped; quiet).
+  const { maybeRegisterForPush } = usePushRegistration();
+
   function clearAttending() {
     setRsvpEntry(eventId, role, { status: 'no_response' });
   }
@@ -162,6 +167,7 @@ function RsvpCard({ task, role }: { task: MockTask; role: Role }) {
       setRsvpEntry(eventId, role, { status: 'not_attending' });
     }
     setDraft(null);
+    maybeRegisterForPush();
   }
 
   // Tapping the title/meta opens the full Event Detail hub (quick buttons stay).

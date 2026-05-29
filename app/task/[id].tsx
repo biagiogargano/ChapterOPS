@@ -33,6 +33,7 @@ import {
 } from '@/lib/rsvpStore';
 import { ROLE_LABELS, isLeadershipRole, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
+import { usePushRegistration } from '@/lib/usePushRegistration';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -805,6 +806,14 @@ export default function TaskDetailScreen() {
   // Real flag-on persistence mode (the alpha): proof submissions go through the
   // RPC-backed task_submissions primitive. Flag-off sandbox stays in-memory.
   const proofSyncRequired = AUTH_ENABLED && ORG_SCOPED_DATA && isSupabaseConfigured();
+
+  // Push v1: opening a task is a "first meaningful action" — try to register this
+  // device for push (no-op unless flag-on + real member + physical device; never
+  // re-prompts after denial; deduped to once/session). Registration only — no sends.
+  const { maybeRegisterForPush } = usePushRegistration();
+  useEffect(() => {
+    if (task) maybeRegisterForPush();
+  }, [task, maybeRegisterForPush]);
 
   function setTaskState(s: TaskState) {
     _setTaskState(s);

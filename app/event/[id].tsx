@@ -20,6 +20,7 @@ import {
   type RsvpStatus,
 } from '@/lib/rsvpStore';
 import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
+import { usePushRegistration } from '@/lib/usePushRegistration';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { emitUpdateNotice, hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import {
@@ -112,6 +113,9 @@ function RsvpSection({
   const [draftExcuse,   setDraftExcuse  ] = useState(entry.excuse);
   const [draftCovering, setDraftCovering] = useState(entry.covering);
 
+  // Push v1: register for push on RSVP save (no-op unless flag-on + real member).
+  const { maybeRegisterForPush } = usePushRegistration();
+
   function beginEdit() {
     setDraftStatus(saved);
     setDraftExcuse(entry.excuse);
@@ -138,6 +142,7 @@ function RsvpSection({
       covering: na ? draftCovering.trim() : '',
     });
     setEditing(false);
+    maybeRegisterForPush();   // Push v1: RSVP save is a first meaningful action
   }
 
   // ── Editing mode ────────────────────────────────────────────────────────────
