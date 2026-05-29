@@ -45,7 +45,7 @@ export default function LoginScreen() {
     if (!email || !password) { setError('Enter your email and password.'); return; }
     setLoading(true);
     setError(null);
-    const res = await signInWithPassword(email.trim(), password);
+    const res = await signInWithPassword(email.trim().toLowerCase(), password);
     setLoading(false);
     if (res.error) setError(res.error);
     // On success the session updates → IdentityProvider resolves → guards redirect.

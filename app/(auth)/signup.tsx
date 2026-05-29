@@ -50,7 +50,7 @@ export default function SignupScreen() {
     setLoading(true);
     setError(null);
     setInfo(null);
-    const res = await signUp(email.trim(), password);
+    const res = await signUp(email.trim().toLowerCase(), password);
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     // If the project requires email confirmation, no session is created — guide

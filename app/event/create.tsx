@@ -68,7 +68,8 @@ const MAX_ISO   = isoDateFromParts(_maxDate.getFullYear(), _maxDate.getMonth(), 
 function parseTime(t: string): { hour: number; minute: string; ampm: 'AM' | 'PM' } {
   const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(t.trim());
   if (!m) return { hour: 8, minute: '00', ampm: 'PM' };
-  const minute = ['00', '15', '30', '45'].includes(m[2]) ? m[2] : '00';
+  const mi = parseInt(m[2], 10);
+  const minute = !Number.isNaN(mi) && mi >= 0 && mi <= 59 ? String(mi).padStart(2, '0') : '00';
   return { hour: parseInt(m[1], 10), minute, ampm: m[3].toUpperCase() as 'AM' | 'PM' };
 }
 
@@ -119,7 +120,6 @@ const MONTH_NAMES    = [
   'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December',
 ];
-const MINUTE_CHIPS: string[] = ['00', '15', '30', '45'];
 
 const AUDIENCE_OPTIONS: { value: EventAudience; label: string; sub: string }[] = [
   { value: 'all',           label: 'Mandatory',          sub: 'All active members required' },
@@ -305,7 +305,10 @@ function CalendarPicker({
   );
 }
 
-// ─── TimePicker ───────────────────────────────────────────────────────────────
+// ─── TimePicker (typed hh:mm + AM/PM) ─────────────────────────────────────────
+// Simple typed field: accepts "h:mm" / "hh:mm" (and bare "h"/"hmm") and writes a
+// validated hour(1-12)+minute back to the parent. Invalid keystrokes stay in the
+// local buffer until they parse, and the buffer normalizes on blur.
 
 function TimePicker({
   hour, minute, ampm, onHour, onMinute, onAmpm,
@@ -317,27 +320,37 @@ function TimePicker({
   onMinute:(m: string) => void;
   onAmpm:  (a: 'AM' | 'PM') => void;
 }) {
+  const [text, setText] = useState(`${hour}:${minute}`);
+
+  function commit(raw: string) {
+    const cleaned = raw.replace(/[^\d:]/g, '').slice(0, 5);
+    setText(cleaned);
+    const m = cleaned.match(/^(\d{1,2}):?(\d{0,2})$/);
+    if (!m) return;
+    const h = parseInt(m[1], 10);
+    if (Number.isNaN(h) || h < 1 || h > 12) return;
+    let mm = m[2] ?? '';
+    if (mm === '') mm = '00';
+    if (mm.length === 1) mm = `0${mm}`;
+    const mi = parseInt(mm, 10);
+    if (Number.isNaN(mi) || mi > 59) return;
+    onHour(h);
+    onMinute(String(mi).padStart(2, '0'));
+  }
+
   return (
-    <View style={s.timePicker}>
-      {/* Row 1: Hour arrows + AM/PM */}
-      <View style={s.timeRow1}>
-        <Pressable
-          style={s.timeArrow}
-          onPress={() => onHour(hour === 1 ? 12 : hour - 1)}
-        >
-          <Text style={s.timeArrowText}>‹</Text>
-        </Pressable>
-        <Text style={s.timeHourNum}>{hour}</Text>
-        <Pressable
-          style={s.timeArrow}
-          onPress={() => onHour(hour === 12 ? 1 : hour + 1)}
-        >
-          <Text style={s.timeArrowText}>›</Text>
-        </Pressable>
-
-        <Text style={s.timeColon}>h</Text>
-        <View style={{ flex: 1 }} />
-
+    <View style={s.timeRow}>
+      <TextInput
+        style={s.timeTextInput}
+        value={text}
+        onChangeText={commit}
+        onBlur={() => setText(`${hour}:${minute}`)}
+        placeholder="h:mm"
+        placeholderTextColor="#475569"
+        keyboardType="numbers-and-punctuation"
+        maxLength={5}
+      />
+      <View style={s.timeAmpmGroup}>
         {(['AM', 'PM'] as const).map(a => (
           <Pressable
             key={a}
@@ -345,19 +358,6 @@ function TimePicker({
             onPress={() => onAmpm(a)}
           >
             <Text style={[s.timeAmpmText, ampm === a && s.timeAmpmTextOn]}>{a}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Row 2: Minute chips */}
-      <View style={s.timeRow2}>
-        {MINUTE_CHIPS.map(m => (
-          <Pressable
-            key={m}
-            style={[s.timeMinChip, minute === m && s.timeMinChipOn]}
-            onPress={() => onMinute(m)}
-          >
-            <Text style={[s.timeMinText, minute === m && s.timeMinTextOn]}>:{m}</Text>
           </Pressable>
         ))}
       </View>
@@ -1042,49 +1042,16 @@ const s = StyleSheet.create({
   calCellTextToday: { color: '#a5b4fc', fontWeight: '700' },
   calCellTextOff:   { color: '#334155' },
 
-  // Time picker
-  timePicker: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    gap: 10,
+  // Time picker (typed hh:mm + AM/PM)
+  timeRow:        { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timeTextInput:  {
+    width: 110, backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155',
+    color: '#f1f5f9', fontSize: 18, fontWeight: '700', textAlign: 'center', paddingVertical: 12,
   },
-  timeRow1: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timeArrow: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  timeArrowText: { fontSize: 18, color: '#94a3b8', lineHeight: 22 },
-  timeHourNum: {
-    width: 32,
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#f1f5f9',
-  },
-  timeColon: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    marginLeft: 2,
-  },
+  timeAmpmGroup:  { flexDirection: 'row', gap: 6 },
   timeAmpmBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     borderRadius: 8,
     backgroundColor: '#0f172a',
     borderWidth: 1,
@@ -1092,24 +1059,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   timeAmpmBtnOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  timeAmpmText:   { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  timeAmpmText:   { fontSize: 14, fontWeight: '700', color: '#64748b' },
   timeAmpmTextOn: { color: '#a5b4fc' },
-  timeRow2: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  timeMinChip: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  timeMinChipOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  timeMinText:    { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  timeMinTextOn:  { color: '#a5b4fc' },
 
   // Recurrence
   recWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

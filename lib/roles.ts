@@ -78,6 +78,21 @@ export function isFloorRole(role: Role): boolean {
   return role === FLOOR_ROLE;
 }
 
+/**
+ * Roles allowed to assign a task to ANY officer role (not just themselves).
+ * Leadership (president/pro_consul) have broad authority; the annotator
+ * (Secretary) coordinates chapter work and assigns officer tasks too. This is
+ * narrower than `isLeadershipRole` — it ONLY governs the assignee dropdown in
+ * task creation; it does NOT grant event-kind management, review, or approval
+ * power (those stay gated by ROLE_ALLOWED_KINDS / reviewer rules).
+ */
+export const TASK_ASSIGNER_ROLES: Role[] = [...LEADERSHIP_ROLES, ROLES.ANNOTATOR];
+
+/** True if the role may assign tasks to any officer role (leadership or annotator). */
+export function canAssignToAnyOfficer(role: Role): boolean {
+  return TASK_ASSIGNER_ROLES.includes(role);
+}
+
 // Ordered list for the role switcher UI (officers in rough precedence, then brother)
 export const ROLE_SWITCHER_OPTIONS: Role[] = [
   ROLES.PRESIDENT,

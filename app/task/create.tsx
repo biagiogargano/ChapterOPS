@@ -11,7 +11,7 @@ import {
   type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
-import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, isOfficer, type Role } from '@/lib/roles';
+import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, canAssignToAnyOfficer, isOfficer, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
@@ -51,7 +51,6 @@ const MONTH_NAMES    = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const MINUTE_CHIPS = ['00', '15', '30', '45'];
 
 // ─── dueAt round-trip (date+time ↔ ISO timestamp) ─────────────────────────────
 
@@ -75,7 +74,7 @@ function parseDueAt(dueAt?: string): { dateString: string; includeTime: boolean;
   const rawMin = hhmm.slice(3, 5);
   const ampm: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
   h = h % 12; if (h === 0) h = 12;
-  const minute = MINUTE_CHIPS.includes(rawMin) ? rawMin : '00';
+  const minute = /^[0-5]\d$/.test(rawMin) ? rawMin : '00';
   return { dateString, includeTime: true, hour: h, minute, ampm };
 }
 
@@ -224,36 +223,59 @@ function CalendarPicker({
   );
 }
 
-// ─── TimePicker (self-contained copy) ─────────────────────────────────────────
+// ─── TypedTimeInput (typed hh:mm + AM/PM) ─────────────────────────────────────
+// Replaces the old arrow-stepper picker with a simple typed field. Accepts
+// "h:mm" / "hh:mm" (and bare "h"/"hmm"); writes a validated hour(1-12)+minute
+// back to the parent. Invalid keystrokes are kept in the local buffer (so the
+// user can finish typing) but don't propagate until they parse.
 
-function TimePicker({
-  hour, minute, ampm, onHour, onMinute, onAmpm,
+function TypedTimeInput({
+  hour, minute, ampm, onChange, onAmpm,
 }: {
   hour: number; minute: string; ampm: 'AM' | 'PM';
-  onHour: (h: number) => void; onMinute: (m: string) => void; onAmpm: (a: 'AM' | 'PM') => void;
+  onChange: (hour: number, minute: string) => void;
+  onAmpm: (a: 'AM' | 'PM') => void;
 }) {
+  const [text, setText] = useState(`${hour}:${minute}`);
+
+  function commit(raw: string) {
+    // Allow only digits and a single colon while typing.
+    const cleaned = raw.replace(/[^\d:]/g, '').slice(0, 5);
+    setText(cleaned);
+
+    const m = cleaned.match(/^(\d{1,2}):?(\d{0,2})$/);
+    if (!m) return;
+    const h = parseInt(m[1], 10);
+    if (Number.isNaN(h) || h < 1 || h > 12) return;
+    let mm = m[2] ?? '';
+    if (mm === '') mm = '00';
+    if (mm.length === 1) mm = `0${mm}`;
+    const mi = parseInt(mm, 10);
+    if (Number.isNaN(mi) || mi > 59) return;
+    onChange(h, String(mi).padStart(2, '0'));
+  }
+
+  // On blur, normalize the buffer to the last valid hour:minute.
+  function normalize() {
+    setText(`${hour}:${minute}`);
+  }
+
   return (
-    <View style={s.timePicker}>
-      <View style={s.timeRow1}>
-        <Pressable style={s.timeArrow} onPress={() => onHour(hour === 1 ? 12 : hour - 1)}>
-          <Text style={s.timeArrowText}>‹</Text>
-        </Pressable>
-        <Text style={s.timeHourNum}>{hour}</Text>
-        <Pressable style={s.timeArrow} onPress={() => onHour(hour === 12 ? 1 : hour + 1)}>
-          <Text style={s.timeArrowText}>›</Text>
-        </Pressable>
-        <Text style={s.timeColon}>h</Text>
-        <View style={{ flex: 1 }} />
+    <View style={s.timeRow}>
+      <TextInput
+        style={s.timeTextInput}
+        value={text}
+        onChangeText={commit}
+        onBlur={normalize}
+        placeholder="h:mm"
+        placeholderTextColor="#475569"
+        keyboardType="numbers-and-punctuation"
+        maxLength={5}
+      />
+      <View style={s.timeAmpmGroup}>
         {(['AM', 'PM'] as const).map(a => (
           <Pressable key={a} style={[s.timeAmpmBtn, ampm === a && s.timeAmpmBtnOn]} onPress={() => onAmpm(a)}>
             <Text style={[s.timeAmpmText, ampm === a && s.timeAmpmTextOn]}>{a}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={s.timeRow2}>
-        {MINUTE_CHIPS.map(m => (
-          <Pressable key={m} style={[s.timeMinChip, minute === m && s.timeMinChipOn]} onPress={() => onMinute(m)}>
-            <Text style={[s.timeMinText, minute === m && s.timeMinTextOn]}>:{m}</Text>
           </Pressable>
         ))}
       </View>
@@ -282,18 +304,21 @@ export default function CreateTaskScreen() {
   const effState     = existing ? getStoredState(existing.id, existing.state) : 'assigned';
   const reviewLocked = editing && (effState === 'submitted' || effState === 'approved' || effState === 'rejected');
 
-  // BROAD officers can assign to any officer role OR a brother; others only to
-  // themselves. (Brothers are assignable — they receive and complete tasks too.)
-  const isBroad         = isLeadershipRole(role);
-  const assignableRoles = useMemo<Role[]>(
-    () => (isBroad ? [...OFFICER_ROLES, FLOOR_ROLE] : [role]),
-    [isBroad, role],
+  // Who can assign to OTHER roles? Leadership (president/pro_consul) AND the
+  // annotator (Secretary) can assign to any officer role or a brother. Everyone
+  // else can only assign to themselves. (Brothers are assignable too.)
+  const canAssignBroadly = canAssignToAnyOfficer(role);
+  const assignableRoles  = useMemo<Role[]>(
+    () => (canAssignBroadly ? [...OFFICER_ROLES, FLOOR_ROLE] : [role]),
+    [canAssignBroadly, role],
   );
 
   // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
   const [title,        setTitle       ] = useState(existing?.title ?? '');
-  const [assignedRole, setAssignedRole] = useState<Role>(
-    () => (existing?.assignedRole as Role) ?? assignableRoles[0] ?? role,
+  // Multi-role assignee. Edit mode is single (one existing task); create mode
+  // allows selecting several roles → one independent cloned task per role.
+  const [assignedRoles, setAssignedRoles] = useState<Role[]>(
+    () => (existing?.assignedRole ? [existing.assignedRole as Role] : [assignableRoles[0] ?? role]),
   );
   const [dateString,   setDateString  ] = useState(prefillDue.dateString);
   const [includeTime,  setIncludeTime ] = useState(prefillDue.includeTime);
@@ -302,30 +327,24 @@ export default function CreateTaskScreen() {
   const [ampm,         setAmpm        ] = useState<'AM' | 'PM'>(prefillDue.ampm);
   const [linkedEventId, setLinkedEventId] = useState<string | undefined>(existing?.linkedEventId ?? params.eventId);
   const [requiresProof, setRequiresProof] = useState(existing?.requiresProof ?? false);
-  const [proofType,    setProofType   ] = useState<ProofType>(existing?.proofType ?? 'text');
-  const [requiresApproval, setRequiresApproval] = useState(existing?.requiresApproval ?? false);
+  const [proofType,    setProofType   ] = useState<ProofType>(
+    existing?.proofType === 'link' ? 'link' : 'text',
+  );
+  // Review defaults ON for new officer-created tasks; on edit, preserve as stored.
+  const [requiresApproval, setRequiresApproval] = useState(
+    editing ? (existing?.requiresApproval ?? false) : true,
+  );
   const [reviewerRole, setReviewerRole] = useState<Role | undefined>(existing?.reviewerRole);
   const [description,  setDescription ] = useState(existing?.description ?? '');
   const [errors,       setErrors      ] = useState<string[]>([]);
 
-  // UI-only collapse state (presentation only; no effect on what gets submitted).
-  // Event picker is collapsed by default; advanced options open only when an
-  // edited task already uses them (so nothing configured is hidden on edit).
+  // UI-only collapse state for the event picker + due-date calendar.
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
-  // Due-date calendar collapses to a summary row so it doesn't dominate the form;
-  // opens automatically in create mode when no date is set yet.
   const [dateOpen, setDateOpen] = useState(() => !editing && !prefillDue.dateString);
-  const [advancedOpen, setAdvancedOpen] = useState(
-    () => editing && (!!existing?.requiresProof || !!existing?.requiresApproval || prefillDue.includeTime),
-  );
 
   const events = useMemo(() => getAllEvents(), []);
 
-  // Picker options (soonest first) + a "standalone" sentinel. The searchable
-  // picker handles filtering as the list grows.
-  // Only offer events whose kind this role may manage tasks for (president/
-  // pro_consul → all; each chair → their domain). Keeps the standalone-create
-  // picker from linking a task to an event the role can't manage.
+  // Picker options (soonest first) + a "standalone" sentinel.
   const eventPickerOptions = useMemo(() => [
     { id: STANDALONE_OPTION, label: 'None — standalone task' },
     ...[...events]
@@ -338,37 +357,31 @@ export default function CreateTaskScreen() {
       })),
   ], [events, role]);
 
-  // Launched from Event Detail ("+ Add Task") → the linked event is fixed to that
-  // event; show a read-only summary instead of the full picker. Editing an
-  // existing task (taskId) keeps the normal picker. Standalone create unchanged.
+  // Launched from Event Detail ("+ Add Task") → the linked event is fixed.
   const lockedToEvent    = !editing && !!params.eventId;
   const lockedEventTitle = lockedToEvent
     ? (events.find(e => e.id === params.eventId)?.title ?? 'this event')
     : '';
 
-  // Current selection label for the collapsed standalone event picker.
   const selectedEventTitle = linkedEventId
     ? (events.find(e => e.id === linkedEventId)?.title ?? 'Selected event')
     : 'None — standalone task';
 
-  // Event-task permission gate: if this (new) task is linked to an event whose
-  // kind the role may not manage, block creation with a clear message. Mirrors
-  // Event Detail, where "+ Add Task" is hidden for such events. Edit mode is left
-  // to canManageTask (the existing per-task gate) so this only affects creation.
+  // Event-task permission gate (creation only).
   const linkedEventObj = linkedEventId ? events.find(e => e.id === linkedEventId) : undefined;
   const blockedByEventKind = !editing && !!linkedEventObj && !canManageEventTasks(role, linkedEventObj.kind);
 
-  // Reviewer options = leadership roles, excluding the assignee (a task can't
-  // review itself). Recompute + reset when assignee changes (skip while locked).
+  // Reviewer options = leadership roles, excluding any selected assignee (a task
+  // can't review itself). Reset/auto-pick when assignees or review toggle change.
   const reviewerOptions = useMemo<Role[]>(
-    () => LEADERSHIP_ROLES.filter(r => r !== assignedRole),
-    [assignedRole],
+    () => LEADERSHIP_ROLES.filter(r => !assignedRoles.includes(r)),
+    [assignedRoles],
   );
   useEffect(() => {
-    if (!reviewLocked && requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
+    if (!reviewLocked && requiresApproval && (!reviewerRole || assignedRoles.includes(reviewerRole))) {
       setReviewerRole(reviewerOptions[0]);
     }
-  }, [assignedRole, requiresApproval, reviewerRole, reviewerOptions, reviewLocked]);
+  }, [assignedRoles, requiresApproval, reviewerRole, reviewerOptions, reviewLocked]);
 
   // Guard: non-officers (or non-managers of this task) should never be here.
   useEffect(() => {
@@ -387,19 +400,38 @@ export default function CreateTaskScreen() {
     });
   }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Toggle an assignee chip. Edit mode = single-select (replace). Create mode =
+  // multi-select (keep at least one selected).
+  function toggleAssignee(r: Role) {
+    if (reviewLocked) return;
+    if (editing) { setAssignedRoles([r]); return; }
+    setAssignedRoles(prev => {
+      if (prev.includes(r)) {
+        const next = prev.filter(x => x !== r);
+        return next.length > 0 ? next : prev;   // never empty
+      }
+      return [...prev, r];
+    });
+  }
+
+  const reviewerInvalid =
+    requiresApproval && (!reviewerRole || assignedRoles.includes(reviewerRole));
+
   const canSubmit =
     !blockedByEventKind &&
+    assignedRoles.length > 0 &&
     title.trim().length > 0 &&
     dateString !== '' &&
-    (!requiresProof    || !!proofType) &&
-    (!requiresApproval || (!!reviewerRole && reviewerRole !== assignedRole));
+    (!requiresProof || !!proofType) &&
+    !reviewerInvalid;
 
-  // Reactive "what's missing" hint so the disabled Create button explains itself.
+  // Reactive "what's missing" hint.
   const missing: string[] = [];
-  if (!title.trim())                                                          missing.push('a title');
-  if (!dateString)                                                            missing.push('a due date');
-  if (requiresProof && !proofType)                                            missing.push('a proof type');
-  if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole))   missing.push('a reviewer');
+  if (!title.trim())                    missing.push('a title');
+  if (!dateString)                      missing.push('a due date');
+  if (assignedRoles.length === 0)       missing.push('an assignee');
+  if (requiresProof && !proofType)      missing.push('a proof type');
+  if (reviewerInvalid)                  missing.push('a reviewer different from the assignee');
   const missingHint = missing.length === 0
     ? ''
     : `Add ${missing.length === 1
@@ -407,54 +439,60 @@ export default function CreateTaskScreen() {
         : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`} to ${editing ? 'save' : 'create'} this task.`;
 
   function handleSubmit() {
-    // Hard stop: never create a task linked to an event the role can't manage.
     if (blockedByEventKind) {
       setErrors(['Your role can’t manage tasks for this event’s type.']);
       return;
     }
     const errs: string[] = [];
-    if (!title.trim())  errs.push('Task title is required.');
-    if (!dateString)    errs.push('Please pick a due date.');
-    if (requiresApproval && (!reviewerRole || reviewerRole === assignedRole)) {
-      errs.push('Choose a reviewer different from the assignee.');
-    }
+    if (!title.trim())              errs.push('Task title is required.');
+    if (!dateString)                errs.push('Please pick a due date.');
+    if (assignedRoles.length === 0) errs.push('Choose at least one assignee.');
+    if (reviewerInvalid)            errs.push('Choose a reviewer different from the assignee.');
     if (errs.length > 0) { setErrors(errs); return; }
 
     const linkedEvent = linkedEventId
       ? events.find(e => e.id === linkedEventId)?.title
       : undefined;
 
-    const input: CreateTaskInput = {
-      title:            title.trim(),
-      assignedRole,
-      dateString,
-      time:             includeTime ? `${hour}:${minute} ${ampm}` : undefined,
-      dueAt:            buildDueAt(dateString, includeTime, hour, minute, ampm),
-      linkedEvent,
-      linkedEventId:    linkedEventId,
-      requiresProof,
-      proofType:        requiresProof ? proofType : undefined,
-      requiresApproval,
-      reviewerRole:     requiresApproval ? reviewerRole : undefined,
-      description:      description.trim(),
-      createdByRole:    role,   // used on create; preserved (ignored) on edit
-    };
+    const time = includeTime ? `${hour}:${minute} ${ampm}` : undefined;
+    const dueAt = buildDueAt(dateString, includeTime, hour, minute, ampm);
 
-    // Safety: if review has started, force workflow-critical fields back to the
-    // existing values so they can never be altered (UI also locks them).
-    if (reviewLocked && existing) {
-      input.assignedRole     = existing.assignedRole as Role;
-      input.requiresProof    = existing.requiresProof ?? false;
-      input.proofType        = existing.proofType;
-      input.requiresApproval = existing.requiresApproval ?? false;
-      input.reviewerRole     = existing.reviewerRole;
+    function buildInput(assignedRole: Role, reviewer: Role | undefined): CreateTaskInput {
+      return {
+        title:            title.trim(),
+        assignedRole,
+        dateString,
+        time,
+        dueAt,
+        linkedEvent,
+        linkedEventId,
+        requiresProof,
+        proofType:        requiresProof ? proofType : undefined,
+        requiresApproval,
+        // Reviewer must differ from THIS clone's assignee; if it collides, drop
+        // approval for that clone rather than letting it review itself.
+        reviewerRole:     requiresApproval && reviewer !== assignedRole ? reviewer : undefined,
+        description:      description.trim(),
+        createdByRole:    role,
+      };
     }
 
     if (editing && existing) {
+      const assignedRole = assignedRoles[0];
+      const input = buildInput(assignedRole, reviewerRole);
+
+      // Safety: if review has started, force workflow-critical fields back.
+      if (reviewLocked) {
+        input.assignedRole     = existing.assignedRole as Role;
+        input.requiresProof    = existing.requiresProof ?? false;
+        input.proofType        = existing.proofType;
+        input.requiresApproval = existing.requiresApproval ?? false;
+        input.reviewerRole     = existing.reviewerRole;
+      }
+
       const updated = updateUserTask(existing.id, input);
       if (updated) {
-        void updateTask(updated);   // persist (no-op in mock fallback)
-        // Emit an in-app update notice for affected roles (diff-gated, coalesced).
+        void updateTask(updated);
         const notice = buildTaskEditNotice(existing, updated);
         if (notice) {
           emitUpdateNotice({
@@ -467,22 +505,28 @@ export default function CreateTaskScreen() {
           });
         }
       }
-      // Return to the SAME task-detail screen already in the stack (it re-reads on
-      // focus), instead of replacing into a fresh one — which left a duplicate
-      // detail underneath and forced a double back-tap to exit.
       router.back();
-    } else {
-      const task = addUserTask(input);
+      return;
+    }
+
+    // Create mode: one INDEPENDENT cloned task per selected role.
+    const created: MockTask[] = [];
+    for (const assignedRole of assignedRoles) {
+      const input = buildInput(assignedRole, reviewerRole);
+      const task  = addUserTask(input);
       void insertTask(task);
-      if (params.eventId) {
-        // Launched from Event Detail ("+ Add Task"): return to the existing Event
-        // Detail underneath rather than pushing a duplicate. Its focus effect
-        // re-reads related tasks, so the new task appears there.
-        router.back();
-      } else {
-        // Standalone create → open the new task's detail (unchanged).
-        router.replace(`/task/${task.id}` as any);
-      }
+      created.push(task);
+    }
+
+    if (params.eventId) {
+      // Launched from Event Detail → return to it (focus effect re-reads tasks).
+      router.back();
+    } else if (created.length === 1) {
+      // Single standalone create → open the new task's detail (unchanged).
+      router.replace(`/task/${created[0].id}` as any);
+    } else {
+      // Multiple clones → no single detail to open; go back to the list.
+      router.back();
     }
   }
 
@@ -508,8 +552,7 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Permission block — this task is linked to an event whose kind the
-            role can't manage. Submit is disabled; offer the way out. */}
+        {/* Permission block — linked to an event the role can't manage. */}
         {blockedByEventKind && (
           <View style={s.blockedNote}>
             <Text style={s.blockedNoteText}>
@@ -528,40 +571,29 @@ export default function CreateTaskScreen() {
           </View>
         )}
 
-        {/* Assignee role */}
+        {/* Assignee role(s) */}
         <View style={[s.field, reviewLocked && s.lockedField]}>
           <FieldLabel text="ASSIGN TO" required />
+          {!editing && canAssignBroadly && (
+            <Text style={s.assignHint}>
+              Pick one or more roles. Each gets its own copy to complete independently.
+            </Text>
+          )}
           <View style={s.chipWrap}>
             {assignableRoles.map(r => {
-              const on = assignedRole === r;
+              const on = assignedRoles.includes(r);
               return (
                 <Pressable
                   key={r}
                   style={[s.chip, on && s.chipOn]}
                   disabled={reviewLocked}
-                  onPress={() => setAssignedRole(r)}
+                  onPress={() => toggleAssignee(r)}
                 >
                   <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
                 </Pressable>
               );
             })}
           </View>
-        </View>
-
-        {/* Linked event — locked summary when launched from an event, else picker */}
-        <View style={s.field}>
-          <FieldLabel text="LINK TO EVENT" />
-          {lockedToEvent ? (
-            <View style={s.lockedEventRow}>
-              <Text style={s.lockedEventLabel}>LINKED TO</Text>
-              <Text style={s.lockedEventTitle} numberOfLines={1}>{lockedEventTitle}</Text>
-            </View>
-          ) : (
-            <Pressable style={s.eventSelectRow} onPress={() => setEventPickerOpen(true)}>
-              <Text style={s.eventSelectValue} numberOfLines={1}>{selectedEventTitle}</Text>
-              <Text style={s.eventSelectChevron}>▾</Text>
-            </Pressable>
-          )}
         </View>
 
         {/* Due date — collapses to a summary row so the calendar doesn't dominate */}
@@ -587,6 +619,44 @@ export default function CreateTaskScreen() {
           )}
         </View>
 
+        {/* Due time — typed hh:mm + AM/PM, right next to the date. Optional. */}
+        <View style={s.field}>
+          <FieldLabel text="DUE TIME" />
+          <Pressable style={s.toggleRow} onPress={() => setIncludeTime(v => !v)}>
+            <View style={[s.toggleBox, includeTime && s.toggleBoxOn]}>
+              {includeTime && <Text style={s.toggleCheck}>✓</Text>}
+            </View>
+            <Text style={s.toggleLabel}>Add a specific due time</Text>
+          </Pressable>
+          {includeTime && (
+            <View style={{ marginTop: 12 }}>
+              <TypedTimeInput
+                hour={hour}
+                minute={minute}
+                ampm={ampm}
+                onChange={(h, m) => { setHour(h); setMinute(m); }}
+                onAmpm={setAmpm}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Linked event — locked summary when launched from an event, else picker */}
+        <View style={s.field}>
+          <FieldLabel text="LINK TO EVENT" />
+          {lockedToEvent ? (
+            <View style={s.lockedEventRow}>
+              <Text style={s.lockedEventLabel}>LINKED TO</Text>
+              <Text style={s.lockedEventTitle} numberOfLines={1}>{lockedEventTitle}</Text>
+            </View>
+          ) : (
+            <Pressable style={s.eventSelectRow} onPress={() => setEventPickerOpen(true)}>
+              <Text style={s.eventSelectValue} numberOfLines={1}>{selectedEventTitle}</Text>
+              <Text style={s.eventSelectChevron}>▾</Text>
+            </Pressable>
+          )}
+        </View>
+
         {/* Description */}
         <View style={s.field}>
           <FieldLabel text="DESCRIPTION" />
@@ -602,86 +672,72 @@ export default function CreateTaskScreen() {
           />
         </View>
 
-        {/* Advanced options (time / proof / approval) — collapsed by default to
-            keep the common path short. Same controls, just grouped lower. */}
-        <View style={s.field}>
-          <Pressable style={s.advancedHeader} onPress={() => setAdvancedOpen(o => !o)}>
-            <Text style={s.advancedHeaderText}>ADVANCED OPTIONS</Text>
-            <Text style={s.advancedChevron}>{advancedOpen ? '▴' : '▾'}</Text>
-          </Pressable>
+        {/* Submission & Review — one section combining review + proof. */}
+        <View style={[s.field, reviewLocked && s.lockedField]}>
+          <FieldLabel text="SUBMISSION & REVIEW" />
 
-          {advancedOpen && (
-            <View style={{ marginTop: 16 }}>
-              {/* Optional time */}
-              <View style={s.field}>
-                <Pressable style={s.toggleRow} onPress={() => setIncludeTime(v => !v)}>
-                  <View style={[s.toggleBox, includeTime && s.toggleBoxOn]}>
-                    {includeTime && <Text style={s.toggleCheck}>✓</Text>}
-                  </View>
-                  <Text style={s.toggleLabel}>Add a specific due time</Text>
-                </Pressable>
-                {includeTime && (
-                  <View style={{ marginTop: 12 }}>
-                    <TimePicker hour={hour} minute={minute} ampm={ampm} onHour={setHour} onMinute={setMinute} onAmpm={setAmpm} />
-                  </View>
-                )}
-              </View>
+          {/* Review choice (defaults to "Needs review" for new tasks). */}
+          <View style={s.chipWrap}>
+            <Pressable style={[s.chip, requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(true)}>
+              <Text style={[s.chipText, requiresApproval && s.chipTextOn]}>Needs review</Text>
+            </Pressable>
+            <Pressable style={[s.chip, !requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(false)}>
+              <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just mark complete</Text>
+            </Pressable>
+          </View>
 
-              {/* Requires proof */}
-              <View style={[s.field, reviewLocked && s.lockedField]}>
-                <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
-                  <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
-                    {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
-                  </View>
-                  <Text style={s.toggleLabel}>Requires proof of completion</Text>
-                </Pressable>
-                {requiresProof && (
-                  <View style={[s.chipWrap, { marginTop: 12 }]}>
-                    {PROOF_OPTIONS.map(({ value, label }) => {
-                      const on = proofType === value;
-                      return (
-                        <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
-                          <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-
-              {/* Review — does the response need approval? (orthogonal to proof) */}
-              <View style={[s.field, reviewLocked && s.lockedField]}>
-                <Text style={s.subReviewLabel}>REVIEW</Text>
+          {requiresApproval && (
+            <>
+              <Text style={[s.fieldLabel, { marginTop: 14, marginBottom: 8 }]}>REVIEWED BY</Text>
+              {errors.includes('Choose a reviewer different from the assignee.') && (
+                <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
+              )}
+              {reviewerOptions.length === 0 ? (
+                <Text style={s.subFootHint}>
+                  No reviewer available — leadership roles are all assignees here. Turn review off, or
+                  remove a leadership role from the assignees.
+                </Text>
+              ) : (
                 <View style={s.chipWrap}>
-                  <Pressable style={[s.chip, !requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(false)}>
-                    <Text style={[s.chipText, !requiresApproval && s.chipTextOn]}>No review — just complete</Text>
-                  </Pressable>
-                  <Pressable style={[s.chip, requiresApproval && s.chipOn]} disabled={reviewLocked} onPress={() => setRequiresApproval(true)}>
-                    <Text style={[s.chipText, requiresApproval && s.chipTextOn]}>Needs review</Text>
-                  </Pressable>
+                  {reviewerOptions.map(r => {
+                    const on = reviewerRole === r;
+                    return (
+                      <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                {requiresApproval && (
-                  <>
-                    <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 8 }]}>REVIEWED BY</Text>
-                    {errors.includes('Choose a reviewer different from the assignee.') && (
-                      <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
-                    )}
-                    <View style={s.chipWrap}>
-                      {reviewerOptions.map(r => {
-                        const on = reviewerRole === r;
-                        return (
-                          <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
-                            <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </>
-                )}
-                <Text style={s.subFootHint}>Proof of completion and review are separate choices — set proof above; review just decides if a reviewer approves the result.</Text>
-              </View>
-            </View>
+              )}
+            </>
           )}
+
+          {/* Proof requirement — an option inside Submission & Review. */}
+          <View style={{ marginTop: 18 }}>
+            <Pressable style={s.toggleRow} disabled={reviewLocked} onPress={() => setRequiresProof(v => !v)}>
+              <View style={[s.toggleBox, requiresProof && s.toggleBoxOn]}>
+                {requiresProof && <Text style={s.toggleCheck}>✓</Text>}
+              </View>
+              <Text style={s.toggleLabel}>Requires proof of completion</Text>
+            </Pressable>
+            {requiresProof && (
+              <View style={[s.chipWrap, { marginTop: 12 }]}>
+                {PROOF_OPTIONS.map(({ value, label }) => {
+                  const on = proofType === value;
+                  return (
+                    <Pressable key={value} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setProofType(value)}>
+                      <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <Text style={s.subFootHint}>
+            Review decides whether a reviewer approves the result. Proof is an optional record of
+            completion (text or link) — the two are separate choices.
+          </Text>
         </View>
 
         {/* Submit */}
@@ -690,7 +746,11 @@ export default function CreateTaskScreen() {
         )}
         <Pressable style={[s.createBtn, !canSubmit && s.createBtnDisabled]} onPress={handleSubmit} disabled={!canSubmit}>
           <Text style={[s.createBtnText, !canSubmit && s.createBtnTextDisabled]}>
-            {editing ? 'Save Changes' : 'Create Task'}
+            {editing
+              ? 'Save Changes'
+              : assignedRoles.length > 1
+                ? `Create ${assignedRoles.length} Tasks`
+                : 'Create Task'}
           </Text>
         </Pressable>
 
@@ -731,6 +791,7 @@ const s = StyleSheet.create({
   fieldRequired: { fontSize: 10, color: '#475569', fontWeight: '500' },
   missingHint:   { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 10 },
   errorMsg:      { color: '#f87171', fontSize: 12, marginBottom: 8, marginLeft: 2 },
+  assignHint:    { fontSize: 12, color: '#64748b', lineHeight: 17, marginBottom: 10, marginTop: -2 },
 
   textInput: {
     backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155',
@@ -739,7 +800,7 @@ const s = StyleSheet.create({
   textArea:   { minHeight: 96, paddingTop: 12 },
   inputError: { borderColor: '#f87171' },
 
-  // Chips (assignee / proof / reviewer)
+  // Chips (assignee / proof / reviewer / review)
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
@@ -749,36 +810,19 @@ const s = StyleSheet.create({
   chipText:   { fontSize: 13, fontWeight: '600', color: '#64748b' },
   chipTextOn: { color: '#a5b4fc' },
 
-  // Event picker
-  eventList: { gap: 8 },
-  eventRow: {
-    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, gap: 2,
-  },
-  eventRowOn:      { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
-  eventRowTitle:   { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
-  eventRowTitleOn: { color: '#a5b4fc' },
-  eventRowSub:     { fontSize: 12, color: '#64748b' },
-
   // Locked linked-event summary (Task Create launched from an event)
   lockedEventRow:   { backgroundColor: '#1e1b4b', borderWidth: 1, borderColor: '#4f46e5', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
   lockedEventLabel: { fontSize: 10, fontWeight: '700', color: '#6366f1', letterSpacing: 0.6 },
   lockedEventTitle: { fontSize: 14, fontWeight: '600', color: '#a5b4fc' },
 
-  // Collapsed standalone event selector (summary row + chevron)
+  // Collapsed selector rows (date summary + standalone event selector)
   eventSelectRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   eventSelectValue:       { flex: 1, fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
   eventSelectPlaceholder: { color: '#64748b', fontWeight: '500' },
   eventSelectChevron:     { fontSize: 13, color: '#64748b', marginLeft: 8 },
 
-  // Review section (within Advanced options)
-  subReviewLabel: { fontSize: 12, fontWeight: '800', color: '#cbd5e1', letterSpacing: 0.6, marginBottom: 12 },
+  // Submission & Review footnote
   subFootHint:    { fontSize: 12, color: '#475569', lineHeight: 17, marginTop: 14 },
-
-  // Advanced options disclosure header
-  advancedHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  advancedHeaderText: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8 },
-  advancedChevron:    { fontSize: 13, color: '#64748b' },
 
   // Toggle
   toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -812,25 +856,17 @@ const s = StyleSheet.create({
   calCellTextToday: { color: '#a5b4fc', fontWeight: '700' },
   calCellTextOff:   { color: '#334155' },
 
-  // Time picker
-  timePicker: {
-    backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155',
-    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12, gap: 10,
+  // Typed time input
+  timeRow:        { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timeTextInput:  {
+    width: 110, backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155',
+    color: '#f1f5f9', fontSize: 18, fontWeight: '700', textAlign: 'center', paddingVertical: 12,
   },
-  timeRow1:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeArrow:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  timeArrowText: { fontSize: 18, color: '#94a3b8', lineHeight: 22 },
-  timeHourNum: { width: 32, textAlign: 'center', fontSize: 22, fontWeight: '700', color: '#f1f5f9' },
-  timeColon:   { fontSize: 12, fontWeight: '600', color: '#475569', marginLeft: 2 },
-  timeAmpmBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
+  timeAmpmGroup:  { flexDirection: 'row', gap: 6 },
+  timeAmpmBtn:    { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 8, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
   timeAmpmBtnOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  timeAmpmText:   { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  timeAmpmText:   { fontSize: 14, fontWeight: '700', color: '#64748b' },
   timeAmpmTextOn: { color: '#a5b4fc' },
-  timeRow2:    { flexDirection: 'row', gap: 6 },
-  timeMinChip: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  timeMinChipOn:  { backgroundColor: '#1e1b4b', borderColor: '#4f46e5' },
-  timeMinText:    { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  timeMinTextOn:  { color: '#a5b4fc' },
 
   // Submit
   createBtn:             { backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 4 },

@@ -45,7 +45,7 @@ export default function ForgotPasswordScreen() {
     if (!email) { setError('Enter your email.'); return; }
     setLoading(true);
     setError(null);
-    const res = await resetPasswordForEmail(email.trim());
+    const res = await resetPasswordForEmail(email.trim().toLowerCase());
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     setSent(true);
