@@ -316,9 +316,11 @@ export default function CreateTaskScreen() {
   // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
   const [title,        setTitle       ] = useState(existing?.title ?? '');
   // Multi-role assignee. Edit mode is single (one existing task); create mode
-  // allows selecting several roles → one independent cloned task per role.
+  // defaults to the CREATOR'S OWN role (so e.g. Social Chair → Social Chair, not
+  // always Consul just because it's first in the list). Broad assigners can still
+  // change it. `role` is always a valid option in assignableRoles.
   const [assignedRoles, setAssignedRoles] = useState<Role[]>(
-    () => (existing?.assignedRole ? [existing.assignedRole as Role] : [assignableRoles[0] ?? role]),
+    () => (existing?.assignedRole ? [existing.assignedRole as Role] : [role]),
   );
   const [dateString,   setDateString  ] = useState(prefillDue.dateString);
   const [includeTime,  setIncludeTime ] = useState(prefillDue.includeTime);

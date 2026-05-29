@@ -453,6 +453,11 @@ function RsvpResponsesSection({ eventId, label }: { eventId: string; label: stri
   const attending  = entries.filter(e => e.status === 'attending').length;
   const excused    = entries.filter(e => e.status === 'not_attending').length;
 
+  // Tap a stat card to filter the list to that group; tap again to clear. Lets
+  // officers see WHO is in each group. Names/statuses are the same RSVP data the
+  // section already shows — no new sensitive data is exposed.
+  const [groupFilter, setGroupFilter] = useState<'attending' | 'not_attending' | null>(null);
+
   if (entries.length === 0) {
     return (
       <View>
@@ -464,24 +469,42 @@ function RsvpResponsesSection({ eventId, label }: { eventId: string; label: stri
     );
   }
 
+  const toggle = (g: 'attending' | 'not_attending') =>
+    setGroupFilter(prev => (prev === g ? null : g));
+  const shown = groupFilter ? entries.filter(e => e.status === groupFilter) : entries;
+
   return (
     <View>
       <SectionLabel text={label} />
 
-      {/* Stats row */}
+      {/* Stats row — tappable to filter the list to that group */}
       <View style={s.rsvpStats}>
-        <View style={[s.rsvpStat, { backgroundColor: '#052e16' }]}>
+        <Pressable
+          style={[s.rsvpStat, { backgroundColor: '#052e16' }, groupFilter === 'attending' && s.rsvpStatActive]}
+          onPress={() => toggle('attending')}
+        >
           <Text style={[s.rsvpStatNum, { color: '#4ade80' }]}>{attending}</Text>
           <Text style={s.rsvpStatLabel}>Attending</Text>
-        </View>
-        <View style={[s.rsvpStat, { backgroundColor: '#1c1407' }]}>
+        </Pressable>
+        <Pressable
+          style={[s.rsvpStat, { backgroundColor: '#1c1407' }, groupFilter === 'not_attending' && s.rsvpStatActive]}
+          onPress={() => toggle('not_attending')}
+        >
           <Text style={[s.rsvpStatNum, { color: '#fbbf24' }]}>{excused}</Text>
           <Text style={s.rsvpStatLabel}>Not Attending</Text>
-        </View>
+        </Pressable>
       </View>
 
+      {groupFilter && (
+        <Pressable onPress={() => setGroupFilter(null)} style={s.rsvpFilterClear}>
+          <Text style={s.rsvpFilterClearText}>
+            Showing {groupFilter === 'attending' ? 'Attending' : 'Not Attending'} · tap to show all
+          </Text>
+        </Pressable>
+      )}
+
       <View style={s.responseList}>
-        {entries.map((e, i) => {
+        {shown.map((e, i) => {
           const roleName = ROLE_LABELS[e.role as keyof typeof ROLE_LABELS] ?? e.role;
           return (
             <View key={i} style={s.responseRow}>
@@ -1475,6 +1498,21 @@ const s = StyleSheet.create({
     padding: 10,
     alignItems: 'center',
     gap: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  rsvpStatActive: {
+    borderColor: '#6366f1',
+  },
+  rsvpFilterClear: {
+    paddingVertical: 6,
+    marginBottom: 6,
+    alignItems: 'center',
+  },
+  rsvpFilterClearText: {
+    fontSize: 11,
+    color: '#818cf8',
+    fontWeight: '600',
   },
   rsvpStatNum: {
     fontSize: 22,

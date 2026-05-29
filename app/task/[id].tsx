@@ -940,6 +940,12 @@ export default function TaskDetailScreen() {
   // otherwise the assignee can't move it into review. Reuses the existing
   // 'submitted' state (no state-machine change).
   const showApprovalSubmit = task.type === 'structured' && !!task.requiresApproval && !task.requiresProof && isAssignee;
+  // Simple tasks — structured, assignee, and needing NEITHER proof NOR approval —
+  // had no completion action (you couldn't mark them done without deleting). Give
+  // them a plain "Mark Complete" that sets 'approved' (which isTaskCompleted treats
+  // as done, so it leaves To Do). No proof, no reviewer, no state-machine change.
+  const showSimpleComplete =
+    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval;
   const showProofReview = isReviewerOnly && taskState === 'submitted';
   const showEscalation  = !!(task.escalationChain && task.escalationChain.length > 1);
   const showWorkflow    = !!task.isWorkflowParent;
@@ -1085,6 +1091,23 @@ export default function TaskDetailScreen() {
                   <Text style={s.submitBtnText}>Submit for Review</Text>
                 </Pressable>
               </View>
+            )}
+          </>
+        )}
+
+        {/* ── Simple complete (no proof, no approval — assignee only) ── */}
+        {showSimpleComplete && (
+          <>
+            <Divider />
+            <SLabel text="YOUR ACTION" />
+            {taskState === 'approved' ? (
+              <View style={s.actionDone}>
+                <Text style={s.actionDoneText}>✓  Completed</Text>
+              </View>
+            ) : (
+              <Pressable style={s.submitBtn} onPress={() => setTaskState('approved')}>
+                <Text style={s.submitBtnText}>Mark Complete</Text>
+              </Pressable>
             )}
           </>
         )}
