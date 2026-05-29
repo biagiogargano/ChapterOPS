@@ -22,14 +22,13 @@
 --     never in SQL or the repo.
 --
 -- SCOPE GUARANTEES:
---   • Additive only: 1 table + 1 RPC (+ reuses the existing
---     auth_user_roles_for_org helper from proof_v1a). Nothing else is altered.
+--   • Additive only: 1 table + 1 RPC. Nothing else is altered.
 --   • Does NOT alter tasks / events / rsvps / members / positions or their RLS.
 --   • Does NOT change task/event state machines.
 --
--- DEPENDENCY: expects public.auth_user_roles_for_org(uuid) to already exist
---   (created by proof_v1a_task_submissions.sql, applied on alpha). It is reused
---   here only for the org-membership check in the RPC.
+-- DEPENDENCY: only the existing public.members table (org membership). The RPC's
+--   membership gate checks for an ACTIVE members row (NOT officer roles), so plain
+--   members can register tokens too. No dependency on the proof_v1a helper.
 --
 -- Run order (WHEN greenlit): this file is self-contained; run top to bottom.
 -- ════════════════════════════════════════════════════════════════════════════
@@ -90,21 +89,20 @@ as $$
 declare
   v_uid    uuid := auth.uid();
   v_member uuid;
-  v_roles  text[];
   v_id     uuid;
 begin
   if v_uid is null then raise exception 'unauthenticated'; end if;
   if coalesce(p_expo_token,'') = '' then raise exception 'empty_token'; end if;
 
-  -- Caller must actually belong to the org they claim (reuses the proof helper).
-  v_roles := public.auth_user_roles_for_org(p_org);
-  if v_roles is null then raise exception 'not_in_org'; end if;
-
-  -- Resolve the caller's member row for audit/targeting (best-effort).
+  -- Caller must actually be an ACTIVE member of the org they claim. We gate on
+  -- MEMBERSHIP (members table), not officer roles — a plain member (no position)
+  -- must still be able to register a device token. This also resolves the
+  -- member_id we store for audit/targeting.
   select m.id into v_member
   from public.members m
   where m.auth_user_id = v_uid and m.org_id = p_org and m.status = 'active'
   limit 1;
+  if v_member is null then raise exception 'not_in_org'; end if;
 
   insert into public.push_tokens (org_id, member_id, auth_user_id, expo_token, platform)
   values (p_org, v_member, v_uid, p_expo_token, nullif(p_platform,''))
