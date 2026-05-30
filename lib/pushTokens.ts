@@ -108,3 +108,66 @@ export async function registerPushToken(orgId: string): Promise<PushRegisterResu
     return 'error';
   }
 }
+
+// ─── Action push send (Push v1, Stage 4 — task responsibility notifications) ──
+// Fire-and-forget invocation of the send_push Edge Function. The function does
+// the server-side fan-out (audience roles → members → tokens, excluding the
+// actor) — the client only hands it the audience + copy. NEVER throws and NEVER
+// blocks the caller's saved action: callers should `void sendActionPush(...)`.
+
+export interface ActionPushInput {
+  orgId:         string;
+  entityType:    'task' | 'event';
+  entityId:      string;
+  audienceRoles: string[];   // concrete role strings; 'all' is filtered out
+  title:         string;
+  body:          string;
+  actorRole?:    string;     // excluded server-side from recipients
+}
+
+/**
+ * Send an action-linked push via the send_push Edge Function.
+ *
+ * Safe by construction:
+ *   • No-ops when AUTH_ENABLED is false or Supabase is unconfigured.
+ *   • Drops the literal 'all' role and empties — we never broadcast chapter-wide
+ *     from here (send_push can't resolve 'all' anyway). If no concrete audience
+ *     remains, it no-ops.
+ *   • Uses supabase.functions.invoke, which attaches the signed-in user's JWT
+ *     (the function requires an authenticated caller).
+ *   • Never throws; logs/warns on failure and returns false. The caller's save
+ *     has already happened — push is best-effort.
+ */
+export async function sendActionPush(input: ActionPushInput): Promise<boolean> {
+  if (!AUTH_ENABLED)           return false;
+  if (!isSupabaseConfigured()) return false;
+
+  // Concrete roles only — strip 'all'/empty so we never attempt a broad send.
+  const audience = Array.from(
+    new Set((input.audienceRoles ?? []).filter(r => r && r !== 'all' && r !== input.actorRole)),
+  );
+  if (audience.length === 0) return false;
+  if (!input.orgId || !input.entityId) return false;
+
+  try {
+    const { error } = await supabase.functions.invoke('send_push', {
+      body: {
+        org_id:         input.orgId,
+        entity_type:    input.entityType,
+        entity_id:      input.entityId,
+        audience_roles: audience,
+        title:          input.title,
+        body:           input.body,
+        actor_role:     input.actorRole,
+      },
+    });
+    if (error) {
+      console.warn('[pushTokens] sendActionPush error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[pushTokens] sendActionPush threw:', err);
+    return false;
+  }
+}

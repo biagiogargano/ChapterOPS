@@ -15,6 +15,8 @@ import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, canAssignToAn
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
+import { sendActionPush } from '@/lib/pushTokens';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -289,6 +291,7 @@ export default function CreateTaskScreen() {
   const router     = useRouter();
   const navigation = useNavigation();
   const { role }   = useDevRole();
+  const pushOrgId  = useActiveDataOrgId();   // org scope for action push (Push v1)
   const params     = useLocalSearchParams<{ eventId?: string; eventTitle?: string; taskId?: string }>();
 
   // Edit mode when a taskId is supplied.
@@ -518,6 +521,20 @@ export default function CreateTaskScreen() {
       const task  = addUserTask(input);
       void insertTask(task);
       created.push(task);
+
+      // Push v1 #1 — "Task assigned": notify ONLY this clone's assigned role.
+      // assignedRole is always a concrete Role here (create never assigns 'all');
+      // the helper also strips 'all'/actor defensively. Actor excluded server-
+      // side. Fire-and-forget — never blocks the create.
+      void sendActionPush({
+        orgId:         pushOrgId,
+        entityType:    'task',
+        entityId:      task.id,
+        audienceRoles: [assignedRole],
+        title:         'New task assigned',
+        body:          task.title,
+        actorRole:     role,
+      });
     }
 
     if (params.eventId) {

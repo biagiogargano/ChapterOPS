@@ -34,6 +34,8 @@ import {
 import { ROLE_LABELS, isLeadershipRole, type Role } from '@/lib/roles';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { usePushRegistration } from '@/lib/usePushRegistration';
+import { sendActionPush } from '@/lib/pushTokens';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -815,6 +817,32 @@ export default function TaskDetailScreen() {
     if (task) maybeRegisterForPush();
   }, [task, maybeRegisterForPush]);
 
+  // Push v1 (Build 14): action-linked task pushes. Fire-and-forget, never blocks
+  // the saved state change; audience is always a single concrete role:
+  //   • submitted → reviewerRole only (skip if none)
+  //   • approved/rejected → assignedRole only (skip if 'all')
+  const pushOrgId = useActiveDataOrgId();
+  function pushForTransition(t: MockTask, next: TaskState) {
+    if (next === 'submitted') {
+      const reviewer = t.reviewerRole;
+      if (!reviewer) return;   // no reviewer → don't blast leadership (deferred)
+      void sendActionPush({
+        orgId: pushOrgId, entityType: 'task', entityId: t.id,
+        audienceRoles: [reviewer],
+        title: 'Task needs your review', body: t.title, actorRole: role,
+      });
+    } else if (next === 'approved' || next === 'rejected') {
+      const assignee = t.assignedRole;
+      if (!assignee || assignee === 'all') return;   // concrete role only
+      void sendActionPush({
+        orgId: pushOrgId, entityType: 'task', entityId: t.id,
+        audienceRoles: [assignee],
+        title: next === 'approved' ? 'Task approved' : 'Task needs changes',
+        body: t.title, actorRole: role,
+      });
+    }
+  }
+
   function setTaskState(s: TaskState) {
     _setTaskState(s);
     if (task) saveTaskState(task.id, { state: s });
@@ -844,6 +872,7 @@ export default function TaskDetailScreen() {
     }
     setProofError(null);
     setTaskState('submitted');
+    pushForTransition(task, 'submitted');   // notify reviewer (if any)
   }
 
   // Reviewer read: prefer the access-controlled submission row; fall back to
@@ -955,6 +984,7 @@ export default function TaskDetailScreen() {
   function handleReject(note: string) {
     setRejNote(note);
     setTaskState('rejected');
+    if (task) pushForTransition(task, 'rejected');   // notify assignee
   }
 
   return (
@@ -1087,7 +1117,10 @@ export default function TaskDetailScreen() {
                 {taskState === 'rejected' && (
                   <StatusChip icon="✗" text="Rejected — resubmit when ready" color="#fca5a5" bg="#1a0505" />
                 )}
-                <Pressable style={s.submitBtn} onPress={() => setTaskState('submitted')}>
+                <Pressable
+                  style={s.submitBtn}
+                  onPress={() => { setTaskState('submitted'); pushForTransition(task, 'submitted'); }}
+                >
                   <Text style={s.submitBtnText}>Submit for Review</Text>
                 </Pressable>
               </View>
@@ -1135,7 +1168,7 @@ export default function TaskDetailScreen() {
                   : proofContent
               }
               reviewerLabel={ROLE_LABELS[role]}
-              onApprove={() => setTaskState('approved')}
+              onApprove={() => { setTaskState('approved'); pushForTransition(task, 'approved'); }}
               onReject={handleReject}
             />
           </>
