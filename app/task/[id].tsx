@@ -673,23 +673,39 @@ function ProofReviewSection({
   const isLink  = proofType === 'link';
   const linkOk  = /^https?:\/\//i.test(trimmed);
 
+  // A review-required task may carry NO proof requirement (the assignee just
+  // marks it ready for review). Don't show an empty "SUBMITTED PROOF / No content
+  // provided" box in that case — say plainly that there's nothing to attach.
+  const hasProof = !!proofType;
+
   return (
     <View>
-      <SLabel text="SUBMITTED PROOF" />
-      <View style={s.proofDisplay}>
-        {proofType && (
-          <Text style={s.proofDisplayType}>{PROOF_ICON[proofType]}  {PROOF_LABEL[proofType]}</Text>
-        )}
-        {trimmed.length === 0 ? (
-          <Text style={s.proofDisplayEmpty}>No content provided</Text>
-        ) : isLink && linkOk ? (
-          <Text style={s.proofDisplayLink} onPress={() => { void Linking.openURL(trimmed); }}>
-            {trimmed}
-          </Text>
-        ) : (
-          <Text style={s.proofDisplayContent}>{proofContent}</Text>
-        )}
-      </View>
+      {hasProof ? (
+        <>
+          <SLabel text="SUBMITTED PROOF" />
+          <View style={s.proofDisplay}>
+            <Text style={s.proofDisplayType}>{PROOF_ICON[proofType!]}  {PROOF_LABEL[proofType!]}</Text>
+            {trimmed.length === 0 ? (
+              <Text style={s.proofDisplayEmpty}>No content provided</Text>
+            ) : isLink && linkOk ? (
+              <Text style={s.proofDisplayLink} onPress={() => { void Linking.openURL(trimmed); }}>
+                {trimmed}
+              </Text>
+            ) : (
+              <Text style={s.proofDisplayContent}>{proofContent}</Text>
+            )}
+          </View>
+        </>
+      ) : (
+        <>
+          <SLabel text="READY FOR REVIEW" />
+          <View style={s.proofDisplay}>
+            <Text style={s.proofDisplayEmpty}>
+              No proof was required — the assignee marked this complete and sent it for your review.
+            </Text>
+          </View>
+        </>
+      )}
 
       <SLabel text="YOUR REVIEW" />
       <View style={s.reviewBlock}>
@@ -1060,13 +1076,21 @@ export default function TaskDetailScreen() {
 
         {/* ════════ PRIMARY ACTION (kept high so the user sees what to do) ════════ */}
 
-        {/* ── Rejection feedback — actionable context for the assignee's resubmit ── */}
-        {taskState === 'rejected' && rejNote && (
+        {/* ── Rejection feedback — actionable context for the assignee's resubmit.
+               Assignee-facing label ("what to fix"); reviewers see the neutral
+               state badge instead. Falls back to a clear line if no note. ── */}
+        {taskState === 'rejected' && (isAssignee || isReviewerOnly) && (
           <>
             <Divider />
-            <SLabel text="REJECTION FEEDBACK" />
+            <SLabel text={isReviewerOnly ? 'YOUR REJECTION NOTE' : 'WHAT TO FIX'} />
             <View style={s.rejectionNote}>
-              <Text style={s.rejectionNoteText}>{rejNote}</Text>
+              <Text style={s.rejectionNoteText}>
+                {rejNote
+                  ? rejNote
+                  : isReviewerOnly
+                    ? 'No note was left.'
+                    : 'Your reviewer asked for changes. Update your work and resubmit.'}
+              </Text>
             </View>
           </>
         )}
