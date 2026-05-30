@@ -16,7 +16,7 @@ import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
 import { goalProgress, goalDisplay, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
-import type { Goal, GoalCadence } from '@/lib/goals';
+import type { Goal, GoalCadence, GoalValueKind } from '@/lib/goals';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import {
@@ -243,19 +243,16 @@ function CreateGoalForm({
   onCreated: () => void;
 }) {
   const [title, setTitle]     = useState('');
-  const [target, setTarget]   = useState('');
-  const [current, setCurrent] = useState('');
+  const [valueKind, setValueKind] = useState<GoalValueKind>('numeric');
+  const [target, setTarget]   = useState('');   // numeric: target #;  text: target outcome
+  const [current, setCurrent] = useState('');   // numeric: current #; text: current status
   const [cadence, setCadence] = useState<GoalCadence>('weekly');
   const [ownerRole, setOwnerRole] = useState<Role>(defaultOwnerRole);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState<string | null>(null);
-  // NOTE (gated): TEXT/status goal inputs are intentionally NOT shown here yet. The
-  // service + card + types support text goals, but persistence needs the
-  // goals_v2_value_kind patch applied first (supabase/goals_v2_value_kind_patch_draft.sql).
-  // Adding a text input now would let the UI pretend to save text the DB can't keep.
-  // Until applied, this form creates NUMERIC goals only.
+  const isText = valueKind === 'text';
 
-  // Bulk: one goal per line or per ';'. Current/target apply to all created goals.
+  // Bulk: one goal per line or per ';'. Value fields apply to all created goals.
   const titles = parseGoalPrompts(title);
 
   async function submit() {
@@ -265,12 +262,14 @@ function CreateGoalForm({
     setBusy(true);
     setErr(null);
 
-    const tgt = parseNum(target);
-    const cur = parseNum(current);
+    // Numeric goals → target/currentValue; text goals → valueKind + target/currentText.
+    const common = isText
+      ? { valueKind: 'text' as const, targetText: target.trim() || null, currentText: current.trim() || null }
+      : { targetValue: parseNum(target), currentValue: parseNum(current) };
     let created = 0;
     let firstError: string | null = null;
     for (const t of titles) {
-      const r = await createGoal({ orgId, title: t, cadence, targetValue: tgt, currentValue: cur, ownerRole });
+      const r = await createGoal({ orgId, title: t, cadence, ownerRole, ...common });
       if (r.ok) created++;
       else if (!firstError) firstError = r.error ?? 'unknown';
     }
@@ -302,11 +301,31 @@ function CreateGoalForm({
       <Text style={s.helperText}>Add multiple goals at once by separating them with a new line or a semicolon (;).</Text>
       {titles.length > 1 && <Text style={s.ownerNote}>{titles.length} goals will be created.</Text>}
 
-      <Text style={s.ownerLabel}>PROGRESS (OPTIONAL)</Text>
-      <View style={s.row2}>
-        <TextInput style={[s.input, s.flex1]} placeholder="Current #" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
-        <TextInput style={[s.input, s.flex1]} placeholder="Target #" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
+      <Text style={s.ownerLabel}>GOAL TYPE</Text>
+      <View style={s.cadenceRow}>
+        <Pressable style={[s.chip, !isText && s.chipOn]} onPress={() => setValueKind('numeric')}>
+          <Text style={[s.chipText, !isText && s.chipTextOn]}>Measurable number</Text>
+        </Pressable>
+        <Pressable style={[s.chip, isText && s.chipOn]} onPress={() => setValueKind('text')}>
+          <Text style={[s.chipText, isText && s.chipTextOn]}>Status / outcome</Text>
+        </Pressable>
       </View>
+
+      {isText ? (
+        <>
+          <Text style={s.ownerLabel}>PROGRESS (OPTIONAL)</Text>
+          <TextInput style={s.input} placeholder="Current status — e.g. Deposit paid" placeholderTextColor="#475569" value={current} onChangeText={setCurrent} />
+          <TextInput style={s.input} placeholder="Target outcome — e.g. Venue booked" placeholderTextColor="#475569" value={target} onChangeText={setTarget} />
+        </>
+      ) : (
+        <>
+          <Text style={s.ownerLabel}>PROGRESS (OPTIONAL)</Text>
+          <View style={s.row2}>
+            <TextInput style={[s.input, s.flex1]} placeholder="Current #" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
+            <TextInput style={[s.input, s.flex1]} placeholder="Target #" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
+          </View>
+        </>
+      )}
 
       <Text style={s.ownerLabel}>UPDATE CHECK-IN</Text>
       <View style={s.cadenceRow}>
@@ -348,9 +367,12 @@ function CreateGoalForm({
 // ─── Edit form ────────────────────────────────────────────────────────────────
 
 function EditGoalForm({ goal, onCancel, onSaved }: { goal: Goal; onCancel: () => void; onSaved: () => void }) {
+  // A goal's kind is fixed once created (changing numeric↔text mid-life would orphan
+  // values); edit respects the existing kind.
+  const isText = goal.valueKind === 'text';
   const [title, setTitle]     = useState(goal.title);
-  const [target, setTarget]   = useState(goal.targetValue != null ? String(goal.targetValue) : '');
-  const [current, setCurrent] = useState(goal.currentValue != null ? String(goal.currentValue) : '');
+  const [target, setTarget]   = useState(isText ? (goal.targetText ?? '') : (goal.targetValue != null ? String(goal.targetValue) : ''));
+  const [current, setCurrent] = useState(isText ? (goal.currentText ?? '') : (goal.currentValue != null ? String(goal.currentValue) : ''));
   const [cadence, setCadence] = useState<GoalCadence>(goal.cadence);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState<string | null>(null);
@@ -360,12 +382,10 @@ function EditGoalForm({ goal, onCancel, onSaved }: { goal: Goal; onCancel: () =>
     if (title.trim() === '') { setErr('Enter a goal title.'); return; }
     setBusy(true);
     setErr(null);
-    const r = await updateGoal(goal.id, {
-      title: title.trim(),
-      targetValue:  parseNum(target),
-      currentValue: parseNum(current),
-      cadence,
-    });
+    const valueFields = isText
+      ? { targetText: target.trim() || null, currentText: current.trim() || null }
+      : { targetValue: parseNum(target), currentValue: parseNum(current) };
+    const r = await updateGoal(goal.id, { title: title.trim(), cadence, ...valueFields });
     setBusy(false);
     if (r.ok) onSaved();
     else setErr(r.error === 'unconfigured' ? 'Goals storage isn’t available here.' : (r.error ?? 'Couldn’t save changes.'));
@@ -373,12 +393,19 @@ function EditGoalForm({ goal, onCancel, onSaved }: { goal: Goal; onCancel: () =>
 
   return (
     <View style={s.form}>
-      <Text style={s.formLabel}>EDIT GOAL</Text>
+      <Text style={s.formLabel}>EDIT GOAL{isText ? ' (status)' : ''}</Text>
       <TextInput style={s.input} placeholder="Goal title" placeholderTextColor="#475569" value={title} onChangeText={t => { setTitle(t); setErr(null); }} />
+      {isText ? (
+        <>
+          <TextInput style={s.input} placeholder="Current status" placeholderTextColor="#475569" value={current} onChangeText={setCurrent} />
+          <TextInput style={s.input} placeholder="Target outcome" placeholderTextColor="#475569" value={target} onChangeText={setTarget} />
+        </>
+      ) : (
       <View style={s.row2}>
         <TextInput style={[s.input, s.flex1]} placeholder="Current" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
         <TextInput style={[s.input, s.flex1]} placeholder="Target" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
       </View>
+      )}
       <Text style={s.ownerLabel}>UPDATE CHECK-IN</Text>
       <View style={s.cadenceRow}>
         {CADENCE_OPTIONS.map(opt => (
