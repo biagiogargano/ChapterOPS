@@ -1,29 +1,52 @@
-# Build 17 — Device Test Checklist
+# Corrected Private Build — Device Test Checklist
 
-A short, do-it-in-order checklist for when Build 17 is eventually cut. **No build
-is implied by this doc.** The point of Build 17 on device is to verify the
-**questionnaire submission round-trip** (the one thing pure tests can't cover).
+A do-it-in-order checklist for the **next corrected iOS build** — the private,
+founder-only build that supersedes Build 17. **No build is implied by this doc**; it
+only describes what to test once that build exists. Purpose: verify the RPC-backed
+round-trips pure tests can't cover — **questionnaire persistence, Goals CRUD, and the
+weekly goal-update flow** — on a real device.
 
 > ⚠️ **Roll-out caution — read first.**
-> - **Do NOT ask the whole eBoard to test.** Test on **your phone first**, and at
->   most **one other device/account** (so you can check the leadership-reader view).
-> - **Do NOT broadly announce Build 17** until the questionnaire round-trip
->   (sections 4–6 below) works end to end on device.
-> - If the round-trip fails, the bundle is not ready — stop and report, don't widen.
+> - Test on **your phone first**, plus at most **one other device/account** (to check
+>   the leadership-reader view). Do **not** ask the eBoard to test yet.
+> - Do **not** widen distribution until the **Priority 1** round-trips below pass end
+>   to end on device.
+> - If a Priority-1 round-trip fails, the bundle is not ready — stop and report, don't widen.
 >
-> ⛔ **Known: questionnaire persistence — column APPLIED, needs a NEW build.** The
->   `tasks.report_definition_id` column (`supabase/task_report_definition_patch_draft.sql`)
->   is **applied + verified on alpha**, and the client mapping shipped in commit
->   `981b71e`. **But Build 17 predates `981b71e`**, so on Build 17 questionnaire tasks
->   still won't persist their definition (you'd see "This questionnaire is
->   unavailable…"). To verify §4–6 end-to-end you need a **new build** that includes
->   `981b71e`. On Build 17 as-is, verifying the honest "unavailable" state is the
->   most you can check.
+> ⛔ **Build 17 is superseded — do not test on it.** Build 17 predates the
+>   questionnaire-persistence client fix (commit `981b71e`) and everything after it
+>   (text/status goals, weekly goal-update generation, the Goals error-honesty + form
+>   fixes). On Build 17 the questionnaire/goal-update forms still show "unavailable"
+>   after reload. Only the **next** build verifies §4–§7b. This checklist targets that
+>   build.
+
+---
+
+## Priority run order (do in this exact order)
+**Priority 1 — MUST pass. These justify the build; any failure blocks even private use:**
+1. **Questionnaire round-trip** — generate → fill → submit → **reopen persists** (§2–§5).
+2. **Questionnaire read safety** — leadership read-only + non-reader denial + "Not
+   submitted yet" (§6).
+3. **Weekly goal-update round-trip** — generate → not-open state → (when open) fill →
+   submit → **reopen persists** the questions *and* answers (§7b).
+4. **Goals CRUD persists** — create / edit / complete / archive, **numeric and
+   text/status**, persist across reload (§7).
+
+**Priority 2 — should pass. A failure blocks eBoard rollout, not your private use:**
+5. Goals permissions + read-only assigned goals + owner selector + visibility (§7).
+6. Goal-assigned in-app notice + the 4 task-action notices + dismiss + actor-exclusion (§7, §9).
+7. "Opens <date>" card cue, idempotent re-runs, Goals error honesty + pull-to-refresh (§7, §7b).
+
+**Priority 3 — smoke. Confirm no regressions:**
+8. Today / Tasks / Event Detail / starter-pack read surfaces look unchanged (§8).
+
+Pass/fail criteria are at the bottom (**"Pass / fail criteria"**).
 
 ---
 
 ## 1. Install / update
-- [ ] Update TestFlight to the new Build 17 on your phone.
+- [ ] Install the **corrected build** from TestFlight on your phone (it supersedes
+      Build 17).
 - [ ] Launch; confirm you land logged-in on your normal org (no auth regression).
 
 ## 2. Me tab — questionnaire card visibility (by role)
@@ -92,8 +115,9 @@ real/persisted — a failed RPC must show an error, never a fake success.
       reviewed later. It does not create reminders yet." Goal cards show the friendly
       label (Weekly / Monthly / One-time), not raw lowercase.
 - [ ] **Current/target + percent + progress bar** render correctly for a measurable
-      goal; a goal with no target shows no bar (not "NaN%"). NOTE: goal values are
-      **numeric-only** for now (text values are a known v1 limitation, post-build).
+      goal; a goal with no target shows no bar (not "NaN%"). *(Text/status goals are now
+      supported — see the GOAL TYPE = "Status / outcome" bullet above; numeric-only is no
+      longer a limitation.)*
 - [ ] **Edit** a goal (change current/target/title/cadence) → values **persist** on
       reopen.
 - [ ] **Complete** a goal → it leaves the active list. **Archive** a goal (confirm
@@ -111,11 +135,14 @@ real/persisted — a failed RPC must show an error, never a fake success.
         place (read-only — they didn't create it).
   - [ ] As that **officer**, create your **own** goal → you **can** Edit/Complete/
         Archive it.
-- [ ] **Error honesty:** if an RPC fails (e.g. force offline) → an **inline/Alert
-      error** appears and **no goal is created/changed**. NOTE: a failed *read*
-      currently shows the **"No goals yet."** empty state (the read path returns []
-      on error) — if you expect goals and see "No goals yet.", suspect a read error,
-      not truly-empty. Flag this if it's confusing in practice.
+- [ ] **Error honesty (write):** if a write RPC fails (e.g. force offline) → an
+      **inline/Alert error** appears and **no goal is created/changed** (never a fake
+      success).
+- [ ] **Error honesty (read) — FIXED:** force offline and open the Goals tab → it shows
+      **"Couldn't load goals. Check your connection and try again."** (a real error),
+      **not** the misleading "No goals yet." empty state. Restore connection.
+- [ ] **Pull-to-refresh:** pull down on the Goals list → it re-reads (list stays
+      visible, no full-screen spinner) and clears the error after reconnecting.
 
 ## 7b. Weekly goal-update generation (manual; needs goals + the live RPCs)
 The manual goal-update run creates one update task per officer ROLE that has active
@@ -152,6 +179,10 @@ live goals (not stored), so it must survive reload.
 - [ ] **Survives reload:** fill + submit (when open) → reopen the task → your answers
       **persist** and the questions are still there (reconstructed from goals + answers
       from the RPC — **not** "This questionnaire is unavailable").
+- [ ] **Goal-load failure warns (don't silently drop goals):** force offline, open an
+      *open* goal-update task → a **"⚠️ Couldn't load your goals…"** warning shows above
+      the form (so you don't submit a check-in-only form thinking you have no goals).
+      Reconnect + reopen → the goals appear.
 - [ ] **Leadership read:** on a **second leadership account**, open the submitted task →
       the same goal questions render read-only with the answers. *(Known: it reflects
       the role's CURRENT goals — if a goal was archived after submitting, its answer
@@ -202,19 +233,49 @@ live goals (not stored), so it must survive reload.
   - [ ] **Dismiss** a notification (tap it) → it **disappears** from the list.
   - [ ] **Actor does NOT get their own notification** (e.g. the President who
         approved a task sees no "Task approved" notice for it).
-  - [ ] No **all-member / event / RSVP / goal / questionnaire** notifications appear —
-        only the four task actions are mirrored.
+- [ ] **Goal-assigned in-app notice (in-app only, NO push):** the only non-task in-app
+      notice is "New goal assigned: <title>" (covered in §7). It must **not** fire a
+      push. No **event / RSVP / questionnaire / goal-update-generation** notifications
+      appear at all (in-app or push).
 
 ---
 
-## If everything passes
-The questionnaire round-trip is verified. Only then consider a wider (still small)
-test group — not a full-eBoard announcement.
+## Pass / fail criteria
 
-## If something fails
-Note the exact step + what you saw, and stop the roll-out. Most likely failure
-point is **section 5–6** (the RPC round-trip / read permissions) — that's the whole
-reason this build exists.
+**Blocks even PRIVATE use (Priority 1 — fix before relying on it at all):**
+- Questionnaire or goal-update answers **don't persist** after reload (you reopen and
+  the form is empty or shows "unavailable").
+- A submitted form is **readable by a non-reader**, or a leadership reader **can't** read
+  it / can edit it.
+- Goals create/edit/complete/archive **fails silently** or shows a **fake success**.
+- Any **auth/login regression**, or the app **crashes** on a core screen.
 
-*Checklist only. No EAS/build is implied; cut Build 17 only on an explicit
-"cut the build". Current bundled state: `docs/BUILD_17_NOTES.md`.*
+**Blocks EBOARD ROLLOUT (Priority 2 — okay for your own private testing, not for others):**
+- Goal **permissions** wrong (an officer can edit a leadership-assigned goal, or can't
+  edit their own), or the **owner selector / read-only assigned-goal** tag is missing/wrong.
+- **In-app notifications** don't appear/dismiss, the **actor gets their own** notice, or
+  an **unexpected** notice type fires (all-member / event / RSVP / goal-push / questionnaire).
+- **Idempotency** broken (re-running generation **duplicates** tasks).
+- "Opens <date>" cue or **not-open lock** missing (officers can submit before the window).
+- Goals **error honesty** regressed (failed read shows "No goals yet." again).
+
+**Acceptable for PRIVATE testing (note it, don't block):**
+- The two **known limitations** below (reconstructed-not-snapshotted; relative window).
+- Cosmetic copy/spacing nits, slow first load, a one-off transient RPC hiccup that
+  succeeds on retry/refresh.
+- Anything in **Priority 3 smoke** that is purely visual and not a functional regression.
+
+**If something fails:** note the **exact step + what you saw + the role/account**, and
+**stop widening**. Most likely failure points are the **RPC round-trips** (§5, §7b) and
+**read permissions** (§6) — the whole reason this build exists. Do not announce to the
+eBoard until every Priority 1 + Priority 2 item passes.
+
+**Two known limitations (do NOT panic / do NOT file as bugs):**
+- **Goal updates reconstruct CURRENT goals, not a snapshot.** Editing/archiving a goal
+  after submission changes what the form/read view shows; the stored answers remain. A
+  per-cycle history snapshot is the Phase D lane.
+- **The goal-update window is relative to generation time, not calendar-anchored.**
+  availableAt = generation + ~4 days, dueAt = +7 days; first run that ISO week sets it.
+
+*Checklist only. No EAS/build is implied by this doc; a build happens only on an explicit
+"cut the build" from the user. Build 17 is superseded — do not distribute it.*
