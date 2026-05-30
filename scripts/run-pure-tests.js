@@ -25,7 +25,8 @@ const toPosix  = p => p.split(path.sep).join('/');
 const EXPECTED = [
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
-  'orgLevels', 'orgPreference', 'orgScope', 'positions', 'roles', 'routeTarget', 'taskCompletion',
+  'orgLevels', 'orgPreference', 'orgScope', 'positions', 'roles', 'routeTarget',
+  'taskAssignment', 'taskCompletion',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────

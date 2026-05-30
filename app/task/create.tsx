@@ -11,8 +11,8 @@ import {
   type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
-import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
-import { getAssignableRoles, SIGMA_CHI_ASSIGNMENT_EXCEPTIONS } from '@/lib/orgLevels';
+import { LEADERSHIP_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { getAssigneeRoleOptions } from '@/lib/taskAssignment';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
@@ -308,27 +308,17 @@ export default function CreateTaskScreen() {
   const effState     = existing ? getStoredState(existing.id, existing.state) : 'assigned';
   const reviewLocked = editing && (effState === 'submitted' || effState === 'approved' || effState === 'rejected');
 
-  // Assignable roles come from the org-level rule (lib/orgLevels): a role may
-  // assign DOWNWARD to lower levels, plus any default alpha exception, plus
-  // always itself (self-assignment). Candidates stay the current pack's roles
-  // (all officers + the floor/Brother role). Replaces the old flat
-  // canAssignToAnyOfficer gate.
-  //
-  // EDIT MODE: always keep the task's CURRENT assignee selectable even if it now
-  // falls outside the editor's downward set (e.g. a task assigned before the
-  // org-level rule, or by a higher role). Otherwise the existing assignee would
-  // render no chip and could be silently dropped on save. We surface it as a
-  // candidate; the derivation still de-dupes and keeps self-assignment.
-  const assignableRoles = useMemo<Role[]>(() => {
-    const base = getAssignableRoles(role, [...OFFICER_ROLES, FLOOR_ROLE], {
-      exceptions: SIGMA_CHI_ASSIGNMENT_EXCEPTIONS,
-    }) as Role[];
-    const current = existing?.assignedRole;
-    if (editing && current && current !== 'all' && !base.includes(current as Role)) {
-      return [...base, current as Role];
-    }
-    return base;
-  }, [role, editing, existing]);
+  // Assignable roles come from the org-level rule via the pure
+  // getAssigneeRoleOptions helper (lib/taskAssignment): the acting role may
+  // assign DOWNWARD plus any alpha exception, always itself (self-assignment),
+  // returned in canonical display order. In edit mode the task's CURRENT
+  // assignee is always kept selectable so it can't be silently dropped on save.
+  const assignableRoles = useMemo<Role[]>(
+    () => getAssigneeRoleOptions(role, {
+      currentAssignee: editing ? (existing?.assignedRole as Role | 'all' | undefined) : undefined,
+    }),
+    [role, editing, existing],
+  );
   // Whether this role can assign to anyone beyond itself (drives the multi-select
   // hint text). Previously canAssignBroadly.
   const canAssignBroadly = assignableRoles.length > 1;
