@@ -61,6 +61,11 @@ yet). **Sub-step (b) DONE:** a second pack `club` exists as pure data
 (`CLUB_STARTER_PACK`) with real custom role keys, proving genericity — not default,
 not surfaced, not active in alpha. Confirmed the closed-`Role`-union gate: custom
 keys are data-expressible but not yet functional through the runtime engines.
+**Also done:** the pack→runtime boundary is explicit (`lib/rolePackRuntime.ts`), and
+packs are integrity-checked (`lib/starterPackValidation.ts`, test-enforced). The
+create-org screen now reads its template label/value from the registry
+(`DEFAULT_STARTER_PACK_ID`) — behavior-identical, proving setup UI can read packs
+without a picker.
 **Next:** (c) org-type selection UI — now meaningfully possible since a second pack
 exists, but still gated on wiring more read sites + a real product decision; (d)
 opening the `Role` union for custom keys is **Supabase-gated**. Plan:

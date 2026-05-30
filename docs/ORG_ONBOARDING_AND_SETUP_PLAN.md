@@ -23,6 +23,8 @@ The setup path is **already built** and uses real RPCs — it is not greenfield:
 | Sign up / log in | `app/(auth)/signup.tsx`, `login.tsx` | live |
 | Org model carries a template | `memberService` `Organization.template: OrgType` | live |
 | **The `organizations.template` seam** | `createOrganization(name, template, …)` → `p_template` | **live but always `'sigma_chi'`** |
+| Create-org template label + value | `app/(auth)/create.tsx` | now **reads the default starter pack** (`DEFAULT_STARTER_PACK_ID` + `activeStarterPack(...).label`) instead of a hardcoded string — behavior-identical, no picker |
+| Starter-pack integrity | `lib/starterPackValidation.ts` | pure `validateStarterPack` / `starterPackDiagnostics`; every registered pack is test-validated |
 
 **What is manually configured / alpha-pack content today:**
 - **`create.tsx` hardcodes `'sigma_chi'`** as the template and shows

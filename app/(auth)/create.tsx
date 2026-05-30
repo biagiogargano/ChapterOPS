@@ -1,6 +1,7 @@
 import { useAuth } from '@/lib/auth';
 import { useIdentity } from '@/lib/identityStore';
 import { createOrganization } from '@/lib/memberService';
+import { DEFAULT_STARTER_PACK_ID, activeStarterPack } from '@/lib/starterPacks';
 import { useRouteTarget } from '@/lib/useRouteTarget';
 import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -53,7 +54,9 @@ export default function CreateOrgScreen() {
     if (!name.trim()) { setError('Enter an organization name.'); return; }
     setLoading(true);
     setError(null);
-    const res = await createOrganization(name, 'sigma_chi', user.id, email, displayNameFrom(email));
+    // Still hardcoded to the default pack for alpha (no org-type selection yet) —
+    // sourced from the registry constant rather than a bare string. Same value.
+    const res = await createOrganization(name, DEFAULT_STARTER_PACK_ID, user.id, email, displayNameFrom(email));
     setLoading(false);
 
     if (res.kind === 'ok') {
@@ -78,7 +81,10 @@ export default function CreateOrgScreen() {
           value={name}
           onChangeText={t => { setName(t); setError(null); }}
         />
-        <Text style={s.note}>Template: Sigma Chi (default)</Text>
+        {/* Visible label now reads from the starter-pack registry (the default pack)
+            instead of a hardcoded string — effectively the same text for alpha, and
+            no org-type picker is added. */}
+        <Text style={s.note}>Template: {activeStarterPack(DEFAULT_STARTER_PACK_ID).label} · default</Text>
 
         {error && <Text style={s.error}>{error}</Text>}
 
