@@ -91,6 +91,11 @@ export interface MockTask {
   // Created-task metadata (officer-created structured tasks — Phase: edit/delete)
   createdByRole?: Role;     // who created it (for edit/delete permission)
   dueAt?:         string;   // ISO date(+time) the due label was derived from
+
+  // Report tasks (foundation; lib/reportTasks): which structured-response
+  // definition this task collects. Optional + ignored by existing screens; read
+  // by the future report submit/read flow. No behavior change for non-report tasks.
+  reportDefinitionId?: string;
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
