@@ -1,7 +1,7 @@
 /**
  * goals.ts — types for the Goals / Progress Tracking system.
  *
- * Now LIVE: imported by lib/goalService, lib/goalHelpers, lib/goalUpdateTasks, and
+ * Now LIVE: imported by lib/goalService, lib/goalHelpers, lib/goalUpdateGeneration, and
  * app/(tabs)/goals.tsx. Types only (erased at compile time) — the runtime lives in
  * the service + helpers. See docs/GOALS_FIRST_SYSTEM_PLAN.md / GOALS_PERSISTENCE_PLAN.md.
  *

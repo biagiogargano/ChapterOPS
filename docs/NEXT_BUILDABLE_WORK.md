@@ -166,8 +166,9 @@ No new schema for the read path.
 Goals are now a first-class direction with a deep pure foundation (all behavior-free,
 nothing wired/applied):
 - Plan + pivot: `GOALS_FIRST_SYSTEM_PLAN.md`, `GOALS_PERSISTENCE_PLAN.md`.
-- Types: `lib/goals.ts` (inert). Helpers: `lib/goalHelpers.ts` (36 tests),
-  `lib/goalUpdateTasks.ts` pure update-task builder (34 tests).
+- Types: `lib/goals.ts`. Helpers: `lib/goalHelpers.ts`. Weekly update generation:
+  `lib/goalUpdateGeneration.ts` (per-ROLE) + `lib/goalUpdateRun.ts`. *(The earlier
+  per-GOAL `lib/goalUpdateTasks.ts` was removed once the product chose one task per role.)*
 - Draft (UNAPPLIED) SQL: `supabase/goals_v1_draft.sql`.
 
 **Storage gate CLEARED** — `supabase/goals_v1_draft.sql` is **applied + verified on

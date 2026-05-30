@@ -23,8 +23,8 @@
  *   keys. (The alternative — storing the definition jsonb — is a Supabase lane and is
  *   intentionally NOT taken here.)
  *
- * This is the per-ROLE counterpart to lib/goalUpdateTasks (per-GOAL, unwired). The
- * per-role scheme is the live one for the manual run.
+ * This is the live per-ROLE scheme for the manual run. (An earlier per-GOAL builder,
+ * lib/goalUpdateTasks, was removed once the product chose one task per role.)
  */
 
 import { buildGoalUpdateDefinition } from './goalUpdateDefinition';

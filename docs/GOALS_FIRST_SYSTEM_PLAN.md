@@ -164,14 +164,14 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
    gate is the RPCs — `supabase/goals_v1_permissions_patch_draft.sql` rewrote
    update/complete/archive auth and is **APPLIED + verified on alpha**, so the server
    now enforces creator-or-leadership management (client and server agree).
-7. **Generated update tasks** from goal cadence (reuses generation stack).
-   *Pure builder DONE* (`lib/goalUpdateTasks.ts`, 34 tests): deterministic
-   `goalupd_<goalId>_<period>` ids, `buildGoalUpdateTask`,
-   `shouldGenerateGoalUpdateTask` (active + due + not-existing, idempotent),
-   title/description. Mirrors `reportTasks`. **Insertion into the store stays
-   gated** — nothing is created in the app yet. Ownership gap documented: v1 builds
-   update tasks only for goals owned by a runtime-supported `Role` (custom/person
-   owners → null until the Role union opens).
+7. **Generated update tasks** from goals — **BUILT (manual, per-ROLE)**. The product
+   chose ONE weekly update task per officer role (covering all that role's active goals
+   + a check-in), not one per goal. Live modules: `lib/goalUpdateGeneration.ts` (pure
+   builder + deterministic ids + render-time reconstruction) and `lib/goalUpdateRun.ts`
+   (manual run: fetch goals → build → insert), surfaced via the Me-tab leadership card.
+   *(An earlier per-GOAL builder `lib/goalUpdateTasks.ts` was removed once the per-role
+   decision was made.)* Ownership gap unchanged: only goals owned by a runtime-supported
+   `Role` produce a task (custom/person owners skipped until the Role union opens).
 8. **Agenda integration** from goal updates (reuses `agendaContributions`).
 9. **Notifications / AI** — last, gated.
 
