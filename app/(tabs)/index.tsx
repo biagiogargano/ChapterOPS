@@ -13,7 +13,7 @@ import {
   STATE_BG,
   STATE_COLOR,
   STATE_STRIPE,
-  dueLabelOf,
+  dueOrOpenLabel,
   getResponsibilityGroups,
   isOverdue,
   setSupabaseTaskCache,
@@ -509,7 +509,7 @@ function TodayTaskCard({
               <Text style={s.dot}>·</Text>
             </>
           )}
-          <Text style={[s.taskDue, isUrgent && s.taskDueUrgent]}>{dueLabelOf(task)}</Text>
+          <Text style={[s.taskDue, isUrgent && s.taskDueUrgent]}>{dueOrOpenLabel(task)}</Text>
           {task.linkedEvent && (
             <>
               <Text style={s.dot}>·</Text>

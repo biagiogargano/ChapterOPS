@@ -180,7 +180,7 @@ function GoalUpdateGeneratorCard({ orgId }: { orgId: string }) {
     if (busy) return;
     Alert.alert(
       'Create weekly goal update tasks?',
-      'This creates this week’s update task for each officer role that has active goals. Each officer is asked to update their active goals and answer a short weekly check-in. It opens near the end of the week. Safe to run again — existing tasks are skipped.',
+      'This creates one update task per officer role that has active goals. Each officer is asked to update their active goals and answer a short weekly check-in. Tasks open near the end of the week.\n\nThere’s no automatic scheduler yet — you run this manually each week. Safe to run again: existing tasks for this week are skipped, not duplicated.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Create tasks', style: 'default', onPress: () => { void runGenerate(); } },
@@ -208,8 +208,10 @@ function GoalUpdateGeneratorCard({ orgId }: { orgId: string }) {
     <View style={s.genCard}>
       <Text style={s.genTitle}>Create weekly goal update tasks</Text>
       <Text style={s.genSub}>
-        One update task per officer role with active goals. Opens near the end of the week. Safe to press again.
+        Creates one task per officer role with active goals. Each officer updates their goals and
+        answers a short weekly check-in. Tasks open near the end of the week.
       </Text>
+      <Text style={s.genTemplate}>Run this each week — there’s no automatic scheduler yet. Safe to press again.</Text>
 
       <Pressable
         style={[s.genButton, busy && s.genButtonDisabled]}

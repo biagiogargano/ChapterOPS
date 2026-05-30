@@ -1,5 +1,26 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run test:pure)",
+      "Bash(npm run test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin phase-2)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)",
+      "PowerShell(npx tsc:*)",
+      "PowerShell(npm run test:pure)",
+      "PowerShell(npm run test:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(git commit:*)",
+      "PowerShell(git push origin phase-2)",
+      "PowerShell(git reset:*)",
+      "PowerShell(git status:*)",
+      "PowerShell(git log:*)"
+    ]
   }
 }

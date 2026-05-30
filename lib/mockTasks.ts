@@ -34,6 +34,7 @@
  */
 import { LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isLeadershipRole, type Role } from '@/lib/roles';
 import { ORG_SCOPED_DATA } from '@/lib/flags';
+import { taskWindowView } from '@/lib/taskWindow';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -911,6 +912,18 @@ export function urgencyOf(task: MockTask, now: Date = new Date()): TaskUrgency {
 /** Read-time due label: computed from dueAt when present, else the stored label. */
 export function dueLabelOf(task: MockTask, now: Date = new Date()): string {
   return task.dueAt ? formatDueLabel(task.dueAt, now) : task.dueLabel;
+}
+
+/**
+ * Schedule label for a task card. A task whose open window hasn't started yet
+ * (availableAt in the future — e.g. a weekly goal update that opens near end of week)
+ * shows "Opens <date>" instead of a due label, so the assignee isn't prompted to act
+ * before they can. Any task without a future availableAt falls back to dueLabelOf —
+ * so ordinary tasks are unchanged. Pure.
+ */
+export function dueOrOpenLabel(task: MockTask, now: Date = new Date()): string {
+  const win = taskWindowView(task.availableAt, task.dueAt, now);
+  return win.state === 'not_yet_open' ? win.label : dueLabelOf(task, now);
 }
 
 export function sortByUrgency(tasks: MockTask[]): MockTask[] {

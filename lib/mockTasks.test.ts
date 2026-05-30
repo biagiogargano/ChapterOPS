@@ -6,7 +6,7 @@
  * Scope: only the deterministic-id optimistic-add contract (dedup + tombstone).
  */
 
-import { addGeneratedTask, deleteUserTask, deriveVisibleTo, type MockTask } from './mockTasks';
+import { addGeneratedTask, deleteUserTask, deriveVisibleTo, dueOrOpenLabel, type MockTask } from './mockTasks';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
 
@@ -73,6 +73,21 @@ check('deleted id is not resurrected', resurrect === undefined);
   const vtNoRev = deriveVisibleTo('magister');
   check('no-reviewer · visible to assignee (magister)', vtNoRev.includes('magister' as any));
   check('no-reviewer · NOT visible to tribune',         !vtNoRev.includes('tribune' as any));
+}
+
+// ── dueOrOpenLabel: not-yet-open tasks show "Opens …", others fall back ────────
+{
+  const now = new Date(2026, 4, 25);   // 2026-05-25
+  const base = makeTask('win-1');
+  // Future availableAt → "Opens <date>" (not a due label).
+  const notOpen = dueOrOpenLabel({ ...base, availableAt: '2026-05-29', dueAt: '2026-06-01' }, now);
+  check('not-yet-open task shows an Opens label', /opens/i.test(notOpen));
+  // No availableAt → ordinary due label (unchanged behavior; not an Opens label).
+  const ordinary = dueOrOpenLabel({ ...base, availableAt: undefined, dueAt: '2026-06-01' }, now);
+  check('ordinary task does not show an Opens label', !/opens/i.test(ordinary));
+  // availableAt already passed → not an Opens label (window is open).
+  const open = dueOrOpenLabel({ ...base, availableAt: '2026-05-20', dueAt: '2026-06-01' }, now);
+  check('already-open task does not show an Opens label', !/opens/i.test(open));
 }
 
 console.log(`\nmockTasks.test: ${passed} passed, ${failed} failed`);

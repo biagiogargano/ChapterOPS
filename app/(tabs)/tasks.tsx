@@ -10,7 +10,7 @@ import {
   STATE_BG,
   STATE_COLOR,
   STATE_STRIPE,
-  dueLabelOf,
+  dueOrOpenLabel,
   getResponsibilityGroups,
   isOverdue,
   setSupabaseTaskCache,
@@ -152,7 +152,7 @@ function StructuredCard({
 
         {/* Due + proof icon + event */}
         <View style={s.metaRow}>
-          <Text style={[s.cardDue, isUrgent && s.cardDueUrgent]}>{dueLabelOf(task)}</Text>
+          <Text style={[s.cardDue, isUrgent && s.cardDueUrgent]}>{dueOrOpenLabel(task)}</Text>
           {task.requiresProof && task.proofType && (
             <>
               <Text style={s.dot}>·</Text>

@@ -1434,6 +1434,22 @@ export default function TaskDetailScreen() {
           </>
         )}
 
+        {/* ── Goal-update context (assignee, while filling) ── */}
+        {isGoalUpdateTask && showReport && reportDef && isAssignee && !windowLocked && taskState !== 'approved' && (
+          <>
+            <Divider />
+            <SLabel text="HOW THIS WORKS" />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>
+                For each goal below: enter its current value or status, note what changed, and flag if
+                you need help. Tick “No update this cycle” on anything that hasn’t moved. Then answer
+                the weekly check-in at the bottom. Your active goals are pulled in automatically — if a
+                goal is missing, add it on the Goals tab.
+              </Text>
+            </View>
+          </>
+        )}
+
         {/* ── Report form (structured-response task) ── */}
         {showReport && reportDef && (
           <>
