@@ -93,28 +93,58 @@ export function generateWeeklyOfficerReports(
   return generateReportTasks({ orgId, cycle, dueDate });
 }
 
-// ─── Generic vocabulary ───────────────────────────────────────────────────────
+// ─── Generic entry point ──────────────────────────────────────────────────────
 // The core operation is "generate questionnaire / structured-response tasks from a
-// definition". The report-named functions above are the working implementation;
-// `generateQuestionnaireTasks` is the GENERIC entry point new callers (and any
-// future manual-generation UI) should prefer. It is definition-agnostic — pass any
-// definitionId; the Weekly Officer Report is just the default. No behavior change;
-// this is a naming seam toward the generic primitive (see
-// docs/STRUCTURED_RESPONSE_ROADMAP.md). Same idempotency + fail-safe guarantees.
+// definition, for a chosen set of roles". `generateReportTasks` /
+// `generateWeeklyOfficerReports` above are the Sigma Chi PRESET (they default to
+// the Weekly Officer Report + all officer roles). `generateQuestionnaireTasks` is
+// the GENERIC entry point any new caller (and the future manual-generation UI)
+// should prefer — per the product doctrine, it forces NO fraternity defaults:
+// definition and roles are explicit. An admin generating "Event Recap" for three
+// committee roles must not silently get officer roles + the weekly report.
+//
+// Idempotency is per (role, cycle), as documented on reportTaskId — `cycle` is an
+// opaque caller-supplied stable key. When generating MORE THAN ONE definition that
+// could overlap the same role+cycle window, the caller distinguishes them via the
+// cycle key (e.g. 'event_recap:evt_123' vs 'weekly:2026-W23'). See
+// docs/STRUCTURED_RESPONSE_ROADMAP.md.
 
-/** Generic input alias — a questionnaire generation request. */
-export type GenerateQuestionnaireInput = GenerateReportsInput;
-/** Generic result alias. */
+/** Generic questionnaire-generation request — definition + roles are explicit. */
+export interface GenerateQuestionnaireInput {
+  /** Org scope (carried into the task; not part of the deterministic id). */
+  orgId:        string;
+  /** Which questionnaire definition to generate tasks for (required, explicit). */
+  definitionId: string;
+  /** Roles to generate a task for (required, explicit — no fraternity default). */
+  roles:        Role[];
+  /** Stable, opaque cycle/run key. Caller-supplied (no scheduler here). */
+  cycle:        string;
+  /** ISO 'YYYY-MM-DD' due date. Caller-supplied. */
+  dueDate:      string;
+}
+
+/** Generic result alias (same shape as report generation). */
 export type GenerateQuestionnaireResult = GenerateReportsResult;
 
 /**
- * Generate questionnaire (structured-response) tasks for the given roles + cycle
- * from a definition. Generic entry point; `generateReportTasks` is the same
- * operation under the report-era name. Defaults to the Weekly Officer Report
- * definition + all officer roles when unspecified. Idempotent; never throws.
+ * Generate questionnaire (structured-response) tasks for explicit roles + cycle
+ * from an explicit definition. Generic — forces no fraternity defaults. Fail-safe:
+ * returns an empty result (creates nothing) when the definition id or roles are
+ * missing/empty, or when the definition is unknown (the builder returns null).
+ * Idempotent per (role, cycle); never throws; persistence is fire-and-forget.
  */
 export function generateQuestionnaireTasks(
   input: GenerateQuestionnaireInput,
 ): GenerateQuestionnaireResult {
-  return generateReportTasks(input);
+  if (!input.definitionId || !Array.isArray(input.roles) || input.roles.length === 0) {
+    return { created: [], skipped: [] };
+  }
+  // Delegate to the shared loop with the explicit definition + roles (no defaults).
+  return generateReportTasks({
+    orgId:        input.orgId,
+    cycle:        input.cycle,
+    dueDate:      input.dueDate,
+    roles:        input.roles,
+    definitionId: input.definitionId,
+  });
 }

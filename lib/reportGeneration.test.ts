@@ -12,6 +12,7 @@ import {
 } from './reportGeneration';
 import { reportTaskId } from './reportTasks';
 import { WEEKLY_OFFICER_REPORT_ID } from './reportDefinitions';
+import { EVENT_RECAP_ID, WEEKLY_TEAM_CHECKIN_ID } from './questionnaireTemplates';
 import { getAllTasks } from './mockTasks';
 import { OFFICER_ROLES, ROLES } from './roles';
 
@@ -85,17 +86,44 @@ const ORG = 'org-1';
   check('unknown definition creates nothing', res.created.length === 0 && res.skipped.length === 0);
 }
 
-// ── Generic wrapper: generateQuestionnaireTasks == generateReportTasks ─────────
+// ── Generic entry point: explicit definition + roles, no fraternity defaults ──
 {
-  const cycle = '2099-W07';
-  const res = generateQuestionnaireTasks({ orgId: ORG, cycle, dueDate: '2099-02-15', roles: [ROLES.MAGISTER] });
-  check('generic wrapper creates a questionnaire task', res.created.length === 1);
-  check('generic wrapper uses the same deterministic id',
-    res.created[0]?.id === reportTaskId(ROLES.MAGISTER, cycle));
-  check('generic wrapper carries the definition', res.created[0]?.reportDefinitionId === WEEKLY_OFFICER_REPORT_ID);
-  // Idempotent across the alias boundary: report-named call then generic call skips.
-  const again = generateQuestionnaireTasks({ orgId: ORG, cycle, dueDate: '2099-02-15', roles: [ROLES.MAGISTER] });
-  check('generic wrapper is idempotent vs the existing task', again.created.length === 0);
+  const cycle = 'event_recap:2099-evt1';
+  const res = generateQuestionnaireTasks({
+    orgId: ORG, definitionId: EVENT_RECAP_ID, roles: [ROLES.SOCIAL_CHAIR],
+    cycle, dueDate: '2099-02-15',
+  });
+  check('generic entry creates a task from a non-officer-report definition', res.created.length === 1);
+  check('generic entry uses the deterministic id', res.created[0]?.id === reportTaskId(ROLES.SOCIAL_CHAIR, cycle));
+  check('generic entry carries the chosen generic definition',
+    res.created[0]?.reportDefinitionId === EVENT_RECAP_ID);
+  // Idempotent per (role, cycle).
+  const again = generateQuestionnaireTasks({
+    orgId: ORG, definitionId: EVENT_RECAP_ID, roles: [ROLES.SOCIAL_CHAIR],
+    cycle, dueDate: '2099-02-15',
+  });
+  check('generic entry is idempotent', again.created.length === 0 && again.skipped.includes(reportTaskId(ROLES.SOCIAL_CHAIR, cycle)));
+}
+
+// ── Generic entry forces NO defaults: missing/empty inputs create nothing ─────
+{
+  const noRoles = generateQuestionnaireTasks({ orgId: ORG, definitionId: EVENT_RECAP_ID, roles: [], cycle: 'c1', dueDate: '2099-03-01' });
+  check('generic entry with empty roles creates nothing', noRoles.created.length === 0);
+  const noDef = generateQuestionnaireTasks({ orgId: ORG, definitionId: '', roles: [ROLES.SOCIAL_CHAIR], cycle: 'c2', dueDate: '2099-03-01' });
+  check('generic entry with no definition creates nothing', noDef.created.length === 0);
+  const unknown = generateQuestionnaireTasks({ orgId: ORG, definitionId: 'does_not_exist', roles: [ROLES.SOCIAL_CHAIR], cycle: 'c3', dueDate: '2099-03-01' });
+  check('generic entry with unknown definition creates nothing', unknown.created.length === 0);
+}
+
+// ── Multiple distinct definitions for the same role coexist via the cycle key ─
+{
+  const role = ROLES.RECRUITMENT_CHAIR;
+  const a = generateQuestionnaireTasks({ orgId: ORG, definitionId: EVENT_RECAP_ID,         roles: [role], cycle: 'recap:e9',  dueDate: '2099-04-01' });
+  const b = generateQuestionnaireTasks({ orgId: ORG, definitionId: WEEKLY_TEAM_CHECKIN_ID, roles: [role], cycle: 'weekly:W14', dueDate: '2099-04-01' });
+  check('two different definitions for one role create two distinct tasks',
+    a.created.length === 1 && b.created.length === 1 && a.created[0].id !== b.created[0].id);
+  check('each task carries its own definition',
+    a.created[0].reportDefinitionId === EVENT_RECAP_ID && b.created[0].reportDefinitionId === WEEKLY_TEAM_CHECKIN_ID);
 }
 
 console.log(`\nreportGeneration.test: ${passed} passed, ${failed} failed`);
