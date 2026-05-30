@@ -119,7 +119,11 @@ async function runAll() {
     try {
       const mod = require(path.join(outLib, f));
       if (mod && typeof mod.runAsync === 'function') {
-        await mod.runAsync();   // awaited async suite (captures its asserts/exit)
+        // Async suite contract: runAsync() resolves to { failed }. Gate on the
+        // RETURNED count — process.exit interception is unreliable across an await,
+        // so an async suite that only set an exit code would not fail the run.
+        const res = await mod.runAsync();
+        if (!res || (res.failed | 0) > 0) anyFail = true;
       }
     } catch (e) { anyFail = true; console.error('THREW in ' + f + ': ' + ((e && e.stack) || e)); }
   }
