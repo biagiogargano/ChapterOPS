@@ -27,7 +27,22 @@ import {
 // Roles that see ALL org goals + can create for officer roles (RPCs enforce this;
 // the client only decides which list call to make + whether to show the create form).
 const GOAL_ADMIN_ROLES: Role[] = [ROLES.PRESIDENT, ROLES.PRO_CONSUL, ROLES.ANNOTATOR];
-const CADENCES: GoalCadence[] = ['daily', 'weekly', 'monthly', 'custom'];
+
+// "Update check-in" cadence — how often a goal should be REVIEWED later. This does
+// NOT create reminders or scheduled tasks (no scheduler yet). Visible MVP options
+// are Weekly / Monthly / One-time; 'one-time' maps to the GoalCadence 'custom' value
+// ("no recurring check-in"). 'daily' stays in the type but is hidden from the UI.
+const CADENCE_OPTIONS: { value: GoalCadence; label: string }[] = [
+  { value: 'weekly',  label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'custom',  label: 'One-time' },
+];
+const CADENCE_LABEL: Record<GoalCadence, string> = {
+  daily:   'Daily',
+  weekly:  'Weekly',
+  monthly: 'Monthly',
+  custom:  'One-time',
+};
 
 function parseNum(s: string): number | null {
   const t = s.trim();
@@ -183,7 +198,7 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
             {goal.currentValue ?? 0}/{goal.targetValue}{goal.unit ? ` ${goal.unit}` : ''} · {Math.round(progress.percent as number)}%
           </Text>
         )}
-        <Text style={s.metaDim}>{goal.cadence}</Text>
+        <Text style={s.metaDim}>{CADENCE_LABEL[goal.cadence] ?? goal.cadence}</Text>
         {goal.ownerRole && <Text style={s.metaDim}>{ROLE_LABELS[goal.ownerRole as Role] ?? goal.ownerRole}</Text>}
       </View>
       {measurable && (
@@ -275,13 +290,15 @@ function CreateGoalForm({
         <TextInput style={[s.input, s.flex1]} placeholder="Current" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
         <TextInput style={[s.input, s.flex1]} placeholder="Target" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
       </View>
+      <Text style={s.ownerLabel}>UPDATE CHECK-IN</Text>
       <View style={s.cadenceRow}>
-        {CADENCES.map(c => (
-          <Pressable key={c} style={[s.chip, cadence === c && s.chipOn]} onPress={() => setCadence(c)}>
-            <Text style={[s.chipText, cadence === c && s.chipTextOn]}>{c}</Text>
+        {CADENCE_OPTIONS.map(opt => (
+          <Pressable key={opt.value} style={[s.chip, cadence === opt.value && s.chipOn]} onPress={() => setCadence(opt.value)}>
+            <Text style={[s.chipText, cadence === opt.value && s.chipTextOn]}>{opt.label}</Text>
           </Pressable>
         ))}
       </View>
+      <Text style={s.helperText}>This controls how often this goal should be reviewed later. It does not create reminders yet.</Text>
 
       {/* Owner role: leadership/annotator picks; officers are locked to their own. */}
       {canChooseOwner ? (
@@ -344,10 +361,11 @@ function EditGoalForm({ goal, onCancel, onSaved }: { goal: Goal; onCancel: () =>
         <TextInput style={[s.input, s.flex1]} placeholder="Current" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
         <TextInput style={[s.input, s.flex1]} placeholder="Target" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
       </View>
+      <Text style={s.ownerLabel}>UPDATE CHECK-IN</Text>
       <View style={s.cadenceRow}>
-        {CADENCES.map(c => (
-          <Pressable key={c} style={[s.chip, cadence === c && s.chipOn]} onPress={() => setCadence(c)}>
-            <Text style={[s.chipText, cadence === c && s.chipTextOn]}>{c}</Text>
+        {CADENCE_OPTIONS.map(opt => (
+          <Pressable key={opt.value} style={[s.chip, cadence === opt.value && s.chipOn]} onPress={() => setCadence(opt.value)}>
+            <Text style={[s.chipText, cadence === opt.value && s.chipTextOn]}>{opt.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -403,6 +421,7 @@ const s = StyleSheet.create({
   chipTextOn: { color: '#a5b4fc', fontWeight: '700' },
   ownerNote:  { fontSize: 12, color: '#64748b' },
   ownerLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginTop: 2 },
+  helperText: { fontSize: 12, color: '#64748b', lineHeight: 17 },
   formActions:{ flexDirection: 'row', gap: 10, marginTop: 4 },
   secondaryBtn:{ flex: 1, backgroundColor: '#0f172a', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
   secondaryText:{ color: '#94a3b8', fontWeight: '600', fontSize: 14 },

@@ -75,8 +75,14 @@ real/persisted — a failed RPC must show an error, never a fake success.
       picker (officer roles) — choose the officer the goal is for. As a non-leadership
       **officer**, no picker — owner is locked to their own role (no "switch role
       first" workaround).
+- [ ] **Update check-in (cadence):** the create/edit form shows an **UPDATE CHECK-IN**
+      label with **Weekly / Monthly / One-time** chips (default **Weekly**; no "Daily"
+      / raw "custom"), plus helper text "This controls how often this goal should be
+      reviewed later. It does not create reminders yet." Goal cards show the friendly
+      label (Weekly / Monthly / One-time), not raw lowercase.
 - [ ] **Current/target + percent + progress bar** render correctly for a measurable
-      goal; a goal with no target shows no bar (not "NaN%").
+      goal; a goal with no target shows no bar (not "NaN%"). NOTE: goal values are
+      **numeric-only** for now (text values are a known v1 limitation, post-build).
 - [ ] **Edit** a goal (change current/target/title/cadence) → values **persist** on
       reopen.
 - [ ] **Complete** a goal → it leaves the active list. **Archive** a goal (confirm

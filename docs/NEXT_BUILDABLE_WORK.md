@@ -8,6 +8,26 @@ Keep this doc current: when a lane finishes, move it to "Done" with its commit.
 
 ---
 
+## Phase A — pre-build stabilization blocker list (current)
+
+**Must-fix before the next (final) iOS build — DONE:**
+- Questionnaire persistence: `taskService` maps `reportDefinitionId ↔ report_definition_id`; broken questionnaire → honest "unavailable" state; column applied on alpha. *(Needs the new build to verify on device — Build 17 predates the client mapping.)*
+- Goals create UX: bulk create (newline/`;`), leadership owner-role selector, officers locked to own role.
+- Goals cadence wording: "UPDATE CHECK-IN" → Weekly / Monthly / One-time (Daily hidden), helper "…does not create reminders yet."
+- Goals permissions: client `canManageGoal` (creator-or-leadership) ↔ server patch applied.
+- Notifications: 4 task pushes mirror to in-app notices; dismiss works.
+
+**Okay to test privately in the next build (not blockers):** all of the above on device + the device checklist.
+
+**Should WAIT until after the private build:** device-surfaced issues, then Goals v1 depth.
+
+**Requires schema/product redesign (NOT in this build):**
+- Non-numeric goal values (needs a `goals` value-type schema decision).
+- Goal update windows / available-from (needs a task model field).
+- Goal-linked weekly update tasks + leadership review flow (Phase D).
+
+---
+
 ## Do NOT revisit (done — bug/stale-doc only)
 
 - Product doctrine + scale principles — `PRODUCT_ARCHITECTURE_AND_SCALE_DOCTRINE.md`, `PRODUCT_BUILDING_PRINCIPLES.md`
