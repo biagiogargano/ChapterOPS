@@ -313,12 +313,22 @@ export default function CreateTaskScreen() {
   // always itself (self-assignment). Candidates stay the current pack's roles
   // (all officers + the floor/Brother role). Replaces the old flat
   // canAssignToAnyOfficer gate.
-  const assignableRoles = useMemo<Role[]>(
-    () => getAssignableRoles(role, [...OFFICER_ROLES, FLOOR_ROLE], {
+  //
+  // EDIT MODE: always keep the task's CURRENT assignee selectable even if it now
+  // falls outside the editor's downward set (e.g. a task assigned before the
+  // org-level rule, or by a higher role). Otherwise the existing assignee would
+  // render no chip and could be silently dropped on save. We surface it as a
+  // candidate; the derivation still de-dupes and keeps self-assignment.
+  const assignableRoles = useMemo<Role[]>(() => {
+    const base = getAssignableRoles(role, [...OFFICER_ROLES, FLOOR_ROLE], {
       exceptions: SIGMA_CHI_ASSIGNMENT_EXCEPTIONS,
-    }) as Role[],
-    [role],
-  );
+    }) as Role[];
+    const current = existing?.assignedRole;
+    if (editing && current && current !== 'all' && !base.includes(current as Role)) {
+      return [...base, current as Role];
+    }
+    return base;
+  }, [role, editing, existing]);
   // Whether this role can assign to anyone beyond itself (drives the multi-select
   // hint text). Previously canAssignBroadly.
   const canAssignBroadly = assignableRoles.length > 1;
