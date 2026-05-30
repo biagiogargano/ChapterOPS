@@ -46,6 +46,13 @@ export interface Goal {
   /** Owning role (pack-shaped key). A person-owned goal would add ownerMemberId. */
   ownerRole?:    RoleKey;
   ownerMemberId?: string;
+  /**
+   * The member id that CREATED this goal (audit). Drives the "can I manage this?"
+   * rule: an officer may edit/complete/archive only goals they created — a goal
+   * assigned to their role by leadership is read-only to them. Leadership/annotator
+   * may manage any goal regardless of creator.
+   */
+  createdBy?:    string;
 
   /** Optional measurable target + current value (omit for milestone/boolean goals). */
   targetValue?:  number;

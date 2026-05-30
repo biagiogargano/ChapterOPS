@@ -60,6 +60,7 @@ function mapGoalRow(row: any): Goal {
     description:        row?.description ?? undefined,
     ownerRole:          row?.owner_role ?? undefined,
     ownerMemberId:      row?.owner_member_id ?? undefined,
+    createdBy:          row?.created_by ?? undefined,
     targetValue:        typeof row?.target_value === 'number' ? row.target_value : (row?.target_value != null ? Number(row.target_value) : undefined),
     currentValue:       typeof row?.current_value === 'number' ? row.current_value : (row?.current_value != null ? Number(row.current_value) : undefined),
     unit:               row?.unit ?? undefined,

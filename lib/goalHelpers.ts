@@ -137,3 +137,30 @@ export function isGoalCompleted(goal: Pick<Goal, 'status'>): boolean {
 export function canArchiveGoal(goal: Pick<Goal, 'status'>): boolean {
   return goal.status !== 'archived';
 }
+
+// ─── 5. Manage permission (mirrors the goals_v1 permissions-patch RPC auth) ────
+// The CLIENT analog of update_goal/complete_goal/archive_goal's auth: it only
+// shows/hides controls. The RPCs remain the real gate. Keep this in lock-step with
+// supabase/goals_v1_permissions_patch_draft.sql.
+
+/** Roles that may manage ANY org goal (Sigma Chi alpha leadership/reviewer set). */
+export const GOAL_MANAGER_ROLES: string[] = ['president', 'pro_consul', 'annotator'];
+
+/**
+ * May `currentRole` (held by member `currentMemberId`) edit/complete/archive `goal`?
+ *   • leadership/annotator → any goal;
+ *   • otherwise → only goals the caller PERSONALLY created (goal.createdBy ===
+ *     currentMemberId). Holding the goal's owner_role is NOT sufficient — a goal
+ *     assigned to your role by leadership is read-only to you.
+ * Fail safe: if createdBy or currentMemberId is missing/empty, a non-leadership
+ * caller gets false (never pretend permission when the data is absent). Pure.
+ */
+export function canManageGoal(
+  goal: Pick<Goal, 'createdBy'>,
+  currentRole: string,
+  currentMemberId?: string | null,
+): boolean {
+  if (GOAL_MANAGER_ROLES.includes(currentRole)) return true;
+  if (!goal.createdBy || !currentMemberId) return false;   // fail safe
+  return goal.createdBy === currentMemberId;
+}

@@ -15,7 +15,7 @@ import { ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
 import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
-import { goalProgress } from '@/lib/goalHelpers';
+import { goalProgress, canManageGoal } from '@/lib/goalHelpers';
 import type { Goal, GoalCadence } from '@/lib/goals';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
@@ -38,15 +38,17 @@ function parseNum(s: string): number | null {
 
 export default function GoalsScreen() {
   const { role } = useDevRole();
-  const { activeOrgId } = useIdentity();
+  const { activeOrgId, member } = useIdentity();
   const navigation = useNavigation();
 
   const [goals, setGoals]     = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);   // leadership-only
 
   const isAdmin = GOAL_ADMIN_ROLES.includes(role);
+  const currentMemberId = member?.id ?? null;
 
   const load = useCallback(async () => {
     if (!activeOrgId) { setGoals([]); setLoading(false); setError('No active organization.'); return; }
@@ -64,7 +66,16 @@ export default function GoalsScreen() {
   }, [navigation]));
 
   // Only show active goals in the MVP list (completed/archived are filtered out).
-  const activeGoals = goals.filter(g => g.status === 'active');
+  // Leadership may additionally filter the list by a specific owner role (client-
+  // only; does not affect permissions — the RPCs remain the gate).
+  const activeGoals = goals
+    .filter(g => g.status === 'active')
+    .filter(g => !isAdmin || ownerFilter === null || g.ownerRole === ownerFilter);
+
+  // Owner roles present in the loaded goals, for the leadership filter chips.
+  const ownerRolesInList = Array.from(
+    new Set(goals.filter(g => g.status === 'active' && g.ownerRole).map(g => g.ownerRole as string)),
+  );
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.root}>
@@ -87,6 +98,20 @@ export default function GoalsScreen() {
               </Pressable>
         )}
 
+        {/* Owner-role filter (leadership only; client-side view filter) */}
+        {isAdmin && ownerRolesInList.length > 1 && (
+          <View style={s.filterRow}>
+            <Pressable style={[s.chip, ownerFilter === null && s.chipOn]} onPress={() => setOwnerFilter(null)}>
+              <Text style={[s.chipText, ownerFilter === null && s.chipTextOn]}>All</Text>
+            </Pressable>
+            {ownerRolesInList.map(r => (
+              <Pressable key={r} style={[s.chip, ownerFilter === r && s.chipOn]} onPress={() => setOwnerFilter(r)}>
+                <Text style={[s.chipText, ownerFilter === r && s.chipTextOn]}>{ROLE_LABELS[r as Role] ?? r}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {loading ? (
           <View style={s.center}><ActivityIndicator color="#6366f1" /></View>
         ) : error ? (
@@ -100,7 +125,7 @@ export default function GoalsScreen() {
           <Text style={s.empty}>No goals yet.</Text>
         ) : (
           activeGoals.map(g => (
-            <GoalCard key={g.id} goal={g} canManage={isAdmin || g.ownerRole === role} onChanged={() => void load()} />
+            <GoalCard key={g.id} goal={g} canManage={canManageGoal(g, role, currentMemberId)} onChanged={() => void load()} />
           ))
         )}
 
@@ -299,6 +324,7 @@ const s = StyleSheet.create({
 
   newBtn:     { backgroundColor: '#1e1b4b', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#312e81' },
   newBtnText: { color: '#a5b4fc', fontWeight: '700', fontSize: 14 },
+  filterRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
 
   card:      { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, marginBottom: 10, gap: 8 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },

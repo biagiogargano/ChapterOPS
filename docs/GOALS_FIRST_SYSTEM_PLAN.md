@@ -153,6 +153,13 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
    list active goals, create / edit / complete / archive via `lib/goalService` (the
    live RPCs). Real + persisted; needs device testing in the next build. Goal-update
    task generation NOT wired (step 7 stays future).
+   **Permissions v1 (client wired; SQL patch DRAFT-only):** leadership/annotator
+   (President / Pro Consul / Annotator) manage ALL org goals + can filter the list by
+   owner role; an officer manages only goals they **personally created**
+   (`createdBy`), so a goal leadership assigned to their role is **read-only** to them.
+   Client uses `canManageGoal` (mirrors the RPC auth) to show/hide actions; the real
+   gate is the RPCs — `supabase/goals_v1_permissions_patch_draft.sql` rewrites
+   update/complete/archive auth and **must be applied** for the server to enforce it.
 7. **Generated update tasks** from goal cadence (reuses generation stack).
    *Pure builder DONE* (`lib/goalUpdateTasks.ts`, 34 tests): deterministic
    `goalupd_<goalId>_<period>` ids, `buildGoalUpdateTask`,

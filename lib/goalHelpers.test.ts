@@ -6,7 +6,7 @@
 
 import {
   parseGoalPrompts, goalProgress, goalPeriodKey, isGoalUpdateDue,
-  isGoalActive, isGoalCompleted, canArchiveGoal,
+  isGoalActive, isGoalCompleted, canArchiveGoal, canManageGoal,
 } from './goalHelpers';
 import type { Goal } from './goals';
 
@@ -92,6 +92,32 @@ check('isGoalCompleted', isGoalCompleted({ status: 'completed' }) === true && is
 check('canArchive active', canArchiveGoal({ status: 'active' }) === true);
 check('canArchive completed', canArchiveGoal({ status: 'completed' }) === true);
 check('cannot re-archive archived', canArchiveGoal({ status: 'archived' }) === false);
+
+// ── 5. canManageGoal (mirrors the permissions-patch RPC auth) ─────────────────
+{
+  const g = (createdBy?: string) => ({ createdBy });
+  // Leadership/annotator → manage ANY goal regardless of creator.
+  check('president manages any goal',  canManageGoal(g('m_other'), 'president', 'm_me') === true);
+  check('pro_consul manages any goal', canManageGoal(g('m_other'), 'pro_consul', 'm_me') === true);
+  check('annotator manages any goal',  canManageGoal(g('m_other'), 'annotator', 'm_me') === true);
+  check('leadership manages even with no createdBy / no memberId',
+    canManageGoal(g(undefined), 'president', null) === true);
+
+  // Creator → manages their own goal.
+  check('creator manages own goal', canManageGoal(g('m_me'), 'social_chair', 'm_me') === true);
+
+  // Owner role but NOT creator → CANNOT manage (leadership-assigned goal is read-only).
+  check('owner-role-but-not-creator cannot manage',
+    canManageGoal(g('m_leader'), 'social_chair', 'm_me') === false);
+
+  // Unrelated role, not creator → cannot manage.
+  check('unrelated role cannot manage', canManageGoal(g('m_other'), 'brother', 'm_me') === false);
+
+  // Fail safe: missing createdBy or missing memberId → false for non-leadership.
+  check('missing createdBy → false (fail safe)', canManageGoal(g(undefined), 'social_chair', 'm_me') === false);
+  check('missing currentMemberId → false (fail safe)', canManageGoal(g('m_me'), 'social_chair', null) === false);
+  check('missing both → false (fail safe)', canManageGoal(g(undefined), 'social_chair', undefined) === false);
+}
 
 console.log(`\ngoalHelpers.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
