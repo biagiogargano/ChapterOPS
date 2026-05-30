@@ -36,6 +36,17 @@ import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import { usePushRegistration } from '@/lib/usePushRegistration';
 import { sendActionPush } from '@/lib/pushTokens';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
+import { getReportDefinition } from '@/lib/reportDefinitions';
+import {
+  orderedQuestions,
+  responseProgress,
+  validateAnswers,
+  withAnswerValue,
+  withAnswerNoUpdate,
+  type StructuredResponseDefinition,
+  type StructuredAnswerMap,
+} from '@/lib/structuredResponses';
+import { getTaskReportSubmission, upsertTaskReportSubmission } from '@/lib/reportSubmissionService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -761,6 +772,146 @@ function ProofReviewSection({
   );
 }
 
+// ─── Report (structured-response) section ─────────────────────────────────────
+// Rendered for tasks that carry a reportDefinitionId. The assignee fills + submits
+// a structured form (no proof, no review); allowed readers see a read-only view.
+// Backed by real RPCs via reportSubmissionService — fails safe (inline error) when
+// unconfigured / on RPC error; never crashes.
+
+function ReportFormSection({
+  definition,
+  taskId,
+  editable,
+  done,
+  onSubmitted,
+}: {
+  definition:  StructuredResponseDefinition;
+  taskId:      string;
+  editable:    boolean;        // assignee may edit + submit; others read-only
+  done:        boolean;        // task already complete (approved)
+  onSubmitted: () => void;     // parent flips task state + navigates back
+}) {
+  const [answers, setAnswers]       = useState<StructuredAnswerMap>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+
+  // Load any existing submission once (no-op/null when unconfigured or unauthorized).
+  useEffect(() => {
+    let cancelled = false;
+    void getTaskReportSubmission(taskId).then(sub => {
+      if (!cancelled && sub?.answers) setAnswers(sub.answers);
+    });
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  const questions = orderedQuestions(definition);
+  const progress  = responseProgress(definition, answers);
+
+  async function handleSubmit() {
+    if (submitting) return;
+    const v = validateAnswers(definition, answers);
+    if (!v.valid) {
+      setError(v.missingRequired.length > 0
+        ? 'Please answer all required questions.'
+        : 'Please fix the highlighted answers.');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    const ok = await upsertTaskReportSubmission(taskId, definition.id, answers);
+    setSubmitting(false);
+    if (!ok) { setError('Couldn’t submit your report. Please try again.'); return; }
+    onSubmitted();
+  }
+
+  // ── Read-only view: a reader, or the assignee after it's submitted/done ──
+  const readOnly = !editable || done;
+  if (readOnly) {
+    return (
+      <View>
+        <SLabel text={done ? 'SUBMITTED REPORT' : `${definition.label.toUpperCase()}`} />
+        {done && <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Report submitted</Text></View>}
+        <View style={{ marginTop: done ? 10 : 0, gap: 12 }}>
+          {questions.map(q => {
+            const a = answers[q.key];
+            const hasValue = typeof a?.value === 'string' && a.value.trim().length > 0;
+            return (
+              <View key={q.key}>
+                <Text style={s.reportPrompt}>{q.prompt}</Text>
+                {a?.noUpdate ? (
+                  <Text style={s.reportNoUpdateTag}>No update</Text>
+                ) : hasValue ? (
+                  <Text style={s.proofDisplayContent}>{a!.value}</Text>
+                ) : (
+                  <Text style={s.proofDisplayEmpty}>—</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
+  // ── Editable form (assignee, not yet done) ──
+  return (
+    <View>
+      <SLabel text={definition.label.toUpperCase()} />
+      <View style={{ gap: 14, marginTop: 4 }}>
+        {questions.map(q => {
+          const a        = answers[q.key];
+          const isNoUpd  = a?.noUpdate === true;
+          const isLong   = q.type === 'long_text';
+          return (
+            <View key={q.key}>
+              <View style={s.reportPromptRow}>
+                <Text style={s.reportPrompt}>{q.prompt}</Text>
+                {q.required && <Text style={s.reportRequired}>required</Text>}
+              </View>
+              <TextInput
+                style={[s.proofInput, isLong && { minHeight: 80 }, isNoUpd && s.reportInputDisabled]}
+                placeholder={q.placeholder ?? ''}
+                placeholderTextColor="#475569"
+                value={isNoUpd ? '' : (a?.value ?? '')}
+                editable={!isNoUpd}
+                onChangeText={t => { setAnswers(m => withAnswerValue(m, q.key, t)); setError(null); }}
+                multiline={isLong}
+                numberOfLines={isLong ? 4 : 1}
+                textAlignVertical={isLong ? 'top' : 'center'}
+                maxLength={q.maxLength}
+              />
+              {q.allowNoUpdate && (
+                <Pressable
+                  style={s.reportNoUpdateRow}
+                  onPress={() => { setAnswers(m => withAnswerNoUpdate(m, q.key, !isNoUpd)); setError(null); }}
+                >
+                  <View style={[s.reportCheckbox, isNoUpd && s.reportCheckboxOn]}>
+                    {isNoUpd && <Text style={s.reportCheckboxMark}>✓</Text>}
+                  </View>
+                  <Text style={s.reportNoUpdateLabel}>No update this cycle</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      {error && <Text style={s.proofSubmitError}>{error}</Text>}
+
+      <Pressable
+        style={[s.submitBtn, { marginTop: 14 }, (!progress.complete || submitting) && s.submitBtnDisabled]}
+        onPress={handleSubmit}
+        disabled={!progress.complete || submitting}
+      >
+        <Text style={s.submitBtnText}>{submitting ? 'Submitting…' : 'Submit Report'}</Text>
+      </Pressable>
+      {!progress.complete && (
+        <Text style={s.reportHint}>Answer the required questions to submit.</Text>
+      )}
+    </View>
+  );
+}
+
 // ─── Escalation chain ─────────────────────────────────────────────────────────
 
 function EscalationSection({
@@ -986,18 +1137,28 @@ export default function TaskDetailScreen() {
     task.supervisorRole === role ||
     (linkedEv ? canManageEventTasks(role, linkedEv.kind) : isBroadLeader);
 
-  const showProofSubmit = task.type === 'structured' && task.requiresProof && isAssignee;
+  // Report task: carries a reportDefinitionId resolving to a known definition.
+  // It's a structured-response form (no proof, no review) — handled by its own
+  // section, so it's excluded from proof/approval/simple-complete below.
+  const reportDef     = task.reportDefinitionId ? getReportDefinition(task.reportDefinitionId) : null;
+  const isReportTask  = !!reportDef;
+  // Readers allowed to view a report (matches the RPC's read set; the RPC is the
+  // real gate — this only decides whether to render the read-only view).
+  const canReadReport = isAssignee || role === 'annotator' || isLeadershipRole(role);
+
+  const showProofSubmit = task.type === 'structured' && task.requiresProof && isAssignee && !isReportTask;
   // Approval-required tasks WITHOUT a proof requirement still need a submit path —
   // otherwise the assignee can't move it into review. Reuses the existing
   // 'submitted' state (no state-machine change).
-  const showApprovalSubmit = task.type === 'structured' && !!task.requiresApproval && !task.requiresProof && isAssignee;
-  // Simple tasks — structured, assignee, and needing NEITHER proof NOR approval —
-  // had no completion action (you couldn't mark them done without deleting). Give
-  // them a plain "Mark Complete" that sets 'approved' (which isTaskCompleted treats
-  // as done, so it leaves To Do). No proof, no reviewer, no state-machine change.
+  const showApprovalSubmit = task.type === 'structured' && !!task.requiresApproval && !task.requiresProof && isAssignee && !isReportTask;
+  // Simple tasks — structured, assignee, NEITHER proof NOR approval, and NOT a
+  // report — get a plain "Mark Complete" (sets 'approved'). Report tasks render
+  // the report form instead.
   const showSimpleComplete =
-    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval;
-  const showProofReview = isReviewerOnly && taskState === 'submitted';
+    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval && !isReportTask;
+  // Report section: the assignee's form, OR an allowed reader's read-only view.
+  const showReport = isReportTask && canReadReport;
+  const showProofReview = isReviewerOnly && taskState === 'submitted' && !isReportTask;
   const showEscalation  = !!(task.escalationChain && task.escalationChain.length > 1);
   const showWorkflow    = !!task.isWorkflowParent;
 
@@ -1162,6 +1323,26 @@ export default function TaskDetailScreen() {
                 </Pressable>
               </View>
             )}
+          </>
+        )}
+
+        {/* ── Report form (structured-response task) ── */}
+        {showReport && reportDef && (
+          <>
+            <Divider />
+            <ReportFormSection
+              definition={reportDef}
+              taskId={task.id}
+              editable={isAssignee}
+              done={taskState === 'approved'}
+              onSubmitted={() => {
+                // Report submitted → mark the task complete (approved = done per
+                // isTaskCompleted; reports have no review gate), then return. The
+                // answers persist via the RPC; this only flips task state.
+                setTaskState('approved');
+                router.back();
+              }}
+            />
           </>
         )}
 
@@ -1398,6 +1579,19 @@ const s = StyleSheet.create({
   proofDisplayContent: { fontSize: 14, color: '#f1f5f9', lineHeight: 20 },
   proofDisplayLink:    { fontSize: 14, color: '#818cf8', lineHeight: 20, textDecorationLine: 'underline' },
   proofDisplayEmpty:   { fontSize: 13, color: '#334155', fontStyle: 'italic' },
+
+  // Report (structured-response) form
+  reportPromptRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  reportPrompt:       { fontSize: 14, fontWeight: '600', color: '#cbd5e1', flexShrink: 1 },
+  reportRequired:     { fontSize: 10, color: '#64748b', fontWeight: '500' },
+  reportInputDisabled:{ opacity: 0.4 },
+  reportNoUpdateRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  reportCheckbox:     { width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
+  reportCheckboxOn:   { borderColor: '#6366f1', backgroundColor: '#1e1b4b' },
+  reportCheckboxMark: { fontSize: 11, color: '#a5b4fc', fontWeight: '700', lineHeight: 13 },
+  reportNoUpdateLabel:{ fontSize: 13, color: '#94a3b8', fontWeight: '500' },
+  reportNoUpdateTag:  { fontSize: 13, color: '#818cf8', fontWeight: '600', fontStyle: 'italic' },
+  reportHint:         { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 8 },
 
   reviewBlock:    { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 14 },
   reviewerNote:   { fontSize: 13, color: '#64748b' },
