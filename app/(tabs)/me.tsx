@@ -2,10 +2,19 @@ import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
+import { OFFICER_ROLES, ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
 import { AUTH_ENABLED } from '@/lib/flags';
+import { generateQuestionnaireTasks } from '@/lib/reportGeneration';
+import { WEEKLY_OFFICER_REPORT_ID, getQuestionnaireDefinition } from '@/lib/reportDefinitions';
+import { weeklyCycleId, defaultWeeklyDueDate } from '@/lib/questionnaireCycle';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+// Roles allowed to manually generate questionnaire tasks in the alpha (President,
+// Pro Consul, Annotator). Explicit set — narrower than isLeadershipRole (which is
+// President + Pro Consul only) because the Annotator runs reporting in this pack.
+const QUESTIONNAIRE_GENERATOR_ROLES: Role[] = [ROLES.PRESIDENT, ROLES.PRO_CONSUL, ROLES.ANNOTATOR];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -58,6 +67,78 @@ function OrgOption({
         {name}
       </Text>
     </Pressable>
+  );
+}
+
+/**
+ * Manual questionnaire-task generator (leadership alpha action).
+ *
+ * Generic by design: it calls the generic generateQuestionnaireTasks helper with a
+ * chosen template. For alpha the template is the Weekly Officer Report and the
+ * targets are the current officer roles, but nothing here is hardcoded to "reports"
+ * — swapping the template id + roles is all it takes to generate any questionnaire.
+ *
+ *  • Cycle id is deterministic per ISO week + template (idempotent: same week +
+ *    same roles + same template never duplicates).
+ *  • Due date defaults to 7 days out (documented default — no per-org pref yet).
+ *  • No scheduler, no push, no Supabase — one on-demand button press.
+ */
+function QuestionnaireGeneratorCard({ orgId }: { orgId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Alpha default template + targets. The label comes from the definition itself,
+  // so the card never hardcodes the words "officer report".
+  const definitionId = WEEKLY_OFFICER_REPORT_ID;
+  const templateLabel = getQuestionnaireDefinition(definitionId)?.label ?? 'questionnaire';
+
+  function handleGenerate() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const now = new Date();
+      const res = generateQuestionnaireTasks({
+        orgId,
+        definitionId,
+        roles:   OFFICER_ROLES,
+        cycle:   weeklyCycleId(definitionId, now),
+        dueDate: defaultWeeklyDueDate(now),
+      });
+      setResult({ created: res.created.length, skipped: res.skipped.length });
+    } catch {
+      setError('Couldn’t create the tasks. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={s.genCard}>
+      <Text style={s.genTitle}>Create questionnaire tasks</Text>
+      <Text style={s.genSub}>Creates tasks from a questionnaire template. Safe to press again.</Text>
+      <Text style={s.genTemplate}>Template: {templateLabel}</Text>
+
+      <Pressable
+        style={[s.genButton, busy && s.genButtonDisabled]}
+        onPress={handleGenerate}
+        disabled={busy}
+      >
+        <Text style={s.genButtonText}>{busy ? 'Creating…' : 'Create questionnaire tasks'}</Text>
+      </Pressable>
+
+      {result && (
+        <Text style={s.genResult}>
+          {result.created > 0
+            ? `Created ${result.created} task${result.created === 1 ? '' : 's'}`
+            : 'No new tasks'}
+          {result.skipped > 0 ? ` · ${result.skipped} already existed` : ''}.
+        </Text>
+      )}
+      {error && <Text style={s.genError}>{error}</Text>}
+    </View>
   );
 }
 
@@ -170,6 +251,11 @@ export default function MeScreen() {
           </View>
           <Text style={s.linkChevron}>›</Text>
         </Pressable>
+      )}
+
+      {/* ── Create questionnaire tasks (President / Pro Consul / Annotator) ── */}
+      {QUESTIONNAIRE_GENERATOR_ROLES.includes(role) && !!activeOrgId && (
+        <QuestionnaireGeneratorCard orgId={activeOrgId} />
       )}
 
       {/* ── Sign out ── */}
@@ -336,6 +422,17 @@ const s = StyleSheet.create({
   linkTitle:   { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
   linkSub:     { fontSize: 12, color: '#64748b', marginTop: 2 },
   linkChevron: { fontSize: 22, color: '#475569' },
+
+  // Questionnaire generator card
+  genCard:     { backgroundColor: '#1e293b', borderRadius: 16, padding: 20, gap: 6 },
+  genTitle:    { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  genSub:      { fontSize: 12, color: '#64748b' },
+  genTemplate: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginTop: 2 },
+  genButton:   { backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+  genButtonDisabled: { backgroundColor: '#312e81', opacity: 0.6 },
+  genButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  genResult:   { fontSize: 13, color: '#4ade80', fontWeight: '600', marginTop: 8 },
+  genError:    { fontSize: 13, color: '#f87171', fontWeight: '600', marginTop: 8 },
 
   // Sign out
   signOutButton: {
