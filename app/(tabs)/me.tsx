@@ -8,6 +8,7 @@ import { generateQuestionnaireTasks } from '@/lib/reportGeneration';
 import { getQuestionnaireDefinition } from '@/lib/reportDefinitions';
 import { planQuestionnaireGeneration } from '@/lib/questionnaireGenerationPlan';
 import { weeklyCycleId, defaultWeeklyDueDate } from '@/lib/questionnaireCycle';
+import { runWeeklyGoalUpdateGeneration } from '@/lib/goalUpdateRun';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -160,6 +161,80 @@ function QuestionnaireGeneratorCard({ orgId, orgTemplate }: { orgId: string; org
   );
 }
 
+/**
+ * Manual weekly goal-update generator (leadership alpha action).
+ *
+ * One on-demand button: creates this week's goal-update task for every officer ROLE
+ * that has ≥1 active goal. Each task walks that officer through their active goals +
+ * a weekly check-in, opens near the end of the week (availableAt), and is due shortly
+ * after. NOT a scheduler — no timer, no push, no AI, no background job. Idempotent:
+ * safe to run again; existing tasks are skipped. The form is reconstructed at render
+ * from the role's live goals (Task Detail), so it survives reload with no new storage.
+ */
+function GoalUpdateGeneratorCard({ orgId }: { orgId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ created: number; skipped: number; rolesWithGoals: number; error?: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleGenerate() {
+    if (busy) return;
+    Alert.alert(
+      'Create weekly goal update tasks?',
+      'This creates this week’s update task for each officer role that has active goals. Each officer is asked to update their active goals and answer a short weekly check-in. It opens near the end of the week. Safe to run again — existing tasks are skipped.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Create tasks', style: 'default', onPress: () => { void runGenerate(); } },
+      ],
+    );
+  }
+
+  async function runGenerate() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await runWeeklyGoalUpdateGeneration({ orgId, now: new Date() });
+      if (res.error) { setError('Couldn’t read the chapter’s goals. Please try again.'); }
+      else { setResult(res); }
+    } catch {
+      setError('Couldn’t create the tasks. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={s.genCard}>
+      <Text style={s.genTitle}>Create weekly goal update tasks</Text>
+      <Text style={s.genSub}>
+        One update task per officer role with active goals. Opens near the end of the week. Safe to press again.
+      </Text>
+
+      <Pressable
+        style={[s.genButton, busy && s.genButtonDisabled]}
+        onPress={handleGenerate}
+        disabled={busy}
+      >
+        <Text style={s.genButtonText}>{busy ? 'Creating…' : 'Create weekly goal update tasks'}</Text>
+      </Pressable>
+
+      {result && (
+        <Text style={s.genResult}>
+          {result.rolesWithGoals === 0
+            ? 'No active goals yet — nothing to create.'
+            : (result.created > 0
+                ? `Created ${result.created} task${result.created === 1 ? '' : 's'}`
+                : 'No new tasks')
+              + (result.skipped > 0 ? ` · ${result.skipped} already existed` : '')
+              + '.'}
+        </Text>
+      )}
+      {error && <Text style={s.genError}>{error}</Text>}
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MeScreen() {
@@ -274,6 +349,11 @@ export default function MeScreen() {
       {/* ── Create questionnaire tasks (President / Pro Consul / Annotator) ── */}
       {QUESTIONNAIRE_GENERATOR_ROLES.includes(role) && !!activeOrgId && (
         <QuestionnaireGeneratorCard orgId={activeOrgId} orgTemplate={organization?.template} />
+      )}
+
+      {/* ── Create weekly goal update tasks (President / Pro Consul / Annotator) ── */}
+      {QUESTIONNAIRE_GENERATOR_ROLES.includes(role) && !!activeOrgId && (
+        <GoalUpdateGeneratorCard orgId={activeOrgId} />
       )}
 
       {/* ── Sign out ── */}
