@@ -1,11 +1,17 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Reports v1 · task_report_submissions (structured-response answers)
 --
---   ⚠️  DRAFT — DO NOT RUN YET.  This is a committed migration DRAFT for Reports
---       v1 persistence. It is reviewed/planned but must be applied as a deliberate,
---       separately-greenlit step against the alpha Supabase project (it is a
---       Supabase schema + RLS + RPC change). NOTHING in the app calls these objects
---       yet, so applying this is INERT for existing users.
+--   ✅  APPLIED to the alpha Supabase project (2026-05-30) via the Dashboard SQL
+--       Editor, verified (RLS on, 0 policies, both RPCs SECURITY DEFINER, table
+--       has NO anon/authenticated grants, 5 constraints present, empty read safe).
+--       NOTHING in the app calls these objects yet, so it is INERT for users until
+--       the client report flow is wired (a later, separate step).
+--
+--   NOTE: Supabase default privileges also granted EXECUTE on both RPCs to `anon`
+--       (a platform default for new public functions) — this is SAFE: each RPC
+--       rejects unauthenticated callers (`auth.uid()` null → 'unauthenticated'),
+--       and the TABLE itself has no anon/authenticated grant. Matches the deployed
+--       proof v1A posture. Optional future tightening: revoke execute from anon.
 --
 -- WHAT THIS IS (and is not):
 --   • The storage boundary for officer reports / structured-response tasks. A
