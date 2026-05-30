@@ -1,5 +1,9 @@
 # Goals / Progress Tracking — Future Layer Plan (planning only, DO NOT BUILD YET)
 
+> **Superseded framing:** goals are now a **first-class product direction** — see
+> `docs/GOALS_FIRST_SYSTEM_PLAN.md` (the goals-first plan + inert `lib/goals.ts`
+> types). This doc remains the narrower persistence sketch it cross-references.
+
 The future "goals / progress tracking" layer. **Nothing here is to be built now.**
 This exists so the direction is recorded and future sessions don't (a) force goals
 into the task model or (b) reinvent it ad hoc. Governed by
