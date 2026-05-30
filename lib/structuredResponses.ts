@@ -68,7 +68,17 @@ export interface StructuredQuestion {
   placeholder?: string;
   /** Max length for text answers (advisory; validator enforces when present). */
   maxLength?:   number;
+  /**
+   * Optional: a provided answer to this question should feed a meeting-agenda
+   * section later. GENERIC — a definition tags its own questions; the agenda layer
+   * (lib/agendaContributions.ts) reads the tag. Untagged questions never surface on
+   * an agenda. UI/validation ignore this entirely (foundation-only wiring).
+   */
+  agendaSection?: AgendaContributionSection;
 }
+
+/** Agenda sections a structured answer can feed (extend as agendas grow). */
+export type AgendaContributionSection = 'announcement' | 'help_needed';
 
 /** A complete, ordered question set — the "form" a report/questionnaire renders. */
 export interface StructuredResponseDefinition {

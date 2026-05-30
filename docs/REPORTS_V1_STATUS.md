@@ -68,6 +68,30 @@ weekly reports" row in the Me Leadership card (with a minimal cycle/due-date
 input) to `generateWeeklyOfficerReports`. Until then this is the documented,
 approved placement — no new screen or Reports tab required.
 
+## Reports → meeting agenda (foundation built, integration deferred)
+
+The strategic loop (Operating Guide step 6) has meeting agendas pull
+announcements + help-needed items from submitted reports. The **pure half is
+built**:
+
+- `StructuredQuestion.agendaSection?: 'announcement' | 'help_needed'` — a generic
+  tag on a question marking that its answer feeds an agenda section.
+- The weekly report tags `announcements → announcement` and
+  `blockers → help_needed` (`lib/reportDefinitions.ts`).
+- `lib/agendaContributions.ts` — pure `extractAgendaContributions(definition,
+  answers, source?)` returns the tagged + text-answered contributions in
+  definition order; `contributionsForSection` + `mergeAgendaContributions` group
+  and combine across officers. "No update" / blank / untagged answers contribute
+  nothing. 14 pure tests.
+
+**Why integration is deferred (not wired into `app/agenda/[eventId].tsx`):**
+surfacing these on the live agenda means fetching *every* officer's submission
+for the cycle — async I/O across the report RPC, which has not been verified on
+device. The agenda screen + `buildAgenda` already document report sections as
+deferred. Wire them only after the report round-trip is device-verified (post
+first build). The data path is now: report answer → `extractAgendaContributions`
+→ agenda "Announcements" / "Help needed" sections.
+
 ## What remains gated (not built, by design)
 
 - **No scheduler / recurring background generation** — generation is manual; the
@@ -76,11 +100,14 @@ approved placement — no new screen or Reports tab required.
 - **No Reports tab** — completion is via Task Detail; report tasks live in the
   normal Tasks lists.
 - **No non-text question types** (select/scale/time reserved in the union only).
+- **No live report→agenda wiring** — the pure extraction exists; the agenda
+  screen does not yet fetch submissions (needs device-verified RPC first).
 - **A new EAS build** is required to exercise the form + RPC round-trip on device.
 
 ## Tests
 All pure-tested: `structuredResponses` (37), `reportDefinitions` (16),
-`reportTasks` (21), `reportSubmissionService` (6), `reportGeneration` (17).
+`reportTasks` (21), `reportSubmissionService` (6), `reportGeneration` (17),
+`agendaContributions` (14).
 
 ---
 

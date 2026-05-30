@@ -54,6 +54,9 @@ export const WEEKLY_OFFICER_REPORT: StructuredResponseDefinition = {
       required: false,
       allowNoUpdate: true,
       placeholder: 'Anything you’re stuck on or need a hand with',
+      // Feeds the meeting agenda's "Help needed" section (foundation-only — see
+      // lib/agendaContributions.ts; not yet wired into the agenda screen).
+      agendaSection: 'help_needed',
     },
     {
       key:    'announcements',
@@ -63,6 +66,8 @@ export const WEEKLY_OFFICER_REPORT: StructuredResponseDefinition = {
       required: false,
       allowNoUpdate: true,
       placeholder: 'Anything everyone should know',
+      // Feeds the meeting agenda's "Announcements" section (foundation-only).
+      agendaSection: 'announcement',
     },
   ],
 };
