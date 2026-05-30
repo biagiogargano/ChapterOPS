@@ -94,13 +94,38 @@ occurrence would be noise.
 - No additional kind defaults without a product decision.
 - No file/photo proof.
 
-## 8. Open product decisions (before more visible work)
+## 8. Settled decisions (alpha)
 
-1. Which additional event kinds should auto-default a template (e.g. should
-   `philanthropy`, `academic`, `risk`, `formal`-style socials get defaults)?
-2. Should custom templates become org-shared (needs Supabase) — and when?
-3. Should `formal` be reachable as its own event kind, or stay a manual template
-   under `social`?
+These were decided to unblock the lane; they constrain near-term work:
+
+1. **No new auto-defaults yet.** Create-time auto-suggested templates stay
+   limited to the current safe cases (`social → date_party`,
+   `recruitment → recruitment`). Do NOT add automatic templates for
+   philanthropy / academic / risk / etc. yet. Pure helpers
+   (`getDefaultTemplateIdForKind`, `kindHasDefaultTemplate`,
+   `defaultTemplateCoverage`) exist to make adding future defaults a one-line,
+   tested change when a decision is made.
+2. **Custom templates stay local/client-side.** No Supabase schema, no template
+   tables, no RLS/RPC. Org-shared templates remain future-planning only.
+3. **Formal is a manual template/subtype under Social — NOT its own event kind.**
+   - Today: an officer creates a `social` event and manually applies the `formal`
+     template. The `formal` template already exists in the registry and is
+     reachable from the template picker.
+   - Do NOT add a `formal` `EventKind`. Adding a kind ripples through audience
+     rules, ROLE_ALLOWED_KINDS, KIND_LABELS/colors, and calendar dots — a much
+     larger change for no current benefit.
+   - **Future direction (when template packs exist):** "Formal" is the canonical
+     example of an **event subtype** — a named template within a parent kind
+     (Social). If/when we introduce subtypes or org template-packs, model Formal
+     as a Social subtype, not a top-level kind. Until then it stays a manual
+     template.
+
+## 9. Remaining future decisions (not blocking)
+
+- Which additional kinds eventually get auto-defaults (revisit per real usage).
+- When/whether custom templates become org-shared (needs Supabase).
+- Whether to introduce a formal "event subtype" concept (parent kind + named
+  template) once more subtypes than just Formal appear.
 
 ---
 
