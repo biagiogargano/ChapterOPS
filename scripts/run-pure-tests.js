@@ -103,23 +103,36 @@ Module._load = function (request, parent, isMain) {
 };
 
 // ── 4. Run every compiled test file ──────────────────────────────────────────
-const testFiles = fs.readdirSync(outLib).filter(f => f.endsWith('.test.js')).sort();
-let anyFail = false;
-const ran        = [];
-const realExit   = process.exit;
-for (const f of testFiles) {
-  ran.push(f.replace('.test.js', ''));
-  process.exit = code => { if (code) anyFail = true; };   // intercept per-suite exit
-  try { require(path.join(outLib, f)); }
-  catch (e) { anyFail = true; console.error('THREW in ' + f + ': ' + ((e && e.stack) || e)); }
+// Suites are dependency-free and assert via console + process.exit. Most are
+// SYNCHRONOUS. An async suite (one with awaited assertions) must export a
+// function `runAsync` returning a Promise — the runner awaits it so its
+// assertions + exit code are captured (a plain async IIFE would resolve AFTER
+// this loop and silently not gate failures).
+async function runAll() {
+  const testFiles = fs.readdirSync(outLib).filter(f => f.endsWith('.test.js')).sort();
+  let anyFail = false;
+  const ran      = [];
+  const realExit = process.exit;
+  for (const f of testFiles) {
+    ran.push(f.replace('.test.js', ''));
+    process.exit = code => { if (code) anyFail = true; };   // intercept per-suite exit
+    try {
+      const mod = require(path.join(outLib, f));
+      if (mod && typeof mod.runAsync === 'function') {
+        await mod.runAsync();   // awaited async suite (captures its asserts/exit)
+      }
+    } catch (e) { anyFail = true; console.error('THREW in ' + f + ': ' + ((e && e.stack) || e)); }
+  }
+  process.exit = realExit;
+
+  // ── 5. Coverage guard + cleanup ────────────────────────────────────────────
+  const missing = EXPECTED.filter(n => !ran.includes(n));
+  if (missing.length) { anyFail = true; console.error('pure tests: missing expected suites: ' + missing.join(', ')); }
+
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) { /* best effort */ }
+
+  console.log('\npure tests: ran ' + ran.length + ' suites — ' + (anyFail ? 'FAILED' : 'all passed'));
+  process.exit(anyFail ? 1 : 0);
 }
-process.exit = realExit;
 
-// ── 5. Coverage guard + cleanup ──────────────────────────────────────────────
-const missing = EXPECTED.filter(n => !ran.includes(n));
-if (missing.length) { anyFail = true; console.error('pure tests: missing expected suites: ' + missing.join(', ')); }
-
-try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) { /* best effort */ }
-
-console.log('\npure tests: ran ' + ran.length + ' suites — ' + (anyFail ? 'FAILED' : 'all passed'));
-process.exit(anyFail ? 1 : 0);
+void runAll();
