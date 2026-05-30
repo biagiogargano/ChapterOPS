@@ -49,11 +49,18 @@ fallback to `sigma_chi`), `isKnownStarterPackId`. The `sigma_chi` pack is *deriv
 from* the live constants (roles/levels/exceptions/template+questionnaire ids/agenda
 sections), so it describes current behavior without changing it. **Not wired** —
 nothing imports it yet.
-**Next sub-steps:** (a) wire `activeStarterPack` at call sites that currently import
-catalogs directly (behavior-identical refactor); (b) add a second org-type pack as
-data to prove genericity; (c) org-type selection UI only after (a)/(b). **No org-type
-picker UI yet** (fake until wired). Custom/org-created roles stay **Supabase-gated**.
-Plan: `ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–4.
+**Sub-step (a) STARTED — first read site wired:** the Me-tab questionnaire card now
+reads `{ definitionId, roles }` from the active pack via
+`lib/questionnaireGenerationPlan.planQuestionnaireGeneration(org.template)` instead
+of hardcoding `WEEKLY_OFFICER_REPORT_ID` + `OFFICER_ROLES`. Behavior-identical for
+alpha (sigma_chi + fallback); 15 tests lock that in.
+**Still direct (intentional):** assignment/reviewer picker (`task/create.tsx` —
+permission risk, Category C), event-audience composition + template picker
+(`event/*`, `templates/edit.tsx` — Category B, low-level pack data, no behavior win
+yet). **Next sub-steps:** (b) add a second org-type pack as data to prove
+genericity; (c) org-type selection UI only after a real second pack exists (fake
+until then). Custom/org-created roles stay **Supabase-gated**. Plan:
+`ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–4.
 
 ### 5. Agenda integration from questionnaire answers — partly Supabase-gated
 Wire the pure `agendaContributions.ts` into the agenda screen: fetch a cycle's

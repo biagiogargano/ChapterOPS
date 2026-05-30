@@ -2,10 +2,11 @@ import { useAuth } from '@/lib/auth';
 import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { OFFICER_ROLES, ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
+import { ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { generateQuestionnaireTasks } from '@/lib/reportGeneration';
-import { WEEKLY_OFFICER_REPORT_ID, getQuestionnaireDefinition } from '@/lib/reportDefinitions';
+import { getQuestionnaireDefinition } from '@/lib/reportDefinitions';
+import { planQuestionnaireGeneration } from '@/lib/questionnaireGenerationPlan';
 import { weeklyCycleId, defaultWeeklyDueDate } from '@/lib/questionnaireCycle';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -83,14 +84,16 @@ function OrgOption({
  *  • Due date defaults to 7 days out (documented default — no per-org pref yet).
  *  • No scheduler, no push, no Supabase — one on-demand button press.
  */
-function QuestionnaireGeneratorCard({ orgId }: { orgId: string }) {
+function QuestionnaireGeneratorCard({ orgId, orgTemplate }: { orgId: string; orgTemplate?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Alpha default template + targets. The label comes from the definition itself,
-  // so the card never hardcodes the words "officer report".
-  const definitionId = WEEKLY_OFFICER_REPORT_ID;
+  // What to generate comes from the org's active starter pack (lib/starterPacks)
+  // via a pure resolver — behavior-identical for the Sigma Chi alpha (and for any
+  // unknown/missing template, which falls back to sigma_chi). The label still comes
+  // from the definition itself, so the card never hardcodes "officer report".
+  const { definitionId, roles } = planQuestionnaireGeneration(orgTemplate);
   const templateLabel = getQuestionnaireDefinition(definitionId)?.label ?? 'questionnaire';
 
   // Confirm before creating real tasks for every officer role (it's idempotent, but
@@ -118,7 +121,7 @@ function QuestionnaireGeneratorCard({ orgId }: { orgId: string }) {
       const res = generateQuestionnaireTasks({
         orgId,
         definitionId,
-        roles:   OFFICER_ROLES,
+        roles,
         cycle:   weeklyCycleId(definitionId, now),
         dueDate: defaultWeeklyDueDate(now),
       });
@@ -270,7 +273,7 @@ export default function MeScreen() {
 
       {/* ── Create questionnaire tasks (President / Pro Consul / Annotator) ── */}
       {QUESTIONNAIRE_GENERATOR_ROLES.includes(role) && !!activeOrgId && (
-        <QuestionnaireGeneratorCard orgId={activeOrgId} />
+        <QuestionnaireGeneratorCard orgId={activeOrgId} orgTemplate={organization?.template} />
       )}
 
       {/* ── Sign out ── */}
