@@ -149,7 +149,10 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
    applied): a `goals` table + v1 RPCs in the reports pattern; goal **updates reuse
    `task_report_submissions`** for v1 (no new table); open product decisions listed.
 5. **Apply Supabase** — only after explicit approval (own lane).
-6. **Goals tab** (list + create + detail).
+6. **Goals tab** (list + create + detail). *MVP BUILT* (`app/(tabs)/goals.tsx`):
+   list active goals, create / edit / complete / archive via `lib/goalService` (the
+   live RPCs). Real + persisted; needs device testing in the next build. Goal-update
+   task generation NOT wired (step 7 stays future).
 7. **Generated update tasks** from goal cadence (reuses generation stack).
    *Pure builder DONE* (`lib/goalUpdateTasks.ts`, 34 tests): deterministic
    `goalupd_<goalId>_<period>` ids, `buildGoalUpdateTask`,
