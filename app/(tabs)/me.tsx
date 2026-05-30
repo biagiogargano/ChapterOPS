@@ -9,7 +9,7 @@ import { WEEKLY_OFFICER_REPORT_ID, getQuestionnaireDefinition } from '@/lib/repo
 import { weeklyCycleId, defaultWeeklyDueDate } from '@/lib/questionnaireCycle';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // Roles allowed to manually generate questionnaire tasks in the alpha (President,
 // Pro Consul, Annotator). Explicit set — narrower than isLeadershipRole (which is
@@ -93,7 +93,22 @@ function QuestionnaireGeneratorCard({ orgId }: { orgId: string }) {
   const definitionId = WEEKLY_OFFICER_REPORT_ID;
   const templateLabel = getQuestionnaireDefinition(definitionId)?.label ?? 'questionnaire';
 
+  // Confirm before creating real tasks for every officer role (it's idempotent, but
+  // a first press still creates tasks for real people). Generation runs only after
+  // the user taps "Create tasks".
   function handleGenerate() {
+    if (busy) return;
+    Alert.alert(
+      'Create questionnaire tasks?',
+      'This will create this cycle’s Weekly Officer Report tasks for officer roles. It is safe to run again; existing tasks will be skipped.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Create tasks', style: 'default', onPress: runGenerate },
+      ],
+    );
+  }
+
+  function runGenerate() {
     if (busy) return;
     setBusy(true);
     setError(null);
