@@ -127,5 +127,58 @@ check('eb minutes → annotator/+1/link proof/no review',
 check('meeting proof types are link-only',
   [...cm, ...eb].every(t => !t.requiresProof || t.proofType === 'link'));
 
+// ── Registry-wide invariants (protect EVERY current + future template) ────────
+// These guard the foundation: a new template entry that violates any of these
+// would fail CI, catching authoring mistakes (self-review, dup keys, bad proof).
+
+const KNOWN_ROLES = new Set<string>([
+  'president', 'pro_consul', 'annotator', 'quaestor', 'magister', 'kustos',
+  'tribune', 'risk_manager', 'social_chair', 'recruitment_chair',
+  'philanthropy_chair', 'scholarship_chair', 'house_manager', 'brother',
+]);
+// Roles that can be a reviewer/approver (leadership). Keep in sync with
+// lib/roles LEADERSHIP_ROLES; templates today use president / pro_consul.
+const APPROVER_ROLES = new Set<string>(['president', 'pro_consul']);
+
+for (const t of EVENT_TEMPLATES) {
+  // 1. Spec keys unique within the template (deterministic ids must not collide).
+  const keys = t.taskSpecs.map(s => s.key);
+  check(`[${t.id}] spec keys are unique`, new Set(keys).size === keys.length);
+
+  for (const spec of t.taskSpecs) {
+    // 2. Every assigned role is a known role.
+    check(`[${t.id}/${spec.key}] assignedRole is known`, KNOWN_ROLES.has(spec.assignedRole));
+    // 3. Approval tasks: reviewer present, a valid approver, and NOT the assignee.
+    if (spec.requiresApproval) {
+      check(`[${t.id}/${spec.key}] approval task has a reviewer`, !!spec.reviewerRole);
+      check(`[${t.id}/${spec.key}] reviewer is a leadership approver`,
+        !!spec.reviewerRole && APPROVER_ROLES.has(spec.reviewerRole));
+      check(`[${t.id}/${spec.key}] reviewer differs from assignee`,
+        spec.reviewerRole !== spec.assignedRole);
+    }
+    // 4. Proof tasks declare a proofType; alpha exposes text/link only.
+    if (spec.requiresProof) {
+      check(`[${t.id}/${spec.key}] proof task has a text/link proofType`,
+        spec.proofType === 'text' || spec.proofType === 'link');
+    }
+    // 5. Offsets are integers (date math is whole-day).
+    check(`[${t.id}/${spec.key}] dueOffsetDays is an integer`,
+      Number.isInteger(spec.dueOffsetDays));
+  }
+}
+
+// 6. Template ids are globally unique across the registry.
+{
+  const ids = EVENT_TEMPLATES.map(t => t.id);
+  check('template ids are globally unique', new Set(ids).size === ids.length);
+}
+
+// 7. Generated task ids are globally unique for a single event (no collisions
+//    across templates/specs sharing the same event id).
+{
+  const ids = allTemplateTaskIdsForEvent('evt-x');
+  check('all generated ids unique per event', new Set(ids).size === ids.length);
+}
+
 console.log(`\neventTemplates.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
