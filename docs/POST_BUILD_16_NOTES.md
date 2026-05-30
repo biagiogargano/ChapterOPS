@@ -28,6 +28,12 @@ RLS, RPC, auth, flags, push-scope, or new systems.**
   branch could never render; its message was misleading. Reviewer picker behavior
   is unchanged.
 
+### Tasks tab
+- **Empty state is context-aware.** Instead of a generic "No tasks match this
+  filter", it now reads per situation: a search with no hits shows
+  "No tasks match "<query>"", the Done filter shows "Nothing completed yet.",
+  and the To Do filter shows "Nothing to do right now."
+
 ### Event Detail
 - (Build 16 already hid the empty About section.) No further changes — the screen
   was already clean.
@@ -56,9 +62,25 @@ RLS, RPC, auth, flags, push-scope, or new systems.**
 - `npm run test:pure` → 19 suites pass (added `todayFeed`; `eventTemplates`
   expanded to 150).
 
+## Audited & already clean (no changes needed)
+
+A multi-lane clarity sweep confirmed these surfaces are already clear and were
+left untouched (no manufactured churn):
+- **Calendar / event list** — month grid with per-kind color dots + task-day
+  markers, day detail with item count, EVENTS / TASKS DUE sections, clear
+  "Nothing scheduled" empty state, and event cards already showing kind label,
+  audience label ("Mandatory" / "Officers Only" / "Optional · RSVP required"),
+  time/location, and recurring badge.
+- **Event Detail linked tasks** — PREP/RELATED label, "Generated from this
+  event's template" hint, per-card AUTO/ADDED tags, progress count, role-aware
+  empty states.
+- **Create / Edit Event** — labeled fields, honest inline template preview
+  (tasks the template creates, with role/timing/approval/proof), template hint,
+  and a clear "no event types available" guard for roles with no allowed kinds.
+
 ## Commit range
-`8fe71fc..2a508fe` (8 commits): template invariants/accessors/docs (×4), Today
-clarity (×3), create-task dead-code cleanup (×1).
+`8fe71fc..HEAD`: template invariants/accessors/docs, Today clarity (×3),
+create-task dead-code cleanup, Tasks-tab empty-state clarity, and these notes.
 
 ## Build status
 Development-only. The next TestFlight build is **not** justified by these changes
