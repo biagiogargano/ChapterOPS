@@ -867,6 +867,7 @@ function ReportFormSection({
   return (
     <View>
       <SLabel text={definition.label.toUpperCase()} />
+      <Text style={s.reportIntro}>Answer the questions below, then tap Submit. Required questions must be filled (or marked “No update” where allowed).</Text>
       <View style={{ gap: 14, marginTop: 4 }}>
         {questions.map(q => {
           const a        = answers[q.key];
@@ -1622,6 +1623,7 @@ const s = StyleSheet.create({
   reportNoUpdateLabel:{ fontSize: 13, color: '#94a3b8', fontWeight: '500' },
   reportNoUpdateTag:  { fontSize: 13, color: '#818cf8', fontWeight: '600', fontStyle: 'italic' },
   reportHint:         { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 8 },
+  reportIntro:        { fontSize: 12, color: '#94a3b8', lineHeight: 17, marginTop: 4 },
   reportUnavailable:     { backgroundColor: '#1a0505', borderRadius: 10, borderWidth: 1, borderColor: '#7f1d1d', padding: 14 },
   reportUnavailableText: { fontSize: 13, color: '#fca5a5', lineHeight: 19 },
 
