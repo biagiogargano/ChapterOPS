@@ -99,9 +99,11 @@ nothing wired/applied):
 
 **Storage gate CLEARED** — `supabase/goals_v1_draft.sql` is **applied + verified on
 alpha** (RLS on, 0 policies, 6 SECURITY DEFINER RPCs, table locked to definer RPCs).
-Next safe step is the **client goal service** (`lib/goalService.ts`, fallback-safe
-RPC wrappers, pure-testable in dev — no build needed), then the **Goals tab** against
-the live RPCs (real/persisted only — never a fake local tab).
+**Client service DONE** — `lib/goalService.ts` (fallback-safe wrappers over all 6
+RPCs: createGoal / listGoalsForOrg / listMyGoals / updateGoal / completeGoal /
+archiveGoal; never throws; maps rows → `Goal`; 15 tests). **Not wired** — nothing
+imports it yet. Next: the **Goals tab** against the live RPCs (real/persisted only —
+never a fake local tab).
 
 Still gated for the tab to be USER-usable: device verification (a build) of the
 goal CRUD + the questionnaire/update round-trip. Build/EAS still requires an explicit
