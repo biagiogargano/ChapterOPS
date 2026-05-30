@@ -6,21 +6,24 @@ latest cut/submitted TestFlight build.** This doc summarizes everything on
 EAS build has been made.** Cut only on explicit "cut the build" or a live-alpha
 blocker.
 
-Base: Build 16 = commit `8fe71fc`. Range: `8fe71fc..HEAD` (28 commits).
+Base: Build 16 = commit `8fe71fc`. Range: `8fe71fc..HEAD` (34 commits).
 
 This consolidates `docs/POST_BUILD_16_NOTES.md` (clarity polish + helper
-extractions) and adds the **Reports V1** chain and the **agenda contribution
-foundation** built afterward.
+extractions), the **Reports V1** chain, the **agenda contribution foundation**, and
+the **product-doctrine re-anchor + generic questionnaire** work built afterward.
 
 ---
 
 ## Theme
 
-Two threads: (1) **clarity polish + pure-helper extraction** across Today, Tasks,
+Three threads: (1) **clarity polish + pure-helper extraction** across Today, Tasks,
 Create Task, and the event-template registry (no behavior change beyond copy);
-(2) the **Reports V1 vertical slice** — a generic structured-response system
-(officer weekly reports) built end to end from primitive → storage → form →
-generation, plus the pure seam for feeding report answers into meeting agendas.
+(2) the **structured-response / questionnaire vertical slice** — a generic system
+built end to end from primitive → storage → form → generation, with the Weekly
+Officer Report as the Sigma Chi alpha template, plus the pure seam for feeding
+answers into meeting agendas; (3) a **product re-anchor**: ChapterOPS is
+organization-operations software, Sigma Chi is the alpha pack — the questionnaire
+feature was generalized accordingly (generic templates + generic generation).
 
 One Supabase change was applied this cycle (the reports submission table + RPCs);
 everything else is client/docs/tests. No auth, RLS-policy-on-existing-tables, or
@@ -71,6 +74,32 @@ push-scope change.
 - **Event-template registry** invariants/accessors and **Today/Tasks** display
   helpers (from post-Build-16): all pure + unit-tested.
 
+## Product re-anchor + generic questionnaire work (docs + pure foundation)
+
+The structured-response feature was generalized so it is not a fraternity
+officer-reports system. No live-user behavior change; no Supabase.
+
+- **Product doctrine** (`docs/PRODUCT_ARCHITECTURE_AND_SCALE_DOCTRINE.md`):
+  ChapterOPS is organization-operations software; Sigma Chi is the alpha pack. The
+  generic-primitives table, defaults-vs-core rule, build decision filter, and
+  stop-doing list are now the standing contract.
+- **Generic questionnaire templates** (`lib/questionnaireTemplates.ts`): three
+  org-neutral definitions — Event Recap, Weekly Team Check-In, Availability/Status
+  Check — registered through the same registry as the Weekly Officer Report (the
+  alpha template). Proves the primitive is cross-org. 31 tests.
+- **Generic vocabulary** (`lib/structuredResponses.ts`,
+  `lib/reportDefinitions.ts`): `Questionnaire*` type aliases,
+  `QUESTIONNAIRE_DEFINITIONS` / `getQuestionnaireDefinition` over the same lookup.
+- **Generic generation** (`lib/reportGeneration.ts`): `generateQuestionnaireTasks`
+  is now a real generic entry point (explicit definition + roles, no forced
+  fraternity defaults, fail-safe, idempotent). `generateWeeklyOfficerReports`
+  stays the Sigma Chi preset.
+- **Plans (docs only):** `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md` (the eventual
+  "Create questionnaire tasks" trigger — generic copy, Me/Leadership card, not a
+  Reports tab) and `docs/GOALS_PROGRESS_LAYER_PLAN.md` (future goals layer, kept
+  separate from tasks, gated on its own Supabase lane). Roadmap in
+  `docs/STRUCTURED_RESPONSE_ROADMAP.md`.
+
 ## Supabase change applied this cycle
 
 - `task_report_submissions` table + `upsert_task_report_submission` /
@@ -99,15 +128,22 @@ push-scope change.
   fallback-safe path in tests. First on-device use needs a build.
 - **No live report→agenda wiring** — the pure extraction exists; the agenda
   screen does not yet fetch submissions.
+- **No questionnaire generation UI** — `generateQuestionnaireTasks` is generic and
+  tested but has no caller; the trigger is designed
+  (`docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md`) but not wired (real-user impact +
+  device-unverified RPC).
+- **No goals/progress layer** — planned only (`docs/GOALS_PROGRESS_LAYER_PLAN.md`);
+  needs its own future Supabase lane.
 
 ## Tests
 
 - `npx tsc --noEmit` → clean.
-- `npm run test:pure` → **26 suites pass**, including the Reports V1 +
+- `npm run test:pure` → **27 suites pass**, including the questionnaire +
   agenda-contribution suites: `structuredResponses` (37), `reportDefinitions`
-  (16), `reportTasks` (21), `reportSubmissionService` (6), `reportGeneration`
-  (17), `agendaContributions` (14), plus `todayFeed`, `taskListView`,
-  `eventTemplates` (155), `orgLevels`, `taskAssignment`, and the rest.
+  (16), `questionnaireTemplates` (31), `reportTasks` (21),
+  `reportSubmissionService` (6), `reportGeneration` (26), `agendaContributions`
+  (14), plus `todayFeed`, `taskListView`, `eventTemplates` (155), `orgLevels`,
+  `taskAssignment`, and the rest.
 
 ## Smallest manual test list (once a build is cut)
 
@@ -132,6 +168,8 @@ leadership reader → read-only answers shown; as a non-reader → no data.
 
 ## Status
 
-Bundled, checks green (tsc clean, 26 pure suites), **not cut**. The clarity
-changes ride along; Reports V1 needs a generation trigger and a build before it is
-user-usable. Cut only on explicit "cut the build" or a live-alpha blocker.
+Bundled, checks green (tsc clean, 27 pure suites), **not cut**. The clarity
+changes ride along; the questionnaire feature needs a generation trigger and a
+build before it is user-usable. **No build recommended** by these changes alone —
+no native/dependency change, no live-alpha blocker. Cut only on explicit "cut the
+build" or a live-alpha blocker.
