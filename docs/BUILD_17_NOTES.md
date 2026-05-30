@@ -118,58 +118,90 @@ officer-reports system. No live-user behavior change; no Supabase.
 - No Reports tab, no scheduler, no reminders, no new event systems, no template
   builder UI, no AI.
 
+### Questionnaire generation trigger (NEW — wired, sandbox-testable)
+
+- A **"Create questionnaire tasks"** card on the **Me tab**, gated to **President /
+  Pro Consul / Annotator**. Helper text: "Creates tasks from a questionnaire
+  template. Safe to press again." Shows the selected template's label (Weekly
+  Officer Report for alpha).
+- Calls the generic `generateQuestionnaireTasks` (template + officer roles +
+  ISO-week cycle id + due-in-7-days). **Idempotent** — re-press creates nothing
+  new. Inline success (created/skipped counts) or inline error.
+- This creates the report **tasks**; **submitting** a task still writes through the
+  `task_report_submissions` RPC, which remains device-unverified (see gated list).
+
 ## Gated / not user-reachable yet (by design)
 
-- **No trigger for report generation.** `generateWeeklyOfficerReports` has no UI
-  caller, so no report tasks exist for a user to open. Documented placement: a
-  future leadership-gated row on the Me screen Leadership card, wired only after
-  device verification (`docs/REPORTS_V1_STATUS.md`).
-- **Report form + RPC round-trip never run on device** — only against the
-  fallback-safe path in tests. First on-device use needs a build.
-- **No live report→agenda wiring** — the pure extraction exists; the agenda
-  screen does not yet fetch submissions.
-- **No questionnaire generation UI** — `generateQuestionnaireTasks` is generic and
-  tested but has no caller; the trigger is designed
-  (`docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md`) but not wired (real-user impact +
-  device-unverified RPC).
+- **Submission round-trip never run on device.** The questionnaire form +
+  `task_report_submissions` RPC have only run against the fallback-safe path in
+  tests. Generation works in-app now, but persisting answers needs a build to
+  verify on device.
+- **No live answers→agenda wiring** — the pure extraction
+  (`agendaContributions.ts`) exists; the agenda screen does not yet fetch
+  submissions.
 - **No goals/progress layer** — planned only (`docs/GOALS_PROGRESS_LAYER_PLAN.md`);
   needs its own future Supabase lane.
+- **No scheduler / reminders / push / Reports tab** — generation is one manual tap.
 
 ## Tests
 
 - `npx tsc --noEmit` → clean.
-- `npm run test:pure` → **27 suites pass**, including the questionnaire +
+- `npm run test:pure` → **28 suites pass**, including the questionnaire +
   agenda-contribution suites: `structuredResponses` (37), `reportDefinitions`
-  (16), `questionnaireTemplates` (31), `reportTasks` (21),
-  `reportSubmissionService` (6), `reportGeneration` (26), `agendaContributions`
-  (14), plus `todayFeed`, `taskListView`, `eventTemplates` (155), `orgLevels`,
-  `taskAssignment`, and the rest.
+  (16), `questionnaireTemplates` (31), `questionnaireCycle` (12), `reportTasks`
+  (21), `reportSubmissionService` (6), `reportGeneration` (26),
+  `agendaContributions` (14), plus `todayFeed`, `taskListView`,
+  `eventTemplates` (155), `orgLevels`, `taskAssignment`, and the rest.
 
-## Smallest manual test list (once a build is cut)
+## Manual test checklist
 
-Reports V1 cannot be exercised until a generation trigger exists or report tasks
-are seeded. The non-report clarity changes are testable now in the sandbox:
+### Testable now (sandbox / in-app, no build needed)
 1. **Today** with mixed due dates → overdue listed first, accurate summary line,
    red header only when overdue exists.
 2. **Tasks tab** → empty states read correctly for search-miss / Done / To Do.
 3. **Create Task** → reviewer picker behaves; no stale empty-state copy.
+4. **Questionnaire generation** (as President / Pro Consul / Annotator):
+   - Me tab shows the "Create questionnaire tasks" card; other roles do **not**
+     see it.
+   - Press it → success line shows a created count; one questionnaire task per
+     officer role appears in the Tasks list, titled "Weekly Officer Report — <role>".
+   - **Press again → "No new tasks · N already existed"** (idempotent, no dupes).
+   - Generated cards show **no proof icon and no "Reviewed by"** label (correct —
+     questionnaires have neither).
 
-Reports V1 on-device checklist (deferred until generation + build exist):
-seed/generate a weekly report task → open as assignee → fill required prompts,
-toggle "No update" on an optional one → Submit → task shows Done → reopen as a
-leadership reader → read-only answers shown; as a non-reader → no data.
+### Requires the next build (on-device, exercises the RPC)
+5. Open a generated questionnaire task as its **assignee** → fill required prompts,
+   toggle "No update" on an optional one → **Submit Response** → task shows **Done**.
+6. Reopen as a **leadership reader** (President / Pro Consul / Annotator) →
+   read-only answers shown. As a **non-reader** role → no answer data.
+7. Re-submit / edit path: reopen as assignee before submit → "Not submitted yet."
+
+## Gated next steps (explicit)
+
+**Requires EAS build + on-device testing:**
+- Verify the questionnaire submission round-trip (steps 5–7) against the live
+  `task_report_submissions` RPC + deny-by-default table — the first real use is the
+  real test. **No build is cut without an explicit "cut the build."**
+
+**Requires future Supabase work (separate approved lanes):**
+- **Live answers→agenda wiring** — fetch per-cycle submissions and render the
+  agenda sections from `agendaContributions.ts`.
+- **Goals/progress layer** — a `goals` + `goal_progress_updates` schema/RLS/RPC
+  set per `docs/GOALS_PROGRESS_LAYER_PLAN.md`. **Do not build goals yet.**
+- Any rename of `task_report_submissions` / RPCs (a migration).
 
 ## Known risks / notes
 
-- Reports V1 is **code-complete but device-unverified**; treat the first on-device
-  report round-trip as the real test of the RPC + deny-by-default table.
-- The reports RPCs are auto-granted EXECUTE to `anon` by Supabase default — safe:
-  the RPCs reject unauthenticated callers and the table has no anon grant.
+- The questionnaire chain is **code-complete and generation is live in-app, but the
+  submission round-trip is device-unverified**; treat the first on-device submit as
+  the real test of the RPC + deny-by-default table.
+- The submission RPCs are auto-granted EXECUTE to `anon` by Supabase default —
+  safe: the RPCs reject unauthenticated callers and the table has no anon grant.
 
 ## Status
 
-Bundled, checks green (tsc clean, 27 pure suites), **not cut**. The clarity
-changes ride along; the questionnaire feature needs a generation trigger and a
-build before it is user-usable. **No build recommended** by these changes alone —
-no native/dependency change, no live-alpha blocker. Cut only on explicit "cut the
-build" or a live-alpha blocker.
+Bundled, checks green (tsc clean, 28 pure suites), **not cut**. Questionnaire
+generation is now usable in-app; submission persistence needs a build to verify on
+device. **No build recommended** by these changes alone — no native/dependency
+change, no live-alpha blocker. Cut only on explicit "cut the build" or a live-alpha
+blocker.
