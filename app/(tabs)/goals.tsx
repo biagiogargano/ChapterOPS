@@ -147,7 +147,9 @@ export default function GoalsScreen() {
             </Pressable>
           </View>
         ) : activeGoals.length === 0 ? (
-          <Text style={s.empty}>No goals yet.</Text>
+          <Text style={s.empty}>
+            {canCreate ? 'No goals yet. Tap "+ New goal" to add one.' : 'No goals for your role yet.'}
+          </Text>
         ) : (
           activeGoals.map(g => (
             <GoalCard key={g.id} goal={g} canManage={canManageGoal(g, role, currentMemberId)} onChanged={() => void load()} />
@@ -288,20 +290,24 @@ function CreateGoalForm({
 
   return (
     <View style={s.form}>
-      <Text style={s.formLabel}>NEW GOAL{canChooseOwner ? ' (you can add several)' : ''}</Text>
+      <Text style={s.formLabel}>NEW GOAL</Text>
       <TextInput
         style={[s.input, { minHeight: 44 }]}
-        placeholder="Goal title — one per line or separated by ;"
+        placeholder="What's the goal? e.g. Recruit 12 new members"
         placeholderTextColor="#475569"
         value={title}
         onChangeText={t => { setTitle(t); setErr(null); }}
         multiline
       />
+      <Text style={s.helperText}>Add multiple goals at once by separating them with a new line or a semicolon (;).</Text>
       {titles.length > 1 && <Text style={s.ownerNote}>{titles.length} goals will be created.</Text>}
+
+      <Text style={s.ownerLabel}>PROGRESS (OPTIONAL)</Text>
       <View style={s.row2}>
-        <TextInput style={[s.input, s.flex1]} placeholder="Current" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
-        <TextInput style={[s.input, s.flex1]} placeholder="Target" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
+        <TextInput style={[s.input, s.flex1]} placeholder="Current #" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
+        <TextInput style={[s.input, s.flex1]} placeholder="Target #" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
       </View>
+
       <Text style={s.ownerLabel}>UPDATE CHECK-IN</Text>
       <View style={s.cadenceRow}>
         {CADENCE_OPTIONS.map(opt => (
@@ -310,12 +316,12 @@ function CreateGoalForm({
           </Pressable>
         ))}
       </View>
-      <Text style={s.helperText}>This controls how often this goal should be reviewed later. It does not create reminders yet.</Text>
+      <Text style={s.helperText}>How often should this goal be reviewed? This does not create reminders yet.</Text>
 
       {/* Owner role: leadership/annotator picks; officers are locked to their own. */}
       {canChooseOwner ? (
         <>
-          <Text style={s.ownerLabel}>OWNER ROLE</Text>
+          <Text style={s.ownerLabel}>WHO IS THIS GOAL FOR?</Text>
           <View style={s.cadenceRow}>
             {OFFICER_ROLES.map(r => (
               <Pressable key={r} style={[s.chip, ownerRole === r && s.chipOn]} onPress={() => setOwnerRole(r)}>
@@ -325,7 +331,7 @@ function CreateGoalForm({
           </View>
         </>
       ) : (
-        <Text style={s.ownerNote}>Owner: {ROLE_LABELS[ownerRole] ?? ownerRole}</Text>
+        <Text style={s.ownerNote}>For your role: {ROLE_LABELS[ownerRole] ?? ownerRole}</Text>
       )}
 
       {err && <Text style={s.errorText}>{err}</Text>}
