@@ -26,7 +26,9 @@ import {
 import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
 import { NO_TEMPLATE, getDefaultTemplateIdForKind, dueOffsetLabel } from '@/lib/eventTemplates';
-import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import { buildTasksForTemplateId, getTemplateById, getCustomTemplates, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
+import { getTemplateOptionsForOrgTemplate } from '@/lib/templatePackView';
+import { useIdentity } from '@/lib/identityStore';
 import SearchablePicker from '@/components/SearchablePicker';
 import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
 import { insertTask } from '@/lib/taskService';
@@ -454,9 +456,12 @@ export default function CreateEventScreen() {
   const [errors,      setErrors     ] = useState<string[]>([]);
   const [saving,      setSaving      ] = useState(false);   // create-path sync in flight
 
-  // Merged built-in + custom templates for the picker (reactive to edits).
+  // Built-in templates now come from the org's active starter pack (behavior-
+  // identical for the Sigma Chi alpha — that pack lists exactly EVENT_TEMPLATES);
+  // custom templates still merge after, exactly as before. Reactive to custom edits.
   useCustomTemplatesVersion();
-  const templateOptions = mergedTemplateOptions();
+  const { organization } = useIdentity();
+  const templateOptions = getTemplateOptionsForOrgTemplate(organization?.template, getCustomTemplates());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const selectedTemplateLabel = templateOptions.find(o => o.id === templateId)?.label ?? 'None';
   // Specs of the selected template, for the preview (read-only; same data the

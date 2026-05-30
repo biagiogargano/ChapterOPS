@@ -30,6 +30,7 @@ const EXPECTED = [
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'questionnaireCycle',
   'questionnaireGenerationFlow', 'questionnaireGenerationPlan', 'questionnaireTemplates',
   'reportDefinitions', 'rolePackRuntime', 'starterPacks', 'starterPackValidation',
+  'templatePackView',
   'reportGeneration', 'reportSubmissionService', 'reportTasks', 'roles',
   'routeTarget', 'structuredResponses', 'taskAssignment', 'taskCompletion',
   'taskListView', 'todayFeed',
