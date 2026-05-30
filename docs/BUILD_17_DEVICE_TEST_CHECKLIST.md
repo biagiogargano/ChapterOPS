@@ -68,9 +68,20 @@ real/persisted — a failed RPC must show an error, never a fake success.
       goal** (title, current, target, a cadence chip) → it **appears in the list**
       after refresh (persisted, not local). A **Brother / non-officer** sees **no
       create form**.
+- [ ] **Goal type — numeric:** with **GOAL TYPE = "Measurable number"**, set Current #
+      / Target # → the card shows "cur/tgt · NN%" and a progress bar.
+- [ ] **Goal type — status/outcome:** with **GOAL TYPE = "Status / outcome"**, enter
+      Current status + Target outcome (free text) → the card shows "current → target"
+      and **no bar**. Reopen the goal → the text **persisted** (came from the DB).
+      Edit it → the text inputs (not number inputs) appear and save.
 - [ ] **Bulk create:** enter **multiple titles** (one per line, or separated by `;`)
-      → pressing **Create N** creates one goal per title (current/target/cadence/owner
-      shared). Partial failure shows "Created X of N…" and still refreshes.
+      → pressing **Create N** creates one goal per title (value fields/cadence/owner
+      shared). Partial failure shows "Created X of N…" and still refreshes. (Bulk text
+      goals share the same status/outcome for now.)
+- [ ] **Goal-assigned notice (in-app, no push):** as **leadership**, create a goal for
+      **another** officer role → sign in as that officer → the **Notifications** screen
+      shows "New goal assigned: <title>". Tapping it dismisses it and opens the Goals
+      tab. Creating a goal for **your own** role notifies **no one**. No push fires.
 - [ ] **Owner selector:** as **leadership/Annotator**, the form shows an **OWNER ROLE**
       picker (officer roles) — choose the officer the goal is for. As a non-leadership
       **officer**, no picker — owner is locked to their own role (no "switch role

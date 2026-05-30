@@ -37,14 +37,21 @@ Keep this doc current: when a lane finishes, move it to "Done" with its commit.
 2. `task_available_at_patch_draft.sql` — tasks.available_at. → update windows.
 3. `update_notices_goal_entity_patch_draft.sql` — entity_type allows 'goal'. → goal notices.
 
-**NEXT CLIENT SPRINT now unblocked (storage live, safe to wire):**
-- Goals create/edit **text-value input** (valueKind toggle → target_text/current_text);
-  `goalDisplay`/`goalService` mapping already support it.
-- **Goal-assigned in-app notice** emit at the leadership goal-create site (the pure
-  `buildGoalAssignedNotice` builder exists) + Notifications nav for entityType 'goal'.
-- **Update-window** read display in Task Detail/Today via `taskWindow` once a
-  generation step sets `available_at` (still needs the weekly-update generation
-  product decision).
+**Client sprint WIRED (storage live):**
+- ✅ Goals create/edit **text/status values** — GOAL TYPE toggle (Measurable number /
+  Status outcome); card renders both via `goalDisplay`. (`app/(tabs)/goals.tsx`)
+- ✅ **Goal-assigned in-app notice** — `emitGoalAssignedNotice` at the leadership
+  goal-create site (no push; no-ops for self/own-role/all); Notifications opens the
+  Goals tab on tap. (`goals.tsx`, `notifications.tsx`, `updateNoticeStore`)
+- ✅ **available_at mapping** — `tasks.available_at ↔ MockTask.availableAt` (taskService).
+
+**Still gated (next, needs a product decision — NOT just SQL):**
+- **Weekly goal-update task GENERATION** — when/how it's created (cadence + window +
+  who triggers). This is what would SET `available_at` and use
+  `buildGoalUpdateDefinition` + `taskWindow`. Until decided, the update-window LOCK UI
+  and goal-linked update tasks stay unwired (no fake locks/tasks).
+- Goal-update → leadership review flow + update history UI (Phase D).
+- Editable agenda persistence (own SQL lane).
 
 **Requires further product decision (NOT just SQL):**
 - When/how the weekly goal-update task is generated (cadence + window + who triggers).
