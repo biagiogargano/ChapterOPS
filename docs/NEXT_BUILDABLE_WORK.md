@@ -25,10 +25,21 @@ Keep this doc current: when a lane finishes, move it to "Done" with its commit.
 
 **Should WAIT until after the private build:** device-surfaced issues, then Goals v1 depth.
 
-**Requires schema/product redesign (NOT in this build):**
-- Non-numeric goal values (needs a `goals` value-type schema decision).
-- Goal update windows / available-from (needs a task model field).
-- Goal-linked weekly update tasks + leadership review flow (Phase D).
+**Foundation built this sprint (client-safe; UI/wiring gated on DRAFT SQL apply):**
+- **Goals numeric|text values** — types + `goalDisplay`/`goalValueKind` + service mapping + card render done (`lib/goals.ts`, `goalHelpers`, `goalService`, Goals card). Text INPUT gated on `supabase/goals_v2_value_kind_patch_draft.sql` (DRAFT, not applied).
+- **Goal-linked weekly-update form** — pure builder `lib/goalUpdateDefinition.ts` (per-goal questions + officer check-in, reuses the structured-response form). Generation/insertion gated on a product decision + the value/window model.
+- **Update windows** — pure `lib/taskWindow.ts` (open / not-yet-open / overdue). Locked UI gated on `supabase/task_available_at_patch_draft.sql` (DRAFT, not applied).
+- **Goal-assigned in-app notice** — pure `buildGoalAssignedNotice`. Emit gated on `supabase/update_notices_goal_entity_patch_draft.sql` (widen entity_type CHECK to 'goal'; DRAFT, not applied).
+
+**DRAFT SQL patches awaiting approval (apply checkpoints, in rough priority):**
+1. `goals_v2_value_kind_patch_draft.sql` — unlocks text/status goals.
+2. `task_available_at_patch_draft.sql` — unlocks update windows.
+3. `update_notices_goal_entity_patch_draft.sql` — unlocks goal-assigned in-app notices.
+
+**Requires further product decision (NOT just SQL):**
+- When/how the weekly goal-update task is generated (cadence + window + who triggers).
+- Goal-update → leadership review flow + update history UI (Phase D).
+- Agenda editable persistence (own table/SQL lane) — read-only agenda is fine for now.
 
 ---
 
