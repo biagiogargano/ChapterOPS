@@ -727,23 +727,16 @@ export default function CreateTaskScreen() {
               {errors.includes('Choose a reviewer.') && (
                 <Text style={s.errorMsg}>Choose a reviewer.</Text>
               )}
-              {reviewerOptions.length === 0 ? (
-                <Text style={s.subFootHint}>
-                  No reviewer available — leadership roles are all assignees here. Turn review off, or
-                  remove a leadership role from the assignees.
-                </Text>
-              ) : (
-                <View style={s.chipWrap}>
-                  {reviewerOptions.map(r => {
-                    const on = reviewerRole === r;
-                    return (
-                      <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
-                        <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
+              <View style={s.chipWrap}>
+                {reviewerOptions.map(r => {
+                  const on = reviewerRole === r;
+                  return (
+                    <Pressable key={r} style={[s.chip, on && s.chipOn]} disabled={reviewLocked} onPress={() => setReviewerRole(r)}>
+                      <Text style={[s.chipText, on && s.chipTextOn]}>{ROLE_LABELS[r]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </>
           )}
 
