@@ -607,9 +607,11 @@ export default function CreateTaskScreen() {
         {/* Assignee role(s) */}
         <View style={[s.field, reviewLocked && s.lockedField]}>
           <FieldLabel text="ASSIGN TO" required />
-          {!editing && canAssignBroadly && (
+          {!editing && (
             <Text style={s.assignHint}>
-              Pick one or more roles. Each gets its own copy to complete independently.
+              {canAssignBroadly
+                ? 'You can assign based on your role. Pick one or more — each gets its own copy to complete independently.'
+                : 'Based on your role, you can only assign this to yourself.'}
             </Text>
           )}
           <View style={s.chipWrap}>
