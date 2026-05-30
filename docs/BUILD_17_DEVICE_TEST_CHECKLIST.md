@@ -134,9 +134,17 @@ live goals (not stored), so it must survive reload.
       existed."** (deterministic per-role/week ids — no duplicates).
 - [ ] **Task appears:** in **Tasks**, a **"Weekly goal update"** task appears for the
       officer role; no proof icon, no "Reviewed by".
+- [ ] **"Opens <date>" card cue:** before the window opens, the task card (Tasks **and**
+      Today) shows **"Opens <date>"** in place of a due label — so it doesn't read as
+      something to act on now. (Ordinary tasks still show their normal due label.)
 - [ ] **NOT-OPEN window:** open the task as its **assignee** *before* it opens — a
       **"NOT OPEN YET"** notice shows ("Opens <date>") and the form is **read-only**
       (no Submit). (Window opens ~4 days out by default.)
+- [ ] **No plain "Mark Complete" before open:** a not-open goal-update task shows **no**
+      generic complete button — only the read-only form (you can't bypass the update).
+- [ ] **"HOW THIS WORKS" intro:** as the assignee filling the open form, a short intro
+      explains per-goal (current / what changed / need help / request complete), the
+      "No update this cycle" toggle, and the weekly check-in.
 - [ ] **Form reconstructs (the key check):** once open (or to verify content), the form
       lists **each active goal** for that role (current value / what changed / need help
       / request complete) followed by the **weekly check-in** (accomplishments /
@@ -149,6 +157,17 @@ live goals (not stored), so it must survive reload.
       the role's CURRENT goals — if a goal was archived after submitting, its answer
       persists but isn't shown. History snapshot is a later lane.)*
 - [ ] **No push:** generating or submitting a goal update fires **no** push.
+
+**Known limitations (expected — do NOT file as bugs):**
+- **Current goals are reconstructed, not snapshotted.** The form (and the leadership
+  read view) is rebuilt from the role's goals *as they are now*. If a goal is edited or
+  archived after the officer submitted, the submitted answers persist but the form
+  reflects the *current* goal set — there is no per-cycle historical snapshot yet
+  (that's the Phase D update-history lane).
+- **The window is relative to generation time, not calendar-anchored.** availableAt =
+  generation + ~4 days, dueAt = +7 days. Whoever runs it first that ISO week sets the
+  window; re-runs the same week are idempotent (they don't move it). It is **not**
+  pinned to a fixed weekday.
 
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
