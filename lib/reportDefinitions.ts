@@ -14,6 +14,7 @@
  */
 
 import type { StructuredResponseDefinition } from './structuredResponses';
+import { QUESTIONNAIRE_TEMPLATES } from './questionnaireTemplates';
 
 /** Id of the v1 weekly officer report definition. */
 export const WEEKLY_OFFICER_REPORT_ID = 'weekly_officer_report';
@@ -72,12 +73,29 @@ export const WEEKLY_OFFICER_REPORT: StructuredResponseDefinition = {
   ],
 };
 
-/** All registered report definitions (extend as more are added). */
+/**
+ * All registered structured-response / questionnaire definitions, discoverable
+ * through one registry. The Weekly Officer Report is the Sigma Chi ALPHA pack
+ * template; the rest (lib/questionnaireTemplates) are generic, org-neutral
+ * templates. Reports are NOT a separate system — they are questionnaire
+ * definitions (see docs/PRODUCT_ARCHITECTURE_AND_SCALE_DOCTRINE.md).
+ */
 export const REPORT_DEFINITIONS: StructuredResponseDefinition[] = [
   WEEKLY_OFFICER_REPORT,
+  ...QUESTIONNAIRE_TEMPLATES,
 ];
 
-/** Look up a report definition by id, or null if unknown (fail safe). */
+/** Generic alias for the registry (preferred name going forward). */
+export const QUESTIONNAIRE_DEFINITIONS = REPORT_DEFINITIONS;
+
+/**
+ * Look up a definition by id, or null if unknown (fail safe). `getReportDefinition`
+ * is the report-era name; `getQuestionnaireDefinition` is the generic alias — both
+ * resolve over the same registry (reports + generic templates).
+ */
 export function getReportDefinition(id: string): StructuredResponseDefinition | null {
   return REPORT_DEFINITIONS.find(d => d.id === id) ?? null;
 }
+
+/** Generic alias for getReportDefinition (preferred name going forward). */
+export const getQuestionnaireDefinition = getReportDefinition;
