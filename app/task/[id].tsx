@@ -580,6 +580,7 @@ function ProofSubmitSection({
   onSubmit,
   submitError,
   submitting,
+  reviewerLabel,
 }: {
   task:            MockTask;
   taskState:       TaskState;
@@ -588,8 +589,13 @@ function ProofSubmitSection({
   onSubmit:        () => void;
   submitError?:    string | null;
   submitting?:     boolean;
+  reviewerLabel?:  string;
 }) {
   if (!task.requiresProof || !task.proofType) return null;
+
+  const awaitingText = reviewerLabel
+    ? `Submitted — awaiting review by ${reviewerLabel}`
+    : 'Submitted — awaiting review';
 
   const icon    = PROOF_ICON[task.proofType];
   const isLink  = task.proofType === 'link';
@@ -607,7 +613,7 @@ function ProofSubmitSection({
       <SLabel text="PROOF OF COMPLETION" />
 
       {taskState === 'approved'  && <StatusChip icon="✓"  text="Proof accepted"                     color="#4ade80" bg="#052e16" />}
-      {taskState === 'submitted' && <StatusChip icon="⏳" text="Submitted — awaiting review"        color="#fbbf24" bg="#1c1407" />}
+      {taskState === 'submitted' && <StatusChip icon="⏳" text={awaitingText}                       color="#fbbf24" bg="#1c1407" />}
       {taskState === 'rejected'  && <StatusChip icon="✗"  text="Proof rejected — resubmit required" color="#fca5a5" bg="#1a0505" />}
 
       {canEdit && (
@@ -1121,6 +1127,7 @@ export default function TaskDetailScreen() {
               onSubmit={() => { void handleProofSubmit(); }}
               submitError={proofError}
               submitting={submitting}
+              reviewerLabel={task.reviewerRole ? ROLE_LABELS[task.reviewerRole] : undefined}
             />
           </>
         )}
@@ -1135,7 +1142,13 @@ export default function TaskDetailScreen() {
                 <Text style={s.actionDoneText}>✓  Approved</Text>
               </View>
             ) : taskState === 'submitted' ? (
-              <StatusChip icon="⏳" text="Submitted — awaiting review" color="#fbbf24" bg="#1c1407" />
+              <StatusChip
+                icon="⏳"
+                text={task.reviewerRole
+                  ? `Submitted — awaiting review by ${ROLE_LABELS[task.reviewerRole]}`
+                  : 'Submitted — awaiting review'}
+                color="#fbbf24" bg="#1c1407"
+              />
             ) : (
               <View style={s.proofInputBlock}>
                 {taskState === 'rejected' && (
