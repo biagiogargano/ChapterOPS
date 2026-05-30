@@ -89,11 +89,23 @@ submissions and render the announcement / help-needed sections. The **read path
 needs fetching submissions** (uses the existing RPC — verify on device first, #1).
 No new schema for the read path.
 
-### 6. Goals / progress layer — design-to-schema — GATED: Supabase
-Take `GOALS_PROGRESS_LAYER_PLAN.md` from concept to a concrete schema/RLS/RPC
-proposal (`goals` + `goal_progress_updates`), as its own **approved Supabase lane**
-(like `REPORTS_V1_PERSISTENCE_PLAN.md` was). Separate from tasks. Do not build the
-data layer until approved.
+### 6. Goals / progress layer — FOUNDATION DONE, **PARKED** (gated)
+Goals are now a first-class direction with a deep pure foundation (all behavior-free,
+nothing wired/applied):
+- Plan + pivot: `GOALS_FIRST_SYSTEM_PLAN.md`, `GOALS_PERSISTENCE_PLAN.md`.
+- Types: `lib/goals.ts` (inert). Helpers: `lib/goalHelpers.ts` (36 tests),
+  `lib/goalUpdateTasks.ts` pure update-task builder (34 tests).
+- Draft (UNAPPLIED) SQL: `supabase/goals_v1_draft.sql`.
+
+**PARKED — do not build further** (no Goals tab, no SQL apply, no store wiring, no
+more helpers) until ONE gate opens:
+1. **Build 17 device test** verifies the questionnaire submission / RPC round-trip
+   works (#1 above) — the update layer goals ride on must be proven on device first.
+2. **Goals SQL apply is explicitly approved** (its own checkpoint, like reports v1).
+3. A **specific bug** is found in the current foundation.
+
+Rationale: the foundation is deep enough; more pure code risks building too far ahead
+of the still-unverified questionnaire/update layer.
 
 ### 7. AI-assisted setup — LAST, gated on #4 working
 Suggest a starter pack / templates from a description. Only after deterministic
