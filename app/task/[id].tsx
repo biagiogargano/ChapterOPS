@@ -830,25 +830,34 @@ function ReportFormSection({
     return (
       <View>
         <SLabel text={done ? 'SUBMITTED REPORT' : `${definition.label.toUpperCase()}`} />
-        {done && <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Report submitted</Text></View>}
-        <View style={{ marginTop: done ? 10 : 0, gap: 12 }}>
-          {questions.map(q => {
-            const a = answers[q.key];
-            const hasValue = typeof a?.value === 'string' && a.value.trim().length > 0;
-            return (
-              <View key={q.key}>
-                <Text style={s.reportPrompt}>{q.prompt}</Text>
-                {a?.noUpdate ? (
-                  <Text style={s.reportNoUpdateTag}>No update</Text>
-                ) : hasValue ? (
-                  <Text style={s.proofDisplayContent}>{a!.value}</Text>
-                ) : (
-                  <Text style={s.proofDisplayEmpty}>—</Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
+        {done ? (
+          <>
+            <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Report submitted</Text></View>
+            <View style={{ marginTop: 10, gap: 12 }}>
+              {questions.map(q => {
+                const a = answers[q.key];
+                const hasValue = typeof a?.value === 'string' && a.value.trim().length > 0;
+                return (
+                  <View key={q.key}>
+                    <Text style={s.reportPrompt}>{q.prompt}</Text>
+                    {a?.noUpdate ? (
+                      <Text style={s.reportNoUpdateTag}>No update</Text>
+                    ) : hasValue ? (
+                      <Text style={s.proofDisplayContent}>{a!.value}</Text>
+                    ) : (
+                      <Text style={s.proofDisplayEmpty}>—</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        ) : (
+          // Reader viewing before the assignee has submitted. Answers only persist
+          // on full submit (which flips the task to done), so a not-done read-only
+          // view is always "nothing submitted yet" — say so instead of empty dashes.
+          <Text style={s.reportHint}>Not submitted yet.</Text>
+        )}
       </View>
     );
   }

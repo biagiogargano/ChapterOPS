@@ -39,15 +39,34 @@ built. Record/doc only — no behavior, schema, or EAS change implied.
   on `requiresApproval` and the proof icon on `requiresProof`, both false for
   reports, so only the generic status badge (To do / Done / etc.) shows.
 
-## Generation UI placement — DECISION (deferred, documented)
+## Generation UI placement — DECISION (gated, documented)
 
-There is **no safe existing admin surface** for "generate this org's reports for
-a cycle." The Me screen is per-user settings, not org-admin actions; wiring a
-button there that mutates shared task state (and needs a cycle/date picker) would
-be scope creep without a real admin design. **Decision (per Reports V1 defaults):**
-generation stays **service/helper-only for now** (`lib/reportGeneration.ts`); no
-UI added this lane. When an org-admin surface exists (a deliberate future lane), a
-minimal "Generate weekly reports" action wires to `generateWeeklyOfficerReports`.
+**Natural surface identified:** the **Leadership card** on the Me screen
+(`app/(tabs)/me.tsx`, gated on `isLeadershipRole(role)`) is the right home. It is
+already leadership-only and already hosts an org-admin action ("Manage task
+templates" → `/templates`), so a "Generate weekly reports" row would fit there
+structurally — contrary to the earlier note that "no safe surface exists" (that
+reasoning is superseded: the Leadership card is org-admin, not per-user settings).
+
+**Why it is still gated (NOT wired this lane):**
+
+1. **Materially affects real users.** `generateWeeklyOfficerReports(orgId, cycle,
+   dueDate)` creates a report task for *every* officer role. In the live alpha,
+   a working button means real officers immediately receive report tasks — a
+   product decision that affects real users, which is an explicit stop gate.
+2. **Unverified path.** The form + `task_report_submissions` RPC round-trip has
+   never run on device. Shipping a live trigger before a build is cut makes the
+   first real use also the first test.
+3. **Needs real input.** Generation requires a stable cycle key + due date; a
+   correct trigger needs a small cycle/date input, not a one-tap action — beyond
+   the "tiny action" this lane allows.
+
+**Decision (per Reports V1 defaults + roadmap Lane 1):** generation stays
+**service/helper-only** (`lib/reportGeneration.ts`); no UI added. When a build is
+cut and the RPC round-trip is device-verified, wire a leadership-gated "Generate
+weekly reports" row in the Me Leadership card (with a minimal cycle/due-date
+input) to `generateWeeklyOfficerReports`. Until then this is the documented,
+approved placement — no new screen or Reports tab required.
 
 ## What remains gated (not built, by design)
 
