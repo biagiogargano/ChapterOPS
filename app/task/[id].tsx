@@ -43,7 +43,7 @@ import {
   parseGoalUpdateId,
   reconstructGoalUpdateDefinition,
 } from '@/lib/goalUpdateGeneration';
-import { listGoalsForOrg, listMyGoals } from '@/lib/goalService';
+import { listGoalsForOrgResult, listMyGoalsResult, type GoalListResult } from '@/lib/goalService';
 import { taskWindowView } from '@/lib/taskWindow';
 import {
   orderedQuestions,
@@ -1003,6 +1003,9 @@ export default function TaskDetailScreen() {
   // so the form survives reload with no extra storage. null until the async load runs.
   const [goalUpdateDef,     setGoalUpdateDef    ] = useState<StructuredResponseDefinition | null>(null);
   const [goalUpdateLoading, setGoalUpdateLoading] = useState(false);
+  // True when the goal fetch FAILED (vs. the role genuinely having no goals). Drives a
+  // warning so an officer doesn't submit a check-in-only form thinking they have no goals.
+  const [goalUpdateError,   setGoalUpdateError  ] = useState(false);
 
   // Real flag-on persistence mode (the alpha): proof submissions go through the
   // RPC-backed task_submissions primitive. Flag-off sandbox stays in-memory.
@@ -1054,20 +1057,32 @@ export default function TaskDetailScreen() {
   const isGoalUpdateTask = isGoalUpdateDefinitionId(reportDefId);
   const assignedRole = task?.assignedRole;
   useEffect(() => {
-    if (!isGoalUpdateTask || !reportDefId) { setGoalUpdateDef(null); return; }
+    if (!isGoalUpdateTask || !reportDefId) { setGoalUpdateDef(null); setGoalUpdateError(false); return; }
     const parsed = parseGoalUpdateId(reportDefId);
     const targetRole = parsed?.role ?? assignedRole;
     let cancelled = false;
     setGoalUpdateLoading(true);
+    setGoalUpdateError(false);
     (async () => {
       const canSeeOrgGoals = isLeadershipRole(role) || role === 'annotator';
-      const all = pushOrgId
-        ? (canSeeOrgGoals ? await listGoalsForOrg(pushOrgId) : await listMyGoals(pushOrgId))
-        : [];
-      const goals = all.filter(g => g.status === 'active' && g.ownerRole === targetRole);
-      const def = reconstructGoalUpdateDefinition(reportDefId, goals);
-      if (!cancelled) { setGoalUpdateDef(def); setGoalUpdateLoading(false); }
-    })().catch(() => { if (!cancelled) { setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, [])); setGoalUpdateLoading(false); } });
+      let res: GoalListResult;
+      if (!pushOrgId) res = { ok: true, goals: [] };
+      else if (canSeeOrgGoals) res = await listGoalsForOrgResult(pushOrgId);
+      else res = await listMyGoalsResult(pushOrgId);
+      if (cancelled) return;
+      const goals = res.goals.filter(g => g.status === 'active' && g.ownerRole === targetRole);
+      // Always reconstruct (≥ the check-in) so the task is never "broken"; flag the
+      // error so the UI can warn that goals may be missing from the form.
+      setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, goals));
+      setGoalUpdateError(!res.ok);
+      setGoalUpdateLoading(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, []));
+        setGoalUpdateError(true);
+        setGoalUpdateLoading(false);
+      }
+    });
     return () => { cancelled = true; };
   }, [isGoalUpdateTask, reportDefId, assignedRole, role, pushOrgId]);
 
@@ -1445,6 +1460,19 @@ export default function TaskDetailScreen() {
                 you need help. Tick “No update this cycle” on anything that hasn’t moved. Then answer
                 the weekly check-in at the bottom. Your active goals are pulled in automatically — if a
                 goal is missing, add it on the Goals tab.
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* ── Goal fetch failed: warn before the (check-in-only) form ── */}
+        {isGoalUpdateTask && showReport && reportDef && goalUpdateError && (
+          <>
+            <Divider />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>
+                ⚠️ Couldn’t load your goals, so the form below may be missing them. Pull to refresh
+                and reopen this task before submitting, so your goal updates are included.
               </Text>
             </View>
           </>
