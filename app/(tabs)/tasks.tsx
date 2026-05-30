@@ -490,7 +490,15 @@ export default function TasksScreen() {
       ) : !hasAnyView ? (
         <View style={s.emptyFull}>
           <Text style={s.emptyTitle}>No matches</Text>
-          <Text style={s.emptyText}>No tasks match this filter.</Text>
+          <Text style={s.emptyText}>
+            {taskQuery.trim()
+              ? `No tasks match “${taskQuery.trim()}”.`
+              : statusFilter === 'done'
+                ? 'Nothing completed yet.'
+                : statusFilter === 'todo'
+                  ? 'Nothing to do right now.'
+                  : 'No tasks to show.'}
+          </Text>
         </View>
       ) : (
         <>
