@@ -60,6 +60,14 @@ export interface Goal {
 
   status:        GoalStatus;
 
+  /**
+   * The structured-response definition id this goal's recurring UPDATES collect
+   * (a StructuredResponseDefinition id, e.g. WEEKLY_OFFICER_REPORT_ID). Reuses the
+   * existing questionnaire/report form + storage as the update layer. Optional —
+   * a goal with no update definition simply generates no update tasks.
+   */
+  updateDefinitionId?: string;
+
   /** Optional reviewer role + visibility (mirrors the submissions read model). */
   reviewerRole?: RoleKey;
   visibleTo?:    RoleKey[] | 'all';

@@ -151,6 +151,13 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
 5. **Apply Supabase** — only after explicit approval (own lane).
 6. **Goals tab** (list + create + detail).
 7. **Generated update tasks** from goal cadence (reuses generation stack).
+   *Pure builder DONE* (`lib/goalUpdateTasks.ts`, 34 tests): deterministic
+   `goalupd_<goalId>_<period>` ids, `buildGoalUpdateTask`,
+   `shouldGenerateGoalUpdateTask` (active + due + not-existing, idempotent),
+   title/description. Mirrors `reportTasks`. **Insertion into the store stays
+   gated** — nothing is created in the app yet. Ownership gap documented: v1 builds
+   update tasks only for goals owned by a runtime-supported `Role` (custom/person
+   owners → null until the Role union opens).
 8. **Agenda integration** from goal updates (reuses `agendaContributions`).
 9. **Notifications / AI** — last, gated.
 
