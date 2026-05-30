@@ -1056,10 +1056,14 @@ export default function EventDetailScreen() {
         </>
       )}
 
-      {/* ── About (secondary detail, kept lower) ── */}
-      <View style={s.divider} />
-      <SectionLabel text="ABOUT" />
-      <Text style={s.description}>{event.description}</Text>
+      {/* ── About (secondary detail, kept lower) — only when there's a description ── */}
+      {!!event.description && event.description.trim().length > 0 && (
+        <>
+          <View style={s.divider} />
+          <SectionLabel text="ABOUT" />
+          <Text style={s.description}>{event.description}</Text>
+        </>
+      )}
 
       {/* ── Delete button — user-created events, manager roles only ── */}
       {isUserCreated && canManage && (
