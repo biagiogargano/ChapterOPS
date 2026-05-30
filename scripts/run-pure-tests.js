@@ -26,9 +26,9 @@ const EXPECTED = [
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'reportDefinitions',
-  'reportSubmissionService', 'reportTasks', 'roles', 'routeTarget',
-  'structuredResponses', 'taskAssignment', 'taskCompletion', 'taskListView',
-  'todayFeed',
+  'reportGeneration', 'reportSubmissionService', 'reportTasks', 'roles',
+  'routeTarget', 'structuredResponses', 'taskAssignment', 'taskCompletion',
+  'taskListView', 'todayFeed',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────
