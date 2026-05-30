@@ -31,12 +31,27 @@ const expectedRoles = OFFICER_ROLES.join(',');
 }
 
 // ── unknown / empty / missing template → same sigma_chi defaults (fallback) ───
-for (const t of ['club', 'not_a_template', '', null, undefined] as (string | null | undefined)[]) {
+for (const t of ['not_a_template', '', null, undefined] as (string | null | undefined)[]) {
   const plan = planQuestionnaireGeneration(t);
   check(`template ${JSON.stringify(t)} → Weekly Officer Report (fallback)`,
     plan.definitionId === WEEKLY_OFFICER_REPORT_ID);
   check(`template ${JSON.stringify(t)} → officer roles (fallback)`,
     plan.roles.join(',') === expectedRoles);
+}
+
+// ── club: a real second pack → its OWN questionnaire, but roles fall back safe ─
+// club uses custom role keys (not in OFFICER_ROLES); the resolver filters unknown
+// keys and falls back to the alpha officer set, so generation stays safe even though
+// the definition is the club pack's generic team check-in. This is the behavior
+// boundary: the pack can differ, but the runtime never gets unmapped role keys.
+{
+  const plan = planQuestionnaireGeneration('club');
+  check('club → its own generic questionnaire (weekly_team_checkin)',
+    plan.definitionId === 'weekly_team_checkin');
+  check('club roles fall back to the alpha officer set (custom keys filtered)',
+    plan.roles.join(',') === expectedRoles);
+  check('club roles are all real Role keys (never unmapped)',
+    plan.roles.every(r => OFFICER_ROLES.includes(r)));
 }
 
 // ── plan never yields a generic EXAMPLE template as the definition ────────────

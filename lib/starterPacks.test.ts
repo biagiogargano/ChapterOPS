@@ -30,10 +30,42 @@ function check(name: string, cond: boolean): void {
 // ── Registry basics ───────────────────────────────────────────────────────────
 check('default pack id is sigma_chi', DEFAULT_STARTER_PACK_ID === 'sigma_chi');
 check('sigma_chi pack exists', getStarterPack('sigma_chi') !== null);
-check('exactly one pack is active in alpha', STARTER_PACKS.length === 1);
-check('the one pack is sigma_chi', STARTER_PACKS[0].orgType === 'sigma_chi');
+check('sigma_chi is the FIRST registered pack (the alpha default)', STARTER_PACKS[0].orgType === 'sigma_chi');
 check('isKnownStarterPackId true for sigma_chi', isKnownStarterPackId('sigma_chi') === true);
-check('isKnownStarterPackId false for a future id', isKnownStarterPackId('club') === false);
+check('isKnownStarterPackId false for an unregistered id', isKnownStarterPackId('sports_team') === false);
+
+// ── Second pack: club (architecture proof; NOT default, NOT active in alpha) ───
+check('club pack exists', getStarterPack('club') !== null);
+check('isKnownStarterPackId true for club', isKnownStarterPackId('club') === true);
+check('club is NOT the default', String(DEFAULT_STARTER_PACK_ID) === 'sigma_chi');
+check('club has a distinct label from sigma_chi',
+  getStarterPack('club')?.label === 'Student Club' && getStarterPack('club')?.label !== getStarterPack('sigma_chi')?.label);
+check('activeStarterPack(club) returns the club pack', activeStarterPack('club').orgType === 'club');
+{
+  const club = getStarterPack('club')!;
+  // Real custom role keys — NOT the Sigma Chi catalog.
+  check('club uses custom role keys (vice_president/event_chair)',
+    club.rolePack.roles.some(r => r.key === 'vice_president') &&
+    club.rolePack.roles.some(r => r.key === 'event_chair'));
+  check('club role keys are NOT Sigma Chi roles',
+    !club.rolePack.roles.some(r => r.key === 'pro_consul' || r.key === 'brother'));
+  // Custom keys still map onto the SAME generic OrgLevel tiers.
+  check('club president → owner level',
+    club.rolePack.roles.find(r => r.key === 'president')?.level === 'owner');
+  check('club floor role is member', club.rolePack.floorRole === 'member');
+  // Generic questionnaire default, not the officer report.
+  check('club default questionnaire is the generic team check-in',
+    (club.rolePack.defaultQuestionnaireIds ?? []).join(',') === 'weekly_team_checkin');
+  // Club registers NO event templates → no generic example leaks into a picker.
+  check('club registers no event templates', (club.rolePack.defaultEventTemplateIds ?? []).length === 0);
+}
+
+// Generic EXAMPLE templates are not active defaults in EITHER pack.
+{
+  const exampleIds = new Set(GENERIC_TEMPLATE_EXAMPLES.map(t => t.id));
+  check('neither pack surfaces a generic example template as a default',
+    STARTER_PACKS.every(p => !(p.rolePack.defaultEventTemplateIds ?? []).some(id => exampleIds.has(id))));
+}
 
 // ── Unknown / empty template → safe fallback to sigma_chi ─────────────────────
 check('activeStarterPack(unknown) falls back to sigma_chi',
@@ -47,9 +79,9 @@ check('activeStarterPack("") falls back to sigma_chi',
 check('activeStarterPack(sigma_chi) returns sigma_chi',
   activeStarterPack('sigma_chi').orgType === 'sigma_chi');
 
-// Strict lookup returns null where active falls back.
-check('getStarterPackForOrgTemplate(unknown) is null',
-  getStarterPackForOrgTemplate('club') === null);
+// Strict lookup returns null where active falls back (for an UNREGISTERED id).
+check('getStarterPackForOrgTemplate(unregistered) is null',
+  getStarterPackForOrgTemplate('sports_team') === null);
 check('getStarterPackForOrgTemplate(null) is null',
   getStarterPackForOrgTemplate(null) === null);
 check('getStarterPack(unknown) is null', getStarterPack('nope') === null);

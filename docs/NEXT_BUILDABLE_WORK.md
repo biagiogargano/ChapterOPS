@@ -57,9 +57,13 @@ alpha (sigma_chi + fallback); 15 tests lock that in.
 **Still direct (intentional):** assignment/reviewer picker (`task/create.tsx` —
 permission risk, Category C), event-audience composition + template picker
 (`event/*`, `templates/edit.tsx` — Category B, low-level pack data, no behavior win
-yet). **Next sub-steps:** (b) add a second org-type pack as data to prove
-genericity; (c) org-type selection UI only after a real second pack exists (fake
-until then). Custom/org-created roles stay **Supabase-gated**. Plan:
+yet). **Sub-step (b) DONE:** a second pack `club` exists as pure data
+(`CLUB_STARTER_PACK`) with real custom role keys, proving genericity — not default,
+not surfaced, not active in alpha. Confirmed the closed-`Role`-union gate: custom
+keys are data-expressible but not yet functional through the runtime engines.
+**Next:** (c) org-type selection UI — now meaningfully possible since a second pack
+exists, but still gated on wiring more read sites + a real product decision; (d)
+opening the `Role` union for custom keys is **Supabase-gated**. Plan:
 `ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–4.
 
 ### 5. Agenda integration from questionnaire answers — partly Supabase-gated

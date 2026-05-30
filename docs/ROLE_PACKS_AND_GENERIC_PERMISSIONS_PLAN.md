@@ -109,7 +109,24 @@ A pack is plain data selected by `organizations.template`. Shape sketch in
 Everything above **already exists as Sigma Chi data**; a pack just names the
 bundle and lets `organizations.template` choose it.
 
-## 6. Implementation sequence (later — none of this now)
+## 6. Implementation sequence
+
+> **Progress:** steps 1–3 now have real, tested code (no behavior change).
+> - `lib/starterPacks.ts` — the pack **registry + loader** (`activeStarterPack`),
+>   with `sigma_chi` derived from the live constants.
+> - **Second pack `club` added as pure data** (`CLUB_STARTER_PACK`) — a generic
+>   student org with **real custom role keys** (`vice_president`, `event_chair`, …),
+>   proving the pack DATA layer is genuinely non-fraternity. It is NOT the default,
+>   NOT surfaced in onboarding, and only active if an org's `template` is literally
+>   `'club'` (org creation still hardcodes `sigma_chi`, so never in alpha).
+> - First read site wired behavior-identically (`lib/questionnaireGenerationPlan.ts`).
+>
+> **Known limitation (the gate, confirmed by the club pack):** the runtime engines
+> (`ROLE_LEVEL`, task assignment, `generateQuestionnaireTasks`'s `Role[]`) are keyed
+> by the **closed `Role` union**, so club's custom role keys are expressible as DATA
+> but not yet FUNCTIONAL through those engines — the resolver filters unknown keys
+> and falls back to the alpha officer set. Opening the union to org-defined keys is
+> the Supabase-gated step 4 / §8.
 
 1. **Keep the alpha role catalog as-is.** No rename, no behavior change. (now)
 2. **Introduce a type/adapter layer:** a `RolePack` interface (sketch added) and an

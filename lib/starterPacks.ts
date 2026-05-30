@@ -29,6 +29,7 @@ import {
 import { ROLE_LEVEL, SIGMA_CHI_ASSIGNMENT_EXCEPTIONS } from './orgLevels';
 import { EVENT_TEMPLATES } from './eventTemplates';
 import { WEEKLY_OFFICER_REPORT_ID } from './reportDefinitions';
+import { WEEKLY_TEAM_CHECKIN_ID } from './questionnaireTemplates';
 
 /** The org-type id of the alpha default pack (matches the `sigma_chi` template). */
 export const DEFAULT_STARTER_PACK_ID = 'sigma_chi';
@@ -78,13 +79,68 @@ export const SIGMA_CHI_STARTER_PACK: SetupPack = {
   ],
 };
 
+// ─── Second pack: generic student org / club (architecture proof) ─────────────
+// `club` exists to PROVE the starter-pack system can represent a non-fraternity org
+// end to end. It uses REAL custom role keys (vice_president, event_chair, …) — not
+// the Sigma Chi catalog — which the pack-DATA layer accepts because RolePack keys
+// are RoleKey (string).
+//
+// ⚠️ LIMITATION (documented, not fought): the runtime engines that consume roles
+//    (lib/orgLevels.ROLE_LEVEL, task assignment, generateQuestionnaireTasks's
+//    Role[]) are keyed by the CLOSED `Role` union, so these custom keys are
+//    expressible as data but NOT yet functional through those engines. This is the
+//    known closed-`Role`-union gate (see docs/ROLE_PACKS_AND_GENERIC_PERMISSIONS_PLAN
+//    §8). The club pack is registry/test data only; it is NOT the default, NOT
+//    surfaced in onboarding, and only active if an org's template is literally
+//    'club' (org creation still hardcodes 'sigma_chi', so that never happens in
+//    alpha). planQuestionnaireGeneration already guards this — unknown role keys are
+//    filtered out and it falls back to the alpha officer set.
+
+/** Generic club/student-org role pack with custom (non-Sigma-Chi) role keys. */
+const CLUB_ROLE_PACK: RolePack = {
+  id:    'club',
+  label: 'Student Club',
+  roles: [
+    { key: 'president',      label: 'President',      level: 'owner' },
+    { key: 'vice_president', label: 'Vice President', level: 'executives' },
+    { key: 'secretary',      label: 'Secretary',      level: 'officers' },
+    { key: 'treasurer',      label: 'Treasurer',      level: 'officers' },
+    { key: 'event_chair',    label: 'Event Chair',    level: 'officers' },
+    { key: 'member',         label: 'Member',         level: 'members' },
+    { key: 'advisor',        label: 'Advisor',        level: 'advisors' },
+  ],
+  floorRole:       'member',
+  leadershipRoles: ['president', 'vice_president'],
+  officerRoles:    ['secretary', 'treasurer', 'event_chair'],
+  // No same-level/upward grants for the club pack (keep it simple).
+  assignmentExceptions: [],
+  // Generic, org-neutral defaults (NOT the Sigma Chi content): a weekly team
+  // check-in questionnaire; event templates left empty (the generic EXAMPLE
+  // templates stay unsurfaced — a real club pack would register its own later).
+  defaultEventTemplateIds: [],
+  defaultQuestionnaireIds: [WEEKLY_TEAM_CHECKIN_ID],
+  defaultAgendaSections:   ['oldBusiness', 'newBusiness', 'unresolved'],
+};
+
+/** The generic club starter pack (registry/test data; not active in alpha). */
+export const CLUB_STARTER_PACK: SetupPack = {
+  orgType: 'club',
+  label:   'Student Club',
+  rolePack: CLUB_ROLE_PACK,
+  defaultEventKinds: ['social', 'philanthropy', 'finance', 'communications'],
+};
+
 /**
- * All registered starter packs. Alpha ships exactly one (sigma_chi). Future org
- * types (club / sports_team / business_team / class_project / nonprofit) get their
- * own entries here — the loader + every consumer stay unchanged.
+ * All registered starter packs. Alpha's DEFAULT + only active-in-practice pack is
+ * `sigma_chi` (org creation hardcodes that template). `club` is registered as a
+ * second pack to prove genericity — it only becomes active if an org's template is
+ * literally 'club', which alpha never sets. Future org types (sports_team /
+ * business_team / class_project / nonprofit) get their own entries here; the loader
+ * and every consumer stay unchanged.
  */
 export const STARTER_PACKS: SetupPack[] = [
   SIGMA_CHI_STARTER_PACK,
+  CLUB_STARTER_PACK,
 ];
 
 /** True if `id` names a registered starter pack. */
