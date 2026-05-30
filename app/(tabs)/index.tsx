@@ -847,7 +847,7 @@ export default function TodayScreen() {
         {/* ── COMING UP ── */}
         {(weekMine.length > 0 || comingUpEvs.length > 0) && (
           <View style={s.section}>
-            <SLabel text="COMING UP" />
+            <SLabel text="COMING UP" count={weekMine.length + comingUpEvs.length} />
             <View style={s.upcomingBlock}>
               {weekMine.map(t => (
                 <Pressable key={t.id} onPress={() => navTask(t)}>
