@@ -24,6 +24,19 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { AUTH_ENABLED } from './flags';
 
+// Foreground display: by default iOS suppresses the banner/sound while the app is
+// open. Registering this handler lets our action-linked task notifications show
+// even when the app is foregrounded. Display only — does NOT change WHO receives
+// a push or the notification scope. Registered once at module load.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList:   true,
+    shouldPlaySound:  true,
+    shouldSetBadge:   false,
+  }),
+});
+
 export type PushRegisterResult = 'ok' | 'denied' | 'skipped' | 'error';
 
 // Persistent flag: once the user denies, never auto-prompt again.

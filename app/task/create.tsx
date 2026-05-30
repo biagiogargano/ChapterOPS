@@ -377,16 +377,22 @@ export default function CreateTaskScreen() {
   const blockedByEventKind = !editing && !!linkedEventObj && !canManageEventTasks(role, linkedEventObj.kind);
 
   // Reviewer options = leadership roles, excluding any selected assignee (a task
-  // can't review itself). Reset/auto-pick when assignees or review toggle change.
-  const reviewerOptions = useMemo<Role[]>(
-    () => LEADERSHIP_ROLES.filter(r => !assignedRoles.includes(r)),
-    [assignedRoles],
-  );
+  // Reviewer picker = the full leadership set. We intentionally do NOT remove a
+  // leadership role just because it's one of several assignees: each cloned task
+  // independently drops self-review in buildInput (reviewer !== that clone's
+  // assignee), so e.g. assigning to Consul + Brother still offers Consul + Pro
+  // Consul as reviewers — the Brother's copy can be reviewed by Consul, and the
+  // Consul copy just won't carry Consul-as-its-own-reviewer. Avoids the bug where
+  // a mixed assignment shrank the Brother group's reviewer options.
+  const reviewerOptions = useMemo<Role[]>(() => [...LEADERSHIP_ROLES], []);
   useEffect(() => {
-    if (!reviewLocked && requiresApproval && (!reviewerRole || assignedRoles.includes(reviewerRole))) {
+    // Auto-pick a default reviewer only when none is chosen yet. Do NOT clear a
+    // valid choice just because it coincides with one assignee (self-review is
+    // handled per-clone at create time).
+    if (!reviewLocked && requiresApproval && !reviewerRole) {
       setReviewerRole(reviewerOptions[0]);
     }
-  }, [assignedRoles, requiresApproval, reviewerRole, reviewerOptions, reviewLocked]);
+  }, [requiresApproval, reviewerRole, reviewerOptions, reviewLocked]);
 
   // Guard: non-officers (or non-managers of this task) should never be here.
   useEffect(() => {
@@ -417,8 +423,11 @@ export default function CreateTaskScreen() {
     );
   }
 
-  const reviewerInvalid =
-    requiresApproval && (!reviewerRole || assignedRoles.includes(reviewerRole));
+  // A reviewer is required when approval is on. We do NOT treat "reviewer is also
+  // one of the assignees" as invalid here — each cloned task drops self-review
+  // independently at create time (buildInput). Blocking on overlap would wrongly
+  // reject e.g. Consul+Brother reviewed-by-Consul (valid for the Brother copy).
+  const reviewerInvalid = requiresApproval && !reviewerRole;
 
   const canSubmit =
     !blockedByEventKind &&
@@ -434,7 +443,7 @@ export default function CreateTaskScreen() {
   if (!dateString)                      missing.push('a due date');
   if (assignedRoles.length === 0)       missing.push('an assignee');
   if (requiresProof && !proofType)      missing.push('a proof type');
-  if (reviewerInvalid)                  missing.push('a reviewer different from the assignee');
+  if (reviewerInvalid)                  missing.push('a reviewer');
   const missingHint = missing.length === 0
     ? ''
     : `Add ${missing.length === 1
@@ -450,7 +459,7 @@ export default function CreateTaskScreen() {
     if (!title.trim())              errs.push('Task title is required.');
     if (!dateString)                errs.push('Please pick a due date.');
     if (assignedRoles.length === 0) errs.push('Choose at least one assignee.');
-    if (reviewerInvalid)            errs.push('Choose a reviewer different from the assignee.');
+    if (reviewerInvalid)            errs.push('Choose a reviewer.');
     if (errs.length > 0) { setErrors(errs); return; }
 
     const linkedEvent = linkedEventId
@@ -706,8 +715,8 @@ export default function CreateTaskScreen() {
           {requiresApproval && (
             <>
               <Text style={[s.fieldLabel, { marginTop: 14, marginBottom: 8 }]}>REVIEWED BY</Text>
-              {errors.includes('Choose a reviewer different from the assignee.') && (
-                <Text style={s.errorMsg}>Choose a reviewer different from the assignee.</Text>
+              {errors.includes('Choose a reviewer.') && (
+                <Text style={s.errorMsg}>Choose a reviewer.</Text>
               )}
               {reviewerOptions.length === 0 ? (
                 <Text style={s.subFootHint}>
