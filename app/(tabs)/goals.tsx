@@ -84,17 +84,21 @@ export default function GoalsScreen() {
     navigation.setOptions({ title: 'Goals' });
   }, [navigation]));
 
-  // Only show active goals in the MVP list (completed/archived are filtered out).
-  // Leadership may additionally filter the list by a specific owner role (client-
-  // only; does not affect permissions — the RPCs remain the gate).
-  const activeGoals = goals
-    .filter(g => g.status === 'active')
-    .filter(g => !isAdmin || ownerFilter === null || g.ownerRole === ownerFilter);
-
-  // Owner roles present in the loaded goals, for the leadership filter chips.
+  // Owner roles present in the loaded active goals, for the leadership filter chips.
   const ownerRolesInList = Array.from(
     new Set(goals.filter(g => g.status === 'active' && g.ownerRole).map(g => g.ownerRole as string)),
   );
+
+  // The filter "self-heals": if the selected owner role is no longer present (its
+  // goals were archived/completed, or the list reloaded without them), treat it as
+  // no filter so the user can never get stuck on an empty filtered view.
+  const effectiveFilter = ownerFilter && ownerRolesInList.includes(ownerFilter) ? ownerFilter : null;
+
+  // Only show active goals (completed/archived are filtered out). Leadership may
+  // additionally filter by owner role (client-only; RPCs remain the permission gate).
+  const activeGoals = goals
+    .filter(g => g.status === 'active')
+    .filter(g => !isAdmin || effectiveFilter === null || g.ownerRole === effectiveFilter);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.root}>
@@ -122,12 +126,12 @@ export default function GoalsScreen() {
         {/* Owner-role filter (leadership only; client-side view filter) */}
         {isAdmin && ownerRolesInList.length > 1 && (
           <View style={s.filterRow}>
-            <Pressable style={[s.chip, ownerFilter === null && s.chipOn]} onPress={() => setOwnerFilter(null)}>
-              <Text style={[s.chipText, ownerFilter === null && s.chipTextOn]}>All</Text>
+            <Pressable style={[s.chip, effectiveFilter === null && s.chipOn]} onPress={() => setOwnerFilter(null)}>
+              <Text style={[s.chipText, effectiveFilter === null && s.chipTextOn]}>All</Text>
             </Pressable>
             {ownerRolesInList.map(r => (
-              <Pressable key={r} style={[s.chip, ownerFilter === r && s.chipOn]} onPress={() => setOwnerFilter(r)}>
-                <Text style={[s.chipText, ownerFilter === r && s.chipTextOn]}>{ROLE_LABELS[r as Role] ?? r}</Text>
+              <Pressable key={r} style={[s.chip, effectiveFilter === r && s.chipOn]} onPress={() => setOwnerFilter(r)}>
+                <Text style={[s.chipText, effectiveFilter === r && s.chipTextOn]}>{ROLE_LABELS[r as Role] ?? r}</Text>
               </Pressable>
             ))}
           </View>
