@@ -45,18 +45,39 @@ Keep this doc current: when a lane finishes, move it to "Done" with its commit.
   Goals tab on tap. (`goals.tsx`, `notifications.tsx`, `updateNoticeStore`)
 - ✅ **available_at mapping** — `tasks.available_at ↔ MockTask.availableAt` (taskService).
 
-**Still gated (next, needs a product decision — NOT just SQL):**
-- **Weekly goal-update task GENERATION** — when/how it's created (cadence + window +
-  who triggers). This is what would SET `available_at` and use
-  `buildGoalUpdateDefinition` + `taskWindow`. Until decided, the update-window LOCK UI
-  and goal-linked update tasks stay unwired (no fake locks/tasks).
-- Goal-update → leadership review flow + update history UI (Phase D).
-- Editable agenda persistence (own SQL lane).
+**Weekly goal-update GENERATION — ✅ BUILT (manual, alpha; product decision made):**
+Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-end,
+**no new SQL** (reuses the applied `available_at` + `report_definition_id` columns):
+- **Pure generation** (`lib/goalUpdateGeneration.ts`, 43 tests): one task per officer
+  ROLE with active goals; deterministic ids (`goalupdrole_<role>__<period>` task,
+  `goalupddef_<role>__<period>` def); idempotent; sets availableAt + dueAt.
+- **Run service** (`lib/goalUpdateRun.ts`, 19 tests): fetches active goals → derives
+  ISO period + window (availableAt = now+4d opens near end of week, dueAt = now+7d) →
+  builds per-role tasks → persists new ones via addGeneratedTask + insertTask. Async,
+  idempotent, fail-safe.
+- **Leadership UI** (`app/(tabs)/me.tsx` — GoalUpdateGeneratorCard): President / Pro
+  Consul / Annotator only; Alert confirm; created / skipped / "no active goals" line.
+- **Dynamic-definition reload gate CLEARED via render-time reconstruction** (NOT new
+  storage): a goal-update def is not in the static registry, so `app/task/[id].tsx`
+  RECONSTRUCTS it from the role's CURRENT active goals (`reconstructGoalUpdateDefinition`)
+  — questions re-derived from persisted goals; answers persist via the existing
+  `task_report_submissions` RPC keyed by stable goal field keys. Survives reload.
+- **Available-window UI**: `taskWindowView` gates the form — before availableAt the
+  assignee sees "NOT OPEN YET" and the form is read-only (no submit before open).
 
-**Requires further product decision (NOT just SQL):**
-- When/how the weekly goal-update task is generated (cadence + window + who triggers).
-- Goal-update → leadership review flow + update history UI (Phase D).
-- Agenda editable persistence (own table/SQL lane) — read-only agenda is fine for now.
+  **Known alpha limitations (documented, not bugs):** (1) window is *now-relative* on
+  first run, not calendar-anchored — re-runs the same ISO week are idempotent so timing
+  is fixed by the first run; (2) the reconstructed form reflects *current* goals, not a
+  snapshot at generation time — if a goal is archived after submission its answer
+  persists but isn't shown. A historical snapshot / update-history view is **Phase D**
+  (see below). **Needs device verification** of the generate → submit → reload →
+  leadership-read round-trip (a build), like the questionnaire round-trip.
+
+**Still gated (next):**
+- Goal-update → leadership review flow + **update history / snapshot UI** (Phase D) —
+  the one real follow-on: a per-cycle historical record so a reader sees what was
+  answered *then*, independent of later goal edits.
+- Editable agenda persistence (own SQL lane) — read-only agenda is fine for now.
 
 ---
 

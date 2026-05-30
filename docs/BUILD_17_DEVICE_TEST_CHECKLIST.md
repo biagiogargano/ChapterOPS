@@ -117,6 +117,39 @@ real/persisted — a failed RPC must show an error, never a fake success.
       on error) — if you expect goals and see "No goals yet.", suspect a read error,
       not truly-empty. Flag this if it's confusing in practice.
 
+## 7b. Weekly goal-update generation (manual; needs goals + the live RPCs)
+The manual goal-update run creates one update task per officer ROLE that has active
+goals. No scheduler, no push. The form is **reconstructed at render** from the role's
+live goals (not stored), so it must survive reload.
+- [ ] **Card visibility:** as **President / Pro Consul / Annotator**, the **"Create
+      weekly goal update tasks"** card shows on the Me tab; a non-leadership role does
+      **not** see it.
+- [ ] **Pre-req:** create at least one **active goal** for an officer role (e.g. Social
+      Chair) — see §7. With **no** active goals, generating shows **"No active goals
+      yet — nothing to create."**
+- [ ] **Confirm + generate:** tap the card → confirm dialog describes the flow → **Create
+      tasks** → result line shows a **created** count (one per officer role with active
+      goals). **Cancel** creates nothing.
+- [ ] **Idempotent:** tap again the **same week** → **"No new tasks · N already
+      existed."** (deterministic per-role/week ids — no duplicates).
+- [ ] **Task appears:** in **Tasks**, a **"Weekly goal update"** task appears for the
+      officer role; no proof icon, no "Reviewed by".
+- [ ] **NOT-OPEN window:** open the task as its **assignee** *before* it opens — a
+      **"NOT OPEN YET"** notice shows ("Opens <date>") and the form is **read-only**
+      (no Submit). (Window opens ~4 days out by default.)
+- [ ] **Form reconstructs (the key check):** once open (or to verify content), the form
+      lists **each active goal** for that role (current value / what changed / need help
+      / request complete) followed by the **weekly check-in** (accomplishments /
+      priorities / blockers / announcements).
+- [ ] **Survives reload:** fill + submit (when open) → reopen the task → your answers
+      **persist** and the questions are still there (reconstructed from goals + answers
+      from the RPC — **not** "This questionnaire is unavailable").
+- [ ] **Leadership read:** on a **second leadership account**, open the submitted task →
+      the same goal questions render read-only with the answers. *(Known: it reflects
+      the role's CURRENT goals — if a goal was archived after submitting, its answer
+      persists but isn't shown. History snapshot is a later lane.)*
+- [ ] **No push:** generating or submitting a goal update fires **no** push.
+
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
       when overdue exists.
