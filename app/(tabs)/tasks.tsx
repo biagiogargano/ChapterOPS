@@ -14,13 +14,13 @@ import {
   getResponsibilityGroups,
   isOverdue,
   setSupabaseTaskCache,
-  sortTasks,
   type MockTask,
   type TaskState,
   type TaskSortBy,
 } from '@/lib/mockTasks';
 import { getRsvpEntry, refreshRsvpsFromSupabase, useRsvpEntry, useRsvpVersion, type RsvpStatus } from '@/lib/rsvpStore';
 import { isRsvpTaskExpired, isTaskCompleted } from '@/lib/taskCompletion';
+import { applyTaskView, STATUS_FILTERS, TASK_SORTS, type StatusFilter } from '@/lib/taskListView';
 import { hydrateUpdateNotices } from '@/lib/updateNoticeStore';
 import { ROLE_LABELS, isOfficer } from '@/lib/roles';
 import { useFocusEffect } from '@react-navigation/native';
@@ -280,42 +280,6 @@ function SectionHeader({
 
 // ─── Filter + sort ────────────────────────────────────────────────────────────
 
-type StatusFilter = 'todo' | 'done' | 'all';
-
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: 'todo', label: 'To Do' },
-  { id: 'done', label: 'Done' },
-  { id: 'all',  label: 'All' },
-];
-
-const SORTS: { id: TaskSortBy; label: string }[] = [
-  { id: 'due',   label: 'Due date' },
-  { id: 'event', label: 'Event' },
-  { id: 'type',  label: 'Type' },
-];
-
-/**
- * Does a task match the chosen status filter? "Done" uses the single source of
- * truth (isTaskCompleted: approved / answered RSVP / saved date name). "To Do"
- * is simply everything not done — so overdue + rejected + waiting-on-review all
- * stay actionable. "All" shows both.
- */
-function matchesStatus(t: MockTask, filter: StatusFilter, role: string): boolean {
-  if (filter === 'all') return true;
-  const done = isTaskCompleted(t, role);
-  return filter === 'done' ? done : !done;
-}
-
-/** Apply the active search + filter + sort to a bucket's tasks (pure). */
-function applyView(tasks: MockTask[], filter: StatusFilter, sortBy: TaskSortBy, query: string, role: string): MockTask[] {
-  const q = query.trim().toLowerCase();
-  const filtered = tasks.filter(t =>
-    matchesStatus(t, filter, role) &&
-    (q === '' || t.title.toLowerCase().includes(q) || (t.linkedEvent ?? '').toLowerCase().includes(q)),
-  );
-  return sortTasks(filtered, sortBy);
-}
-
 function FilterSortBar({
   status, sortBy, query, onStatus, onSort, onQuery,
 }: {
@@ -347,7 +311,7 @@ function FilterSortBar({
       </ScrollView>
       <View style={s.sortRow}>
         <Text style={s.sortLabel}>Sort:</Text>
-        {SORTS.map(o => (
+        {TASK_SORTS.map(o => (
           <Pressable key={o.id} style={[s.sortChip, sortBy === o.id && s.sortChipOn]} onPress={() => onSort(o.id)}>
             <Text style={[s.sortChipText, sortBy === o.id && s.sortChipTextOn]}>{o.label}</Text>
           </Pressable>
@@ -438,10 +402,11 @@ export default function TasksScreen() {
   // belong with what I need to act on (To Do / All), never under Done.
   const showActionSections = statusFilter !== 'done';
 
-  const viewAlert    = showActionSections ? applyView(alert,  statusFilter, sortBy, taskQuery, role) : [];
-  const viewMine     = applyView(mine,     statusFilter, sortBy, taskQuery, role);
-  const viewReview   = showActionSections ? applyView(review, statusFilter, sortBy, taskQuery, role) : [];
-  const viewReviewed = applyView(reviewed, statusFilter, sortBy, taskQuery, role);
+  const isDone       = (t: MockTask) => isTaskCompleted(t, role);
+  const viewAlert    = showActionSections ? applyTaskView(alert,  statusFilter, sortBy, taskQuery, isDone) : [];
+  const viewMine     = applyTaskView(mine,     statusFilter, sortBy, taskQuery, isDone);
+  const viewReview   = showActionSections ? applyTaskView(review, statusFilter, sortBy, taskQuery, isDone) : [];
+  const viewReviewed = applyTaskView(reviewed, statusFilter, sortBy, taskQuery, isDone);
   const hasAnyView   = viewAlert.length + viewMine.length + viewReview.length + viewReviewed.length > 0;
 
   /**
