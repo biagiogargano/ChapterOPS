@@ -15,6 +15,7 @@ import {
   getDefaultTemplateIdForKind,
   kindHasDefaultTemplate,
   defaultTemplateCoverage,
+  dueOffsetLabel,
   templateTaskId,
   type EventTemplateInput,
 } from './eventTemplates';
@@ -216,6 +217,13 @@ check('accessor matches DEFAULT_TEMPLATE_BY_KIND',
   check('coverage: every mapped default resolves to a real template',
     cov.withDefault.every(k => !!getEventTemplate(getDefaultTemplateIdForKind(k)!)));
 }
+
+// ── dueOffsetLabel (template preview copy) ────────────────────────────────────
+check('offset 0 → On event day',    dueOffsetLabel(0) === 'On event day');
+check('offset -7 → 7 days before',  dueOffsetLabel(-7) === '7 days before');
+check('offset -1 → 1 day before',   dueOffsetLabel(-1) === '1 day before');
+check('offset +1 → 1 day after',    dueOffsetLabel(1) === '1 day after');
+check('offset +3 → 3 days after',   dueOffsetLabel(3) === '3 days after');
 
 console.log(`\neventTemplates.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

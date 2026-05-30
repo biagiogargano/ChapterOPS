@@ -351,6 +351,17 @@ export function defaultTemplateCoverage(kinds: EventKind[]): {
 
 // ─── Date math ────────────────────────────────────────────────────────────────
 
+/**
+ * Human label for a template spec's due offset relative to the event day, e.g.
+ * "7 days before", "1 day after", "On event day". Pure; used by the event-create
+ * template preview. Lives here so the preview copy stays next to the spec data.
+ */
+export function dueOffsetLabel(offsetDays: number): string {
+  if (offsetDays === 0) return 'On event day';
+  const d = Math.abs(offsetDays);
+  return `${d} day${d === 1 ? '' : 's'} ${offsetDays < 0 ? 'before' : 'after'}`;
+}
+
 /** Shift an ISO "YYYY-MM-DD" date by `delta` days (local-time, tz-safe). */
 function addDays(dateString: string, delta: number): string {
   const d = new Date(dateString + 'T00:00:00');

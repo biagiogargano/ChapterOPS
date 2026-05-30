@@ -25,7 +25,7 @@ import {
 } from '@/lib/mockEvents';
 import { FLOOR_ROLE, OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { buildRsvpReviewTask } from '@/lib/generatedTasks';
-import { NO_TEMPLATE, getDefaultTemplateIdForKind } from '@/lib/eventTemplates';
+import { NO_TEMPLATE, getDefaultTemplateIdForKind, dueOffsetLabel } from '@/lib/eventTemplates';
 import { buildTasksForTemplateId, getTemplateById, mergedTemplateOptions, useCustomTemplatesVersion } from '@/lib/customTemplatesStore';
 import SearchablePicker from '@/components/SearchablePicker';
 import { addGeneratedTask, PROOF_LABEL } from '@/lib/mockTasks';
@@ -131,12 +131,6 @@ const AUDIENCE_OPTIONS: { value: EventAudience; label: string; sub: string }[] =
 const RECURRENCE_OPTS: RecurrenceType[] = ['none', 'daily', 'weekly', 'biweekly', 'monthly'];
 
 // Human label for a template task's due offset (negative = before the event).
-function dueOffsetLabel(n: number): string {
-  if (n === 0) return 'On event day';
-  const d = Math.abs(n);
-  return `${d} day${d === 1 ? '' : 's'} ${n < 0 ? 'before' : 'after'}`;
-}
-
 // ─── FieldLabel ───────────────────────────────────────────────────────────────
 
 function FieldLabel({ text, required }: { text: string; required?: boolean }) {
