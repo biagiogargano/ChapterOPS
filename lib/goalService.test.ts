@@ -12,6 +12,7 @@
 
 import {
   createGoal, listGoalsForOrg, listMyGoals, updateGoal, completeGoal, archiveGoal,
+  listGoalsForOrgResult, listMyGoalsResult,
 } from './goalService';
 
 export async function runAsync(): Promise<{ passed: number; failed: number }> {
@@ -27,6 +28,20 @@ export async function runAsync(): Promise<{ passed: number; failed: number }> {
   check('listMyGoals → [] when unconfigured', (await listMyGoals('org-1')).length === 0);
   check('listGoalsForOrg → [] on empty orgId', (await listGoalsForOrg('')).length === 0);
   check('listMyGoals → [] on empty orgId', (await listMyGoals('')).length === 0);
+
+  // ── Error-aware read variants: unconfigured = ok:true empty (not an error) ────
+  {
+    const r1 = await listGoalsForOrgResult('org-1');
+    check('listGoalsForOrgResult → ok:true when unconfigured (legit empty)', r1.ok === true && r1.goals.length === 0);
+    check('listGoalsForOrgResult → no error when unconfigured', r1.error === undefined);
+    const r2 = await listMyGoalsResult('org-1');
+    check('listMyGoalsResult → ok:true when unconfigured', r2.ok === true && r2.goals.length === 0);
+    const r3 = await listGoalsForOrgResult('');
+    check('listGoalsForOrgResult → ok:true on empty orgId', r3.ok === true && r3.goals.length === 0);
+    // The plain wrappers delegate to the result variant and still return [].
+    check('listGoalsForOrg delegates → []', (await listGoalsForOrg('org-1')).length === 0);
+    check('listMyGoals delegates → []', (await listMyGoals('org-1')).length === 0);
+  }
 
   // ── Mutations return a safe failure ──────────────────────────────────────────
   {

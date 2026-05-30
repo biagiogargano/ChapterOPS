@@ -13,7 +13,7 @@ import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { ROLES, ROLE_LABELS, OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
 import {
-  listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
+  listGoalsForOrgResult, listMyGoalsResult, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
 import { goalProgress, goalDisplay, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
 import { emitGoalAssignedNotice } from '@/lib/updateNoticeStore';
@@ -74,8 +74,15 @@ export default function GoalsScreen() {
     if (!activeOrgId) { setGoals([]); setLoading(false); setError('No active organization.'); return; }
     setLoading(true);
     setError(null);
-    const rows = isAdmin ? await listGoalsForOrg(activeOrgId) : await listMyGoals(activeOrgId);
-    setGoals(rows);
+    const res = isAdmin ? await listGoalsForOrgResult(activeOrgId) : await listMyGoalsResult(activeOrgId);
+    if (res.ok) {
+      setGoals(res.goals);
+    } else {
+      // A failed read must NOT masquerade as "No goals yet." — show a real error so
+      // the user can retry (the empty state otherwise looks identical to truly-empty).
+      setGoals([]);
+      setError('Couldn’t load goals. Check your connection and try again.');
+    }
     setLoading(false);
   }, [activeOrgId, isAdmin]);
 

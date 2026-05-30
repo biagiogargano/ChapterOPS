@@ -85,33 +85,52 @@ function mapGoalRow(row: any): Goal {
 
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
-/** All goals the caller may read in an org (leadership/annotator → all; else own).
- *  Returns [] when unconfigured, on error, or when there is no input. Never throws. */
-export async function listGoalsForOrg(orgId: string): Promise<Goal[]> {
-  if (!isSupabaseConfigured()) return [];
-  if (!orgId) return [];
+/**
+ * Result of a goal read. `ok` distinguishes a genuine empty list (ok:true, goals:[])
+ * from a FAILED read (ok:false) — so the UI can show an error instead of a misleading
+ * "No goals yet." An unconfigured/sandbox client is treated as a legitimate empty
+ * (ok:true), not an error. Never throws.
+ */
+export interface GoalListResult {
+  ok:     boolean;
+  goals:  Goal[];
+  error?: string;
+}
+
+async function listGoalsVia(rpc: 'list_goals_for_org' | 'list_my_goals', orgId: string): Promise<GoalListResult> {
+  if (!isSupabaseConfigured()) return { ok: true, goals: [] };   // sandbox: legitimately empty
+  if (!orgId) return { ok: true, goals: [] };
   try {
-    const { data, error } = await supabase.rpc('list_goals_for_org', { p_org_id: orgId });
-    if (error) { console.warn('[goalService] list_goals_for_org error:', error.message); return []; }
-    return Array.isArray(data) ? data.map(mapGoalRow) : [];
+    const { data, error } = await supabase.rpc(rpc, { p_org_id: orgId });
+    if (error) { console.warn(`[goalService] ${rpc} error:`, error.message); return { ok: false, goals: [], error: error.message }; }
+    return { ok: true, goals: Array.isArray(data) ? data.map(mapGoalRow) : [] };
   } catch (err) {
-    console.warn('[goalService] list_goals_for_org threw:', err);
-    return [];
+    console.warn(`[goalService] ${rpc} threw:`, err);
+    return { ok: false, goals: [], error: String(err) };
   }
 }
 
-/** Goals the caller OWNS in an org (owner_role). Same fallback-safe contract. */
+/** All goals the caller may read in an org — error-aware variant (preferred for UI). */
+export function listGoalsForOrgResult(orgId: string): Promise<GoalListResult> {
+  return listGoalsVia('list_goals_for_org', orgId);
+}
+
+/** Goals the caller OWNS in an org — error-aware variant (preferred for UI). */
+export function listMyGoalsResult(orgId: string): Promise<GoalListResult> {
+  return listGoalsVia('list_my_goals', orgId);
+}
+
+/** All goals the caller may read in an org (leadership/annotator → all; else own).
+ *  Returns [] when unconfigured, on error, or when there is no input. Never throws.
+ *  Prefer listGoalsForOrgResult when the caller needs to distinguish error from empty. */
+export async function listGoalsForOrg(orgId: string): Promise<Goal[]> {
+  return (await listGoalsForOrgResult(orgId)).goals;
+}
+
+/** Goals the caller OWNS in an org (owner_role). Same fallback-safe contract.
+ *  Prefer listMyGoalsResult when the caller needs to distinguish error from empty. */
 export async function listMyGoals(orgId: string): Promise<Goal[]> {
-  if (!isSupabaseConfigured()) return [];
-  if (!orgId) return [];
-  try {
-    const { data, error } = await supabase.rpc('list_my_goals', { p_org_id: orgId });
-    if (error) { console.warn('[goalService] list_my_goals error:', error.message); return []; }
-    return Array.isArray(data) ? data.map(mapGoalRow) : [];
-  } catch (err) {
-    console.warn('[goalService] list_my_goals threw:', err);
-    return [];
-  }
+  return (await listMyGoalsResult(orgId)).goals;
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
