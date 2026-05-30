@@ -572,11 +572,15 @@ function UpcomingRow({ label, meta }: { label: string; meta: string }) {
   );
 }
 
-function AllClearRow() {
+function AllClearRow({ hasUpcoming }: { hasUpcoming?: boolean }) {
   return (
     <View style={s.allClear}>
       <Text style={s.allClearIcon}>✓</Text>
-      <Text style={s.allClearText}>You're all caught up for today</Text>
+      <Text style={s.allClearText}>
+        {hasUpcoming
+          ? 'Nothing urgent today — see Coming up below'
+          : "You're all caught up for today"}
+      </Text>
     </View>
   );
 }
@@ -797,7 +801,7 @@ export default function TodayScreen() {
           </View>
         ) : (
           <>
-            <AllClearRow />
+            <AllClearRow hasUpcoming={weekMine.length > 0 || comingUpEvs.length > 0} />
             {isOfficerRole && (
               <Pressable style={s.allClearCreate} onPress={() => router.push('/event/create' as any)}>
                 <Text style={s.allClearCreateText}>+ New event</Text>
