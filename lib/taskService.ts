@@ -84,6 +84,10 @@ interface TaskRow {
   proof_content:          string;
   rejection_note:         string;
   created_by_role:        string | null;
+  // Optional — present only once the report_definition_id column is applied
+  // (supabase/task_report_definition_patch_draft.sql). Until then it is absent on
+  // fetched rows, so this is `?` and read defensively.
+  report_definition_id?:  string | null;
   created_at:             string;
   updated_at:             string;
 }
@@ -144,6 +148,10 @@ function rowToMockTask(row: TaskRow): MockTask {
 
     createdByRole:   (row.created_by_role as Role | null) ?? undefined,
     dueAt:           row.due_at ?? undefined,
+
+    // Questionnaire/report definition this task collects. Read defensively: absent
+    // (column not yet applied) or null → undefined, so ordinary tasks are unaffected.
+    reportDefinitionId: row.report_definition_id ?? undefined,
   };
 }
 
@@ -154,7 +162,15 @@ function rowToMockTask(row: TaskRow): MockTask {
  */
 function mockTaskToRow(task: MockTask): Record<string, unknown> {
   const visibleToAll = task.visibleTo === 'all';
+  // Only include report_definition_id when the task actually carries one. Ordinary
+  // tasks omit the key entirely, so they still insert/upsert cleanly even if the
+  // column isn't applied yet (PostgREST rejects unknown columns). Questionnaire
+  // tasks include it; their persistence requires the patch to be applied.
+  const reportDef = task.reportDefinitionId
+    ? { report_definition_id: task.reportDefinitionId }
+    : {};
   return {
+    ...reportDef,
     id:                     task.id,
     chapter_id:             getDataOrgId(),
     title:                  task.title,

@@ -32,6 +32,20 @@ export function reportTaskId(role: Role, cycle: string): string {
   return `${REPORT_TASK_PREFIX}${role}_${cycle}`;
 }
 
+/**
+ * Does this task LOOK like a questionnaire/report task — independent of whether its
+ * definition currently resolves? True when it carries a reportDefinitionId OR its id
+ * uses the deterministic report task prefix (report_…). Used to tell a BROKEN
+ * questionnaire (was a report, but the definition can't be resolved — e.g. the
+ * persistence column isn't applied so the field was dropped) from an ordinary
+ * structured task, so the UI can show an honest "unavailable" state rather than a
+ * misleading generic complete button. Pure.
+ */
+export function looksLikeReportTask(task: { id?: string; reportDefinitionId?: string }): boolean {
+  if (task.reportDefinitionId) return true;
+  return typeof task.id === 'string' && task.id.startsWith(REPORT_TASK_PREFIX);
+}
+
 export interface ReportTaskInput {
   /** Org scope (carried for the future write path; not used in the id). */
   orgId:        string;

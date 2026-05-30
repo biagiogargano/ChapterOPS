@@ -10,6 +10,14 @@ is implied by this doc.** The point of Build 17 on device is to verify the
 > - **Do NOT broadly announce Build 17** until the questionnaire round-trip
 >   (sections 4–6 below) works end to end on device.
 > - If the round-trip fails, the bundle is not ready — stop and report, don't widen.
+>
+> ⛔ **Known: questionnaire persistence needs a SQL patch.** Build 17 (and any build
+>   before the patch) does NOT persist `reportDefinitionId` — `supabase/task_report_definition_patch_draft.sql`
+>   adds the `tasks.report_definition_id` column and is **NOT applied yet**. Until it
+>   is applied, a generated questionnaire task that round-trips through the DB will
+>   show **"This questionnaire is unavailable…"** (honest error — no longer a blank
+>   "Save & Complete"). So §4–6 below require that patch applied first; on Build 17
+>   as-is you can expect the unavailable state, which itself is worth verifying.
 
 ---
 
@@ -57,9 +65,15 @@ real/persisted — a failed RPC must show an error, never a fake success.
 - [ ] **Goals tab appears** in the tab bar (Target icon, between Tasks and Me).
 - [ ] **+ New goal** is shown to **any officer** (leadership + chairs). **Create a
       goal** (title, current, target, a cadence chip) → it **appears in the list**
-      after refresh (persisted, not local). The new goal's owner defaults to the
-      creator's current role; leadership can create for another role by switching
-      role first. A **Brother / non-officer** sees **no create form**.
+      after refresh (persisted, not local). A **Brother / non-officer** sees **no
+      create form**.
+- [ ] **Bulk create:** enter **multiple titles** (one per line, or separated by `;`)
+      → pressing **Create N** creates one goal per title (current/target/cadence/owner
+      shared). Partial failure shows "Created X of N…" and still refreshes.
+- [ ] **Owner selector:** as **leadership/Annotator**, the form shows an **OWNER ROLE**
+      picker (officer roles) — choose the officer the goal is for. As a non-leadership
+      **officer**, no picker — owner is locked to their own role (no "switch role
+      first" workaround).
 - [ ] **Current/target + percent + progress bar** render correctly for a measurable
       goal; a goal with no target shows no bar (not "NaN%").
 - [ ] **Edit** a goal (change current/target/title/cadence) → values **persist** on

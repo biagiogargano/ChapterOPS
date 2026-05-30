@@ -5,7 +5,7 @@
  * Date-relative fields (dueLabel/urgency) are not asserted (they depend on today).
  */
 
-import { buildReportTask, reportTaskId, REPORT_TASK_PREFIX } from './reportTasks';
+import { buildReportTask, reportTaskId, REPORT_TASK_PREFIX, looksLikeReportTask } from './reportTasks';
 import { WEEKLY_OFFICER_REPORT_ID, WEEKLY_OFFICER_REPORT } from './reportDefinitions';
 import { ROLE_LABELS } from './roles';
 
@@ -72,6 +72,20 @@ check('different cycle → different id',
 // ── Fail safe: unknown definition → null ──────────────────────────────────────
 check('unknown definition → null',
   buildReportTask({ ...input, definitionId: 'nope' }) === null);
+
+// ── looksLikeReportTask: detect a questionnaire task even when broken ──────────
+check('looksLike: has reportDefinitionId → true',
+  looksLikeReportTask({ id: 'whatever', reportDefinitionId: WEEKLY_OFFICER_REPORT_ID }) === true);
+check('looksLike: report_ id but no definition (broken/persisted) → true',
+  looksLikeReportTask({ id: reportTaskId('social_chair', '2026-W23') }) === true);
+check('looksLike: report_ prefix literal → true',
+  looksLikeReportTask({ id: `${REPORT_TASK_PREFIX}x` }) === true);
+check('looksLike: ordinary task id, no def → false',
+  looksLikeReportTask({ id: 'tmpl_date_party_evt1_venue' }) === false);
+check('looksLike: user task id, no def → false',
+  looksLikeReportTask({ id: 'uce_abc123' }) === false);
+check('looksLike: empty/missing id, no def → false',
+  looksLikeReportTask({}) === false);
 
 console.log(`\nreportTasks.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

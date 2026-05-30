@@ -11,11 +11,11 @@
 
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { ROLES, ROLE_LABELS, OFFICER_ROLES, isOfficer, type Role } from '@/lib/roles';
 import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
-import { goalProgress, canManageGoal } from '@/lib/goalHelpers';
+import { goalProgress, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
 import type { Goal, GoalCadence } from '@/lib/goals';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
@@ -88,13 +88,14 @@ export default function GoalsScreen() {
           Track goals that progress over time. {isAdmin ? 'You see all org goals.' : 'You see goals for your role.'}
         </Text>
 
-        {/* Create — any officer (for their own role); leadership for any role via
-            the role switcher. Non-officers get no create form. RPC also enforces. */}
+        {/* Create — any officer (for their own role); leadership picks the owner
+            role in the form. Non-officers get no create form. RPC also enforces. */}
         {canCreate && (
           showCreate
             ? <CreateGoalForm
                 orgId={activeOrgId ?? ''}
                 defaultOwnerRole={role}
+                canChooseOwner={isAdmin}
                 onCancel={() => setShowCreate(false)}
                 onCreated={() => { setShowCreate(false); void load(); }}
               />
@@ -209,38 +210,67 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
 // ─── Create form ──────────────────────────────────────────────────────────────
 
 function CreateGoalForm({
-  orgId, defaultOwnerRole, onCancel, onCreated,
-}: { orgId: string; defaultOwnerRole: Role; onCancel: () => void; onCreated: () => void }) {
+  orgId, defaultOwnerRole, canChooseOwner, onCancel, onCreated,
+}: {
+  orgId: string;
+  defaultOwnerRole: Role;
+  canChooseOwner: boolean;   // leadership/annotator may pick the owner role
+  onCancel: () => void;
+  onCreated: () => void;
+}) {
   const [title, setTitle]     = useState('');
   const [target, setTarget]   = useState('');
   const [current, setCurrent] = useState('');
   const [cadence, setCadence] = useState<GoalCadence>('weekly');
+  const [ownerRole, setOwnerRole] = useState<Role>(defaultOwnerRole);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState<string | null>(null);
 
+  // Bulk: one goal per line or per ';'. Current/target apply to all created goals.
+  const titles = parseGoalPrompts(title);
+
   async function submit() {
     if (busy) return;
-    if (title.trim() === '') { setErr('Enter a goal title.'); return; }
+    if (titles.length === 0) { setErr('Enter at least one goal title.'); return; }
     if (!orgId) { setErr('No active organization.'); return; }
     setBusy(true);
     setErr(null);
-    const r = await createGoal({
-      orgId,
-      title: title.trim(),
-      cadence,
-      targetValue:  parseNum(target),
-      currentValue: parseNum(current),
-      ownerRole:    defaultOwnerRole,
-    });
+
+    const tgt = parseNum(target);
+    const cur = parseNum(current);
+    let created = 0;
+    let firstError: string | null = null;
+    for (const t of titles) {
+      const r = await createGoal({ orgId, title: t, cadence, targetValue: tgt, currentValue: cur, ownerRole });
+      if (r.ok) created++;
+      else if (!firstError) firstError = r.error ?? 'unknown';
+    }
     setBusy(false);
-    if (r.ok) onCreated();
-    else setErr(r.error === 'unconfigured' ? 'Goals storage isn’t available here. Try on a device build.' : (r.error ?? 'Couldn’t create the goal.'));
+
+    if (created === titles.length) { onCreated(); return; }   // all succeeded
+    if (created === 0) {
+      setErr(firstError === 'unconfigured'
+        ? 'Goals storage isn’t available here. Try on a device build.'
+        : `Couldn’t create the goal${titles.length > 1 ? 's' : ''}.`);
+      return;
+    }
+    // Partial: some created, some failed — refresh the list AND report honestly.
+    setErr(`Created ${created} of ${titles.length}. ${titles.length - created} failed — try those again.`);
+    onCreated();
   }
 
   return (
     <View style={s.form}>
-      <Text style={s.formLabel}>NEW GOAL</Text>
-      <TextInput style={s.input} placeholder="Goal title" placeholderTextColor="#475569" value={title} onChangeText={t => { setTitle(t); setErr(null); }} />
+      <Text style={s.formLabel}>NEW GOAL{canChooseOwner ? ' (you can add several)' : ''}</Text>
+      <TextInput
+        style={[s.input, { minHeight: 44 }]}
+        placeholder="Goal title — one per line or separated by ;"
+        placeholderTextColor="#475569"
+        value={title}
+        onChangeText={t => { setTitle(t); setErr(null); }}
+        multiline
+      />
+      {titles.length > 1 && <Text style={s.ownerNote}>{titles.length} goals will be created.</Text>}
       <View style={s.row2}>
         <TextInput style={[s.input, s.flex1]} placeholder="Current" placeholderTextColor="#475569" keyboardType="numeric" value={current} onChangeText={setCurrent} />
         <TextInput style={[s.input, s.flex1]} placeholder="Target" placeholderTextColor="#475569" keyboardType="numeric" value={target} onChangeText={setTarget} />
@@ -252,12 +282,28 @@ function CreateGoalForm({
           </Pressable>
         ))}
       </View>
-      <Text style={s.ownerNote}>Owner: {ROLE_LABELS[defaultOwnerRole] ?? defaultOwnerRole}</Text>
+
+      {/* Owner role: leadership/annotator picks; officers are locked to their own. */}
+      {canChooseOwner ? (
+        <>
+          <Text style={s.ownerLabel}>OWNER ROLE</Text>
+          <View style={s.cadenceRow}>
+            {OFFICER_ROLES.map(r => (
+              <Pressable key={r} style={[s.chip, ownerRole === r && s.chipOn]} onPress={() => setOwnerRole(r)}>
+                <Text style={[s.chipText, ownerRole === r && s.chipTextOn]}>{ROLE_LABELS[r] ?? r}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : (
+        <Text style={s.ownerNote}>Owner: {ROLE_LABELS[ownerRole] ?? ownerRole}</Text>
+      )}
+
       {err && <Text style={s.errorText}>{err}</Text>}
       <View style={s.formActions}>
         <Pressable style={s.secondaryBtn} onPress={onCancel} disabled={busy}><Text style={s.secondaryText}>Cancel</Text></Pressable>
         <Pressable style={[s.primaryBtn, busy && s.btnDisabled]} onPress={() => void submit()} disabled={busy}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>Create</Text>}
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{titles.length > 1 ? `Create ${titles.length}` : 'Create'}</Text>}
         </Pressable>
       </View>
     </View>
@@ -356,6 +402,7 @@ const s = StyleSheet.create({
   chipText:   { fontSize: 12, color: '#64748b', fontWeight: '500' },
   chipTextOn: { color: '#a5b4fc', fontWeight: '700' },
   ownerNote:  { fontSize: 12, color: '#64748b' },
+  ownerLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginTop: 2 },
   formActions:{ flexDirection: 'row', gap: 10, marginTop: 4 },
   secondaryBtn:{ flex: 1, backgroundColor: '#0f172a', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
   secondaryText:{ color: '#94a3b8', fontWeight: '600', fontSize: 14 },

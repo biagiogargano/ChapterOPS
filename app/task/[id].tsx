@@ -37,6 +37,7 @@ import { usePushRegistration } from '@/lib/usePushRegistration';
 import { sendActionPush } from '@/lib/pushTokens';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getReportDefinition } from '@/lib/reportDefinitions';
+import { looksLikeReportTask } from '@/lib/reportTasks';
 import {
   orderedQuestions,
   responseProgress,
@@ -1153,6 +1154,11 @@ export default function TaskDetailScreen() {
   // section, so it's excluded from proof/approval/simple-complete below.
   const reportDef     = task.reportDefinitionId ? getReportDefinition(task.reportDefinitionId) : null;
   const isReportTask  = !!reportDef;
+  // A task that LOOKS like a questionnaire (report_ id, or carried a definition id)
+  // but whose definition can't be resolved — most likely its reportDefinitionId was
+  // dropped on persistence because the report_definition_id column isn't applied yet.
+  // Show an honest "unavailable" state instead of the generic Save & Complete.
+  const isBrokenReport = looksLikeReportTask(task) && !reportDef;
   // Readers allowed to view a report (matches the RPC's read set; the RPC is the
   // real gate — this only decides whether to render the read-only view).
   const canReadReport = isAssignee || role === 'annotator' || isLeadershipRole(role);
@@ -1166,7 +1172,7 @@ export default function TaskDetailScreen() {
   // report — get a plain "Mark Complete" (sets 'approved'). Report tasks render
   // the report form instead.
   const showSimpleComplete =
-    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval && !isReportTask;
+    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval && !isReportTask && !isBrokenReport;
   // Report section: the assignee's form, OR an allowed reader's read-only view.
   const showReport = isReportTask && canReadReport;
   const showProofReview = isReviewerOnly && taskState === 'submitted' && !isReportTask;
@@ -1334,6 +1340,19 @@ export default function TaskDetailScreen() {
                 </Pressable>
               </View>
             )}
+          </>
+        )}
+
+        {/* ── Broken questionnaire (definition unavailable) ── */}
+        {isBrokenReport && (
+          <>
+            <Divider />
+            <SLabel text="QUESTIONNAIRE UNAVAILABLE" />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>
+                This questionnaire is unavailable. Ask leadership to recreate this task.
+              </Text>
+            </View>
           </>
         )}
 
@@ -1603,6 +1622,8 @@ const s = StyleSheet.create({
   reportNoUpdateLabel:{ fontSize: 13, color: '#94a3b8', fontWeight: '500' },
   reportNoUpdateTag:  { fontSize: 13, color: '#818cf8', fontWeight: '600', fontStyle: 'italic' },
   reportHint:         { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 8 },
+  reportUnavailable:     { backgroundColor: '#1a0505', borderRadius: 10, borderWidth: 1, borderColor: '#7f1d1d', padding: 14 },
+  reportUnavailableText: { fontSize: 13, color: '#fca5a5', lineHeight: 19 },
 
   reviewBlock:    { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 14 },
   reviewerNote:   { fontSize: 13, color: '#64748b' },
