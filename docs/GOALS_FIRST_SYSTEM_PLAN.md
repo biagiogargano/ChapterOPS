@@ -138,10 +138,12 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
 ## 10. Recommended implementation sequence
 
 1. **This planning doc.** ✅
-2. **Pure goal types + helpers** (inert): `Goal` / `GoalUpdate` interfaces; a pure
-   multi-line-input → `Goal[]` parser; a pure "is an update due for this goal+date"
-   helper. No app imports, no runtime wiring. Tested.
-3. **Pure tests** for those helpers.
+2. **Pure goal types + helpers** (inert): `Goal` / `GoalUpdate` interfaces ✅
+   (`lib/goals.ts`); pure helpers ✅ (`lib/goalHelpers.ts`) — `parseGoalPrompts`
+   (bulk newline/`;` quick-add), `goalProgress` (safe current/target math),
+   `goalPeriodKey` + `isGoalUpdateDue` (cadence bucketing, NOT a scheduler), and
+   status helpers. No app imports, no runtime wiring.
+3. **Pure tests** ✅ (`lib/goalHelpers.test.ts`, 36 cases).
 4. **Draft Supabase plan** (`goals` / `goal_updates` or reuse) — doc only.
 5. **Apply Supabase** — only after explicit approval (own lane).
 6. **Goals tab** (list + create + detail).

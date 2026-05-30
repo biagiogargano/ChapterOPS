@@ -27,6 +27,7 @@ const EXPECTED = [
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
   'genericEventTemplates',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
+  'goalHelpers',
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'questionnaireCycle',
   'questionnaireGenerationFlow', 'questionnaireGenerationPlan', 'questionnaireTemplates',
   'reportDefinitions', 'rolePackRuntime', 'starterPacks', 'starterPackValidation',
