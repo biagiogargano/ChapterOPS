@@ -207,6 +207,40 @@ export function validateAnswers(
   return { valid, errors, missingRequired };
 }
 
+// ─── Answer editing (pure; the form's state transforms) ───────────────────────
+
+/**
+ * Return a new answer map with `key`'s text value set. Setting a non-empty value
+ * clears any "No update" on that key (they're mutually exclusive). Pure — does
+ * not mutate the input.
+ */
+export function withAnswerValue(
+  map: StructuredAnswerMap,
+  key: string,
+  value: string,
+): StructuredAnswerMap {
+  return { ...map, [key]: { key, value, noUpdate: false } };
+}
+
+/**
+ * Return a new answer map with `key`'s "No update" toggled to `noUpdate`. Turning
+ * No-update ON clears the text value (mutually exclusive); turning it OFF leaves
+ * an empty value. Pure — does not mutate the input.
+ */
+export function withAnswerNoUpdate(
+  map: StructuredAnswerMap,
+  key: string,
+  noUpdate: boolean,
+): StructuredAnswerMap {
+  const prev = map[key];
+  return {
+    ...map,
+    [key]: noUpdate
+      ? { key, noUpdate: true }
+      : { key, value: prev?.value ?? '', noUpdate: false },
+  };
+}
+
 // ─── Completeness ─────────────────────────────────────────────────────────────
 
 export interface ResponseProgress {

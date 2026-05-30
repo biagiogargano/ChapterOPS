@@ -12,6 +12,8 @@ import {
   validateAnswers,
   isAnswered,
   responseProgress,
+  withAnswerValue,
+  withAnswerNoUpdate,
   type StructuredResponseDefinition,
   type StructuredAnswerMap,
 } from './structuredResponses';
@@ -192,6 +194,29 @@ check('no-update NOT counted when disallowed',
   const p = responseProgress(def, a);
   check('no-update counts toward answered', p.answered === 3);
   check('still complete', p.complete === true);
+}
+
+// ── withAnswerValue / withAnswerNoUpdate (form state transforms) ──────────────
+{
+  const m0: StructuredAnswerMap = {};
+  const m1 = withAnswerValue(m0, 'focus', 'ship it');
+  check('withAnswerValue sets value', m1.focus.value === 'ship it' && m1.focus.noUpdate === false);
+  check('withAnswerValue is pure (input unchanged)', m0.focus === undefined);
+
+  // Setting a value clears a prior No-update.
+  const m2 = withAnswerNoUpdate(m1, 'focus', true);
+  check('withAnswerNoUpdate sets noUpdate + clears value',
+    m2.focus.noUpdate === true && (m2.focus.value === undefined));
+  const m3 = withAnswerValue(m2, 'focus', 'actually here');
+  check('setting value clears noUpdate', m3.focus.noUpdate === false && m3.focus.value === 'actually here');
+
+  // Turning No-update OFF keeps an empty value (not undefined → editable).
+  const m4 = withAnswerNoUpdate(m3, 'focus', false);
+  check('noUpdate off leaves empty editable value', m4.focus.noUpdate === false && typeof m4.focus.value === 'string');
+
+  // Other keys are untouched.
+  const m5 = withAnswerValue(m4, 'goals', 'plan');
+  check('other keys preserved', m5.focus.value === 'actually here' && m5.goals.value === 'plan');
 }
 
 console.log(`\nstructuredResponses.test: ${passed} passed, ${failed} failed`);
