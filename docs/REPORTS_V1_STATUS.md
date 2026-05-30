@@ -41,6 +41,15 @@ built. Record/doc only — no behavior, schema, or EAS change implied.
 
 ## Generation UI placement — DECISION (gated, documented)
 
+> **UPDATE (`f8db5f0`): the trigger is now WIRED.** A "Create questionnaire tasks"
+> card (President / Pro Consul / Annotator) on the Me tab calls the generic
+> `generateQuestionnaireTasks` with a native confirm, defaulting to the Weekly
+> Officer Report template + officer roles. The section below records the original
+> (correct-at-the-time) decision to keep it service-only; it has since been
+> approved and built. Current design lives in
+> `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md`; current state in
+> `docs/BUILD_17_NOTES.md`.
+
 **Natural surface identified:** the **Leadership card** on the Me screen
 (`app/(tabs)/me.tsx`, gated on `isLeadershipRole(role)`) is the right home. It is
 already leadership-only and already hosts an org-admin action ("Manage task
@@ -111,5 +120,8 @@ All pure-tested: `structuredResponses` (37), `reportDefinitions` (16),
 
 ---
 
-*Doc only. No schema/RLS/RPC/EAS/auth/push change implied. Generation is manual
-and service-only; the form + storage are live in code pending a build.*
+*Doc only. No schema/RLS/RPC/EAS/auth/push change implied. The manual generation
+trigger is now wired (Me tab, leadership-gated, with a confirm step, `f8db5f0`);
+the form + storage are live in code, with the submission round-trip pending a
+build. This doc is a point-in-time Reports-V1 record — for current Build 17 state
+see `docs/BUILD_17_NOTES.md`.*

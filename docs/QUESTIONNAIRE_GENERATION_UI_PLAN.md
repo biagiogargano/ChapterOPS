@@ -1,7 +1,11 @@
-# Questionnaire Generation — Manual Trigger UI Plan (plan only, NOT wired)
+# Questionnaire Generation — Manual Trigger UI (BUILT `f8db5f0`)
 
-How the eventual small UI for manually creating questionnaire tasks should work.
-**Planning only — no UI is wired by this doc.** Governed by
+> **Status: implemented.** This was the design doc for the trigger; it has since
+> been approved and wired on the Me tab (President / Pro Consul / Annotator), with
+> a native confirm step. The design below matches what shipped. Current state:
+> `docs/BUILD_17_NOTES.md`.
+
+How the small UI for manually creating questionnaire tasks works. Governed by
 `docs/PRODUCT_ARCHITECTURE_AND_SCALE_DOCTRINE.md` (generic core, Sigma Chi as pack).
 
 The backing helper already exists and is generic:
@@ -79,6 +83,8 @@ identical to selecting any other definition — no special-case code path.
 3. **Role multi-select UI.** Needs a small multi-select; reuse `SearchablePicker`
    patterns rather than a new component.
 
-**Decision:** keep generation service-only until (1) is approved and (2) is
-device-verified. This doc is the agreed design; implementation is a separate,
-approved lane.
+**Outcome:** (1) was approved and the trigger was built (`6c17bb7`) with a confirm
+step (`f8db5f0`). It generates the tasks with a fixed Weekly Officer Report default
+for officer roles (no role multi-select yet — item 3 deferred; a future
+enhancement). (2) remains open: the submission round-trip is still device-unverified
+and needs a build.

@@ -87,7 +87,8 @@ on fraternity concepts.
 
 - **Short-term (v1, current):** the generic primitive is the
   structured-response/questionnaire task. Weekly Officer Report is one alpha
-  template. Code-complete, device-unverified, no generation trigger yet.
+  template. Code-complete; the manual generation trigger is wired (Me tab,
+  leadership-gated, with confirm); the submission round-trip is device-unverified.
 - **Medium-term (v2):** report answers feed **agendas**, spawn **follow-up tasks**
   (help-needed), become **notices/announcements**, and surface **blockers** for
   leadership review. Pure foundation exists (`lib/agendaContributions.ts`).

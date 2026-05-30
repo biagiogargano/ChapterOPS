@@ -127,6 +127,10 @@ officer-reports system. No live-user behavior change; no Supabase.
 - Calls the generic `generateQuestionnaireTasks` (template + officer roles +
   ISO-week cycle id + due-in-7-days). **Idempotent** — re-press creates nothing
   new. Inline success (created/skipped counts) or inline error.
+- **Confirmation step (`f8db5f0`):** the button opens a native confirm
+  ("Create questionnaire tasks?" / body explaining it creates this cycle's tasks
+  for officer roles and is safe to re-run / "Create tasks" · "Cancel"). Generation
+  runs only after Confirm.
 - This creates the report **tasks**; **submitting** a task still writes through the
   `task_report_submissions` RPC, which remains device-unverified (see gated list).
 
@@ -163,9 +167,11 @@ officer-reports system. No live-user behavior change; no Supabase.
 4. **Questionnaire generation** (as President / Pro Consul / Annotator):
    - Me tab shows the "Create questionnaire tasks" card; other roles do **not**
      see it.
-   - Press it → success line shows a created count; one questionnaire task per
-     officer role appears in the Tasks list, titled "Weekly Officer Report — <role>".
-   - **Press again → "No new tasks · N already existed"** (idempotent, no dupes).
+   - Press it → **a confirm dialog appears**; tapping **Cancel** creates nothing.
+   - Press it again → **Create tasks** → success line shows a created count; one
+     questionnaire task per officer role appears in the Tasks list, titled
+     "Weekly Officer Report — <role>".
+   - **Confirm again → "No new tasks · N already existed"** (idempotent, no dupes).
    - Generated cards show **no proof icon and no "Reviewed by"** label (correct —
      questionnaires have neither).
 

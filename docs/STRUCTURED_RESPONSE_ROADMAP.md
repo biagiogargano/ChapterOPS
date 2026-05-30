@@ -68,14 +68,14 @@ Rule: **never rename the live table/RPCs outside an approved Supabase lane.**
 
 ## What is NOT done / gated
 
-- **No generation trigger UI.** `generateQuestionnaireTasks` has no caller. The
-  manual entry point is fully designed in
-  `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md` (Me → Leadership card; copy "Create
-  questionnaire tasks"; Weekly Officer Report as the default-selected template —
-  **not** a one-off "Generate weekly officer reports" button). Gated: it creates
-  tasks for real officers (product decision) and the RPC round-trip is
-  device-unverified.
-- **Form + RPC never run on device** — needs a build (gate).
+- **Generation trigger UI — DONE (`f8db5f0`).** A leadership-gated (President /
+  Pro Consul / Annotator) "Create questionnaire tasks" card on the Me tab calls
+  `generateQuestionnaireTasks` with a native confirm step. Design in
+  `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md`. Generation works in-app now; what
+  remains gated is the **submission round-trip** (next bullet).
+- **Form + submission RPC never run on device** — generation creates the tasks,
+  but filling + submitting a questionnaire writes through the
+  `task_report_submissions` RPC, which is device-unverified. Needs a build (gate).
 - **No live report→agenda wiring** — pure extraction exists; agenda screen does
   not fetch submissions yet.
 - **No new question types** — select/scale/time/multi_select reserved, fail-safe.
@@ -87,9 +87,9 @@ Rule: **never rename the live table/RPCs outside an approved Supabase lane.**
 
 ### v1 — structured-response tasks (current)
 A user fills a form attached to a task; the task completes. Weekly Officer Report
-is the first template. **Status: code-complete, device-unverified, no trigger UI.**
-Remaining: (a) generic manual generation entry point; (b) a build to verify
-on device; (c) optionally more templates.
+is the first template. **Status: code-complete; generation trigger wired
+(`f8db5f0`); submission round-trip device-unverified.** Remaining: (a) a build to
+verify the submit→persist round-trip on device; (b) optionally more templates.
 
 ### v2 — answers feed the org
 - Report/questionnaire answers feed **meeting agendas** (foundation built:
