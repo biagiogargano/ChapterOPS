@@ -55,9 +55,11 @@ is implied by this doc.** The point of Build 17 on device is to verify the
 The Goals tab is backed by the live Goals v1 RPCs via `lib/goalService`. It is
 real/persisted — a failed RPC must show an error, never a fake success.
 - [ ] **Goals tab appears** in the tab bar (Target icon, between Tasks and Me).
-- [ ] As **leadership/Annotator** (President / Pro Consul / Annotator): **+ New goal**
-      is shown. **Create a goal** (title, current, target, a cadence chip) → it
-      **appears in the list** after refresh (persisted, not local).
+- [ ] **+ New goal** is shown to **any officer** (leadership + chairs). **Create a
+      goal** (title, current, target, a cadence chip) → it **appears in the list**
+      after refresh (persisted, not local). The new goal's owner defaults to the
+      creator's current role; leadership can create for another role by switching
+      role first. A **Brother / non-officer** sees **no create form**.
 - [ ] **Current/target + percent + progress bar** render correctly for a measurable
       goal; a goal with no target shows no bar (not "NaN%").
 - [ ] **Edit** a goal (change current/target/title/cadence) → values **persist** on
@@ -66,8 +68,8 @@ real/persisted — a failed RPC must show an error, never a fake success.
       dialog) → it leaves the active list.
 - [ ] **Leadership vs owner role (visibility):** as leadership, you see **all org
       goals** + an **owner-role filter** (All / per-role chips); as a non-leadership
-      **owner role**, you see **only goals for your role**. As an unrelated role, the
-      create button is hidden and you see only your own (likely none).
+      **officer**, you see **only goals for your role** (and can create your own). As
+      a non-officer, the create form is hidden and you see only your own (likely none).
 - [ ] **Permissions v1 (REQUIRES the patch SQL applied —
       `supabase/goals_v1_permissions_patch_draft.sql`):**
   - [ ] As **leadership**, create a goal **for an officer** (its owner role). Sign in

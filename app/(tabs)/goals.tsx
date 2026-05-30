@@ -11,7 +11,7 @@
 
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
-import { ROLES, ROLE_LABELS, type Role } from '@/lib/roles';
+import { ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
@@ -48,6 +48,10 @@ export default function GoalsScreen() {
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);   // leadership-only
 
   const isAdmin = GOAL_ADMIN_ROLES.includes(role);
+  // Any officer may create goals — for their OWN role (the form defaults owner to the
+  // current role). Leadership create for any officer role via the role switcher.
+  // Brother / non-officer roles get no create form. RPCs remain the real gate.
+  const canCreate = isOfficer(role);
   const currentMemberId = member?.id ?? null;
 
   const load = useCallback(async () => {
@@ -84,8 +88,9 @@ export default function GoalsScreen() {
           Track goals that progress over time. {isAdmin ? 'You see all org goals.' : 'You see goals for your role.'}
         </Text>
 
-        {/* Create (admins only — RPC also enforces) */}
-        {isAdmin && (
+        {/* Create — any officer (for their own role); leadership for any role via
+            the role switcher. Non-officers get no create form. RPC also enforces. */}
+        {canCreate && (
           showCreate
             ? <CreateGoalForm
                 orgId={activeOrgId ?? ''}
