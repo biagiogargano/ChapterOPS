@@ -144,7 +144,10 @@ Nothing gets deleted; the report layer is *subsumed*, not replaced.
    `goalPeriodKey` + `isGoalUpdateDue` (cadence bucketing, NOT a scheduler), and
    status helpers. No app imports, no runtime wiring.
 3. **Pure tests** ✅ (`lib/goalHelpers.test.ts`, 36 cases).
-4. **Draft Supabase plan** (`goals` / `goal_updates` or reuse) — doc only.
+4. **Draft Supabase plan** (`goals` / `goal_updates` or reuse) — doc only. ✅
+   `docs/GOALS_PERSISTENCE_PLAN.md` + `supabase/goals_v1_draft.sql` (DRAFT, NOT
+   applied): a `goals` table + v1 RPCs in the reports pattern; goal **updates reuse
+   `task_report_submissions`** for v1 (no new table); open product decisions listed.
 5. **Apply Supabase** — only after explicit approval (own lane).
 6. **Goals tab** (list + create + detail).
 7. **Generated update tasks** from goal cadence (reuses generation stack).
