@@ -97,15 +97,15 @@ nothing wired/applied):
   `lib/goalUpdateTasks.ts` pure update-task builder (34 tests).
 - Draft (UNAPPLIED) SQL: `supabase/goals_v1_draft.sql`.
 
-**PARKED — do not build further** (no Goals tab, no SQL apply, no store wiring, no
-more helpers) until ONE gate opens:
-1. **Build 17 device test** verifies the questionnaire submission / RPC round-trip
-   works (#1 above) — the update layer goals ride on must be proven on device first.
-2. **Goals SQL apply is explicitly approved** (its own checkpoint, like reports v1).
-3. A **specific bug** is found in the current foundation.
+**Storage gate CLEARED** — `supabase/goals_v1_draft.sql` is **applied + verified on
+alpha** (RLS on, 0 policies, 6 SECURITY DEFINER RPCs, table locked to definer RPCs).
+Next safe step is the **client goal service** (`lib/goalService.ts`, fallback-safe
+RPC wrappers, pure-testable in dev — no build needed), then the **Goals tab** against
+the live RPCs (real/persisted only — never a fake local tab).
 
-Rationale: the foundation is deep enough; more pure code risks building too far ahead
-of the still-unverified questionnaire/update layer.
+Still gated for the tab to be USER-usable: device verification (a build) of the
+goal CRUD + the questionnaire/update round-trip. Build/EAS still requires an explicit
+"cut the build".
 
 ### 7. AI-assisted setup — LAST, gated on #4 working
 Suggest a starter pack / templates from a description. Only after deterministic

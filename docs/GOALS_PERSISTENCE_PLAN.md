@@ -147,16 +147,17 @@ Deferred (NOT MVP-blocking): person ownership, reviewer-approved completion, adv
 visibility config, cadence/window defaults, per-goal visibility, a dedicated
 `goal_updates` table (v2 if history/trend queries need it).
 
-## 7. Draft SQL — APPLY-READY FOR REVIEW (not applied)
+## 7. SQL — ✅ APPLIED + VERIFIED on alpha
 
-`supabase/goals_v1_draft.sql` — **DRAFT, DO NOT RUN.** Now complete: the `goals`
-table (RLS-on/no-policies/REVOKE) + **six** SECURITY DEFINER RPCs
-(`create_goal`, `list_goals_for_org`, `list_my_goals`, `update_goal`,
-`complete_goal`, `archive_goal`) implementing the MVP decisions, with `begin/commit`
-restored, a VERIFICATION block (RLS on, 0 policies, all RPCs SECURITY DEFINER, table
-grants locked, constraints present, empty reads safe), and the rollback block. It is
-**not applied and not verified** — applying it is a separate, explicitly-approved
-checkpoint.
+`supabase/goals_v1_draft.sql` — **applied to the alpha project via the Dashboard SQL
+Editor and verified.** The `goals` table (RLS-on/no-policies/REVOKE) + **six**
+SECURITY DEFINER RPCs (`create_goal`, `list_goals_for_org`, `list_my_goals`,
+`update_goal`, `complete_goal`, `archive_goal`) implementing the MVP decisions are
+live. Verification passed: RLS on, 0 policies, all 6 RPCs SECURITY DEFINER, table
+grants = postgres/service_role only (no anon/authenticated), constraints present
+(`goals_pkey`, `goals_title_present`, `goals_cadence_check`, `goals_status_check`).
+**Inert for users** until the client goal service + Goals tab are wired (next step) —
+nothing calls these RPCs yet. Rollback block retained in the SQL file.
 
 ## 8. What remains gated
 

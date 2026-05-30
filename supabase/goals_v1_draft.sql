@@ -1,10 +1,22 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Goals v1 · DRAFT — ⛔ DO NOT RUN. NOT APPLIED. NOT VERIFIED. ⛔
+-- Goals v1 · ✅ APPLIED to the alpha Supabase project (via Dashboard SQL Editor)
+--   and VERIFIED. Re-running is unnecessary; `create table` would error on the
+--   existing table (the RPCs are `create or replace` and are safe to re-run).
 --
---   APPLY-READY FOR REVIEW. This finishes the Goals v1 storage layer per the MVP
---   product decisions, but it has NOT been applied to any Supabase project and MUST
---   NOT be run until a separate, explicitly-approved apply checkpoint (like reports
---   v1 had: paste → run → run the VERIFICATION queries below → confirm).
+--   VERIFICATION (passed at apply time):
+--     • goals: relrowsecurity = true (RLS on)
+--     • pg_policies count for goals = 0 (deny-by-default)
+--     • all 6 RPCs prosecdef = true (SECURITY DEFINER)
+--     • table grants: ONLY postgres + service_role — NO anon/authenticated (locked)
+--     • constraints present: goals_pkey, goals_title_present, goals_cadence_check,
+--       goals_status_check
+--     • RPC EXECUTE granted to authenticated (+ anon platform default — SAFE: RPCs
+--       reject unauthenticated callers; the TABLE has no anon/authenticated grant)
+--
+--   INERT FOR USERS until the client goal service + Goals tab are wired (a later,
+--   separate step) — nothing in the app calls these RPCs yet.
+--
+--   This finished the Goals v1 storage layer per the MVP product decisions.
 --
 --   Pattern mirrors supabase/reports_v1_task_report_submissions.sql:
 --     • RLS ENABLED, NO policies (deny-by-default), REVOKE from anon/authenticated.
@@ -32,7 +44,7 @@
 --   grant. Matches the deployed reports v1 / proof v1A posture.
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run this file until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. `create table` would error if re-run.
 
 -- ── 1. goals table (RLS on, NO policies = deny-by-default; clients locked out) ──
 create table public.goals (
@@ -310,7 +322,7 @@ grant execute on function public.archive_goal(uuid) to authenticated;
 -- Goal UPDATES: reuse upsert_task_report_submission / get_task_report_submission
 -- (no new table, no new RPC for v1). See docs/GOALS_PERSISTENCE_PLAN.md §1, §3.
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying — mirrors reports v1)
