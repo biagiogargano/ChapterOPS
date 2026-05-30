@@ -40,16 +40,32 @@ RLS, RPC, auth, flags, push-scope, or new systems.**
 
 ## Foundation / tests (inert, no behavior change)
 
-- **Event template registry invariants** (`lib/eventTemplates.test.ts`, 39 → 150
+- **Event template registry invariants** (`lib/eventTemplates.test.ts`, 39 → 155
   cases): every current/future template is now guarded for unique keys, known
   roles, no self-review, text/link-only proof, integer offsets, unique ids.
 - **Typed kind-default accessors** (`lib/eventTemplates.ts`):
   `getDefaultTemplateIdForKind`, `kindHasDefaultTemplate`,
   `defaultTemplateCoverage` — make adding a future kind-default a one-line tested
   change. Create screen uses the accessor (behavior-identical).
+- **`dueOffsetLabel`** moved from `app/event/create.tsx` into
+  `lib/eventTemplates.ts` (+ tests) — the template-preview copy now lives next to
+  the spec data and is unit-tested.
 - **Today feed helper** (`lib/todayFeed.ts` + tests): `bucketUrgencies`,
   `todaysTaskCount`, `todayIsUrgent`, `todaySummaryText` — moves Today's display
   logic into a tested pure module.
+- **Tasks-tab list view helper** (`lib/taskListView.ts` + tests): `matchesStatus`,
+  `matchesQuery`, `applyTaskView`, `STATUS_FILTERS`, `TASK_SORTS` — extracted the
+  filter/search/sort logic out of `app/(tabs)/tasks.tsx` (completion injected, so
+  the module stays store-free). Behavior identical; now unit-tested.
+
+## Audited clean — no changes (clarity sweep)
+
+These surfaces were inspected and left untouched (already clear, no dead code):
+**Agenda screen** (`app/agenda/[eventId]`), **Me/Settings** (`app/(tabs)/me.tsx`),
+**Notifications** (`app/notifications.tsx`), and the **event template
+apply/replace flow** (`app/event/[id].tsx`) — the latter's idempotency,
+submitted/approved protection, tombstone-clear-on-regen, and series handling are
+correct and well-tested.
 
 ## Docs added
 - `docs/EVENT_TEMPLATES_FOUNDATION.md` — template system architecture, idempotency,
