@@ -15,9 +15,13 @@ import { fetchAllNotices, upsertNotice } from './updateNoticeService';
 
 export type UpdateSeverity = 'critical' | 'moderate' | 'low';
 
+/** Entity a notice links to. 'goal' requires the update_notices CHECK widening
+ *  (supabase/update_notices_goal_entity_patch_draft.sql) before goal notices persist. */
+export type NoticeEntityType = 'task' | 'event' | 'goal';
+
 export interface UpdateNotice {
   id:             string;
-  entityType:     'task' | 'event';
+  entityType:     NoticeEntityType;
   entityId:       string;
   summary:        string;
   severity:       UpdateSeverity;
@@ -66,7 +70,7 @@ export function useUpdateNoticesVersion(): void {
  * per entity, so repeated edits don't spam.
  */
 export function emitUpdateNotice(params: {
-  entityType:    'task' | 'event';
+  entityType:    NoticeEntityType;
   entityId:      string;
   summary:       string;
   severity:      UpdateSeverity;
@@ -172,6 +176,35 @@ export function emitTaskActionNotice(
 ): void {
   const notice = buildTaskActionNotice(kind, params);
   if (notice) emitUpdateNotice(notice);
+}
+
+// ─── Goal-assigned notice (in-app only; GATED on the 'goal' entity_type patch) ──
+// When leadership assigns a goal to an officer ROLE, that role should see an in-app
+// notice. PURE BUILDER ONLY — NOT wired into the Goals screen yet, because the notice
+// table's entity_type CHECK must first be widened to allow 'goal'
+// (supabase/update_notices_goal_entity_patch_draft.sql). Emitting before that would
+// fail the insert. No push — in-app only. The store excludes the actor, so a goal a
+// role creates for itself notifies no one.
+
+/**
+ * Build the emitUpdateNotice params for a goal assigned to an owner role, or null
+ * when there's no concrete target role (or the actor IS that role — handled by the
+ * store too). Pure; never throws.
+ */
+export function buildGoalAssignedNotice(
+  params: { goalId: string; goalTitle: string; ownerRole?: string | null; actorRole: string },
+): Parameters<typeof emitUpdateNotice>[0] | null {
+  const role = params.ownerRole;
+  if (!params.goalId || !role || role === 'all' || role === params.actorRole) return null;
+  const t = (params.goalTitle ?? '').trim() || 'a goal';
+  return {
+    entityType:    'goal',
+    entityId:      params.goalId,
+    summary:       `New goal for you: ${t}`,
+    severity:      'moderate',
+    audienceRoles: [role],
+    changedByRole: params.actorRole,
+  };
 }
 
 // ─── Acknowledge ────────────────────────────────────────────────────────────

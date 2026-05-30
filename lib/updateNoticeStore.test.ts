@@ -7,7 +7,7 @@
  */
 
 import {
-  buildTaskActionNotice, emitTaskActionNotice,
+  buildTaskActionNotice, emitTaskActionNotice, buildGoalAssignedNotice,
   getNoticesForRole, acknowledgeNotice,
   type TaskActionKind,
 } from './updateNoticeStore';
@@ -78,6 +78,25 @@ function check(name: string, cond: boolean): void {
   check('all four task actions build a notice',
     kinds.every(k => buildTaskActionNotice(k, { taskId: 't', taskTitle: 'y', audienceRole: 'social_chair', actorRole: 'president' }) !== null));
 }
+
+// ── buildGoalAssignedNotice (in-app only; entity_type 'goal') ─────────────────
+{
+  const n = buildGoalAssignedNotice({ goalId: 'g1', goalTitle: 'Recruit 12', ownerRole: 'recruitment_chair', actorRole: 'president' });
+  check('goal-assigned → builds a notice', n !== null);
+  check('goal notice entityType=goal', !!n && n.entityType === 'goal');
+  check('goal notice entityId', !!n && n.entityId === 'g1');
+  check('goal notice audience = owner role', !!n && n.audienceRoles.join(',') === 'recruitment_chair');
+  check('goal notice summary mentions title', !!n && n.summary.includes('Recruit 12'));
+  check('goal notice changedBy = actor', !!n && n.changedByRole === 'president');
+}
+check('goal-assigned → null when actor IS the owner role (self-create)',
+  buildGoalAssignedNotice({ goalId: 'g', goalTitle: 'x', ownerRole: 'president', actorRole: 'president' }) === null);
+check('goal-assigned → null with no owner role',
+  buildGoalAssignedNotice({ goalId: 'g', goalTitle: 'x', ownerRole: null, actorRole: 'president' }) === null);
+check('goal-assigned → null for "all"',
+  buildGoalAssignedNotice({ goalId: 'g', goalTitle: 'x', ownerRole: 'all', actorRole: 'president' }) === null);
+check('goal-assigned → null with no goalId',
+  buildGoalAssignedNotice({ goalId: '', goalTitle: 'x', ownerRole: 'social_chair', actorRole: 'president' }) === null);
 
 console.log(`\nupdateNoticeStore.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
