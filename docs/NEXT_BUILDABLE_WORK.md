@@ -42,13 +42,18 @@ tasks are for, a role multi-select (deferred in `QUESTIONNAIRE_GENERATION_UI_PLA
 or a "view this cycle's questionnaire tasks" shortcut. No new system. Not before the
 flow is device-verified (don't polish an unverified path).
 
-### 4. Starter-pack / org-setup FOUNDATION (no UI) — no-build, partly Supabase-gated
-Turn the planned `SetupPack` (`lib/rolePack.ts`) into a real, tested **registry +
-pure loader**: `activePack(template)` returning the Sigma Chi pack for alpha, built
-from today's constants — behavior-identical. Screens/helpers can later read the
-active pack instead of importing catalogs directly. Pure + tested; **no org-type
-picker UI** (that's fake until the loader exists). Custom/org-created roles stay
-**Supabase-gated**. Plan: `ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–3.
+### 4. Starter-pack / org-setup FOUNDATION (no UI) — registry+loader DONE; wiring next
+**Registry + pure loader built** (`lib/starterPacks.ts`, 28 tests): `STARTER_PACKS`,
+`getStarterPack`, `getStarterPackForOrgTemplate`, `activeStarterPack(template)` (safe
+fallback to `sigma_chi`), `isKnownStarterPackId`. The `sigma_chi` pack is *derived
+from* the live constants (roles/levels/exceptions/template+questionnaire ids/agenda
+sections), so it describes current behavior without changing it. **Not wired** —
+nothing imports it yet.
+**Next sub-steps:** (a) wire `activeStarterPack` at call sites that currently import
+catalogs directly (behavior-identical refactor); (b) add a second org-type pack as
+data to prove genericity; (c) org-type selection UI only after (a)/(b). **No org-type
+picker UI yet** (fake until wired). Custom/org-created roles stay **Supabase-gated**.
+Plan: `ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–4.
 
 ### 5. Agenda integration from questionnaire answers — partly Supabase-gated
 Wire the pure `agendaContributions.ts` into the agenda screen: fetch a cycle's
