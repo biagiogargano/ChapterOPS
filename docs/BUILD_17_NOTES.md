@@ -94,10 +94,17 @@ officer-reports system. No live-user behavior change; no Supabase.
   is now a real generic entry point (explicit definition + roles, no forced
   fraternity defaults, fail-safe, idempotent). `generateWeeklyOfficerReports`
   stays the Sigma Chi preset.
-- **Plans (docs only):** `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md` (the eventual
-  "Create questionnaire tasks" trigger — generic copy, Me/Leadership card, not a
-  Reports tab) and `docs/GOALS_PROGRESS_LAYER_PLAN.md` (future goals layer, kept
-  separate from tasks, gated on its own Supabase lane). Roadmap in
+- **Generic event-template examples** (`lib/genericEventTemplates.ts`): three
+  org-neutral example templates (Club Fundraiser, Team Practice, Business Meeting)
+  on the same `EventTaskTemplate` shape, proving the template engine is generic.
+  **Not registered, not surfaced** (kept out of `EVENT_TEMPLATES` — never in the
+  picker/preview/defaults/cascade). 51 tests assert same-invariants + not-surfaced.
+- **Role-pack planning** (`lib/rolePack.ts` inert type-only sketch +
+  `docs/ROLE_PACKS_AND_GENERIC_PERMISSIONS_PLAN.md`): the future role-pack shape
+  for supporting many org types. Nothing imports the sketch — zero runtime code.
+- **Plans (docs only):** `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md` (the
+  "Create questionnaire tasks" trigger — now wired), `docs/GOALS_PROGRESS_LAYER_PLAN.md`
+  (future goals layer, separate from tasks, Supabase-gated), and
   `docs/STRUCTURED_RESPONSE_ROADMAP.md`.
 
 ## Supabase change applied this cycle
@@ -150,14 +157,19 @@ officer-reports system. No live-user behavior change; no Supabase.
 ## Tests
 
 - `npx tsc --noEmit` → clean.
-- `npm run test:pure` → **28 suites pass**, including the questionnaire +
+- `npm run test:pure` → **29 suites pass**, including the questionnaire +
   agenda-contribution suites: `structuredResponses` (37), `reportDefinitions`
   (16), `questionnaireTemplates` (31), `questionnaireCycle` (12), `reportTasks`
   (21), `reportSubmissionService` (6), `reportGeneration` (26),
-  `agendaContributions` (14), plus `todayFeed`, `taskListView`,
-  `eventTemplates` (155), `orgLevels`, `taskAssignment`, and the rest.
+  `agendaContributions` (14), `genericEventTemplates` (51), plus `todayFeed`,
+  `taskListView`, `eventTemplates` (155), `orgLevels`, `taskAssignment`, and the rest.
 
 ## Manual test checklist
+
+> For the **on-device** pass when Build 17 is cut, use the dedicated, ordered
+> `docs/BUILD_17_DEVICE_TEST_CHECKLIST.md` (includes roll-out caution: test on your
+> phone + one other account, don't announce broadly until the round-trip works).
+> The lists below are the quick dev/sandbox view.
 
 ### Testable now (sandbox / in-app, no build needed)
 1. **Today** with mixed due dates → overdue listed first, accurate summary line,
