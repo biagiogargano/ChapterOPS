@@ -96,7 +96,8 @@ real/persisted — a failed RPC must show an error, never a fake success.
       creator-or-leadership management; the client guard (`canManageGoal`) matches it.
   - [ ] As **leadership**, create a goal **for an officer** (its owner role). Sign in
         as that **officer** → the goal is **visible but Edit/Complete/Archive are
-        hidden** (read-only — they didn't create it).
+        hidden**, with a **"View only — you didn't create this goal"** tag in their
+        place (read-only — they didn't create it).
   - [ ] As that **officer**, create your **own** goal → you **can** Edit/Complete/
         Archive it.
 - [ ] **Error honesty:** if an RPC fails (e.g. force offline) → an **inline/Alert

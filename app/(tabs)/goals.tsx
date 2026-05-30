@@ -205,7 +205,7 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
         <View style={s.barTrack}><View style={[s.barFill, { width: `${fillPct}%` }]} /></View>
       )}
 
-      {canManage && (
+      {canManage ? (
         <View style={s.actions}>
           <Pressable style={s.actionBtn} disabled={busy} onPress={() => setEditing(true)}>
             <Text style={s.actionText}>Edit</Text>
@@ -217,6 +217,10 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
             <Text style={[s.actionText, s.actionDangerText]}>Archive</Text>
           </Pressable>
         </View>
+      ) : (
+        // Read-only: an officer viewing a goal they didn't personally create (e.g.
+        // one leadership assigned to their role). Make the absence of actions honest.
+        <Text style={s.viewOnly}>View only — you didn’t create this goal</Text>
       )}
     </View>
   );
@@ -422,6 +426,7 @@ const s = StyleSheet.create({
   ownerNote:  { fontSize: 12, color: '#64748b' },
   ownerLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginTop: 2 },
   helperText: { fontSize: 12, color: '#64748b', lineHeight: 17 },
+  viewOnly:   { fontSize: 12, color: '#475569', fontStyle: 'italic', marginTop: 2 },
   formActions:{ flexDirection: 'row', gap: 10, marginTop: 4 },
   secondaryBtn:{ flex: 1, backgroundColor: '#0f172a', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
   secondaryText:{ color: '#94a3b8', fontWeight: '600', fontSize: 14 },
