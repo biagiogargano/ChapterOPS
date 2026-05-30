@@ -29,7 +29,7 @@ const EXPECTED = [
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'questionnaireCycle',
   'questionnaireGenerationFlow', 'questionnaireGenerationPlan', 'questionnaireTemplates',
-  'reportDefinitions', 'starterPacks',
+  'reportDefinitions', 'rolePackRuntime', 'starterPacks',
   'reportGeneration', 'reportSubmissionService', 'reportTasks', 'roles',
   'routeTarget', 'structuredResponses', 'taskAssignment', 'taskCompletion',
   'taskListView', 'todayFeed',

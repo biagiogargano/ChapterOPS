@@ -18,6 +18,7 @@
 import { activeStarterPack } from './starterPacks';
 import { WEEKLY_OFFICER_REPORT_ID } from './reportDefinitions';
 import { OFFICER_ROLES, type Role } from './roles';
+import { packOfficerRuntimeRoles } from './rolePackRuntime';
 
 export interface QuestionnaireGenerationPlan {
   /** Which questionnaire definition the card generates (the pack's first default). */
@@ -40,11 +41,12 @@ export function planQuestionnaireGeneration(template?: string | null): Questionn
 
   const definitionId = pack.rolePack.defaultQuestionnaireIds?.[0] ?? WEEKLY_OFFICER_REPORT_ID;
 
-  // The pack's officer roles are RoleKey[] (strings) derived from OFFICER_ROLES;
-  // keep only values that are real Role keys, then fall back if empty.
-  const known = new Set<string>(OFFICER_ROLES);
-  const packRoles = (pack.rolePack.officerRoles ?? []).filter(r => known.has(r)) as Role[];
-  const roles = packRoles.length > 0 ? packRoles : [...OFFICER_ROLES];
+  // The pack's officer roles are RoleKey[] (strings). Narrow to runtime-supported
+  // `Role`s via the compatibility layer (drops any custom/future-only keys), then
+  // fall back to the alpha officer set if none are usable — so generation never
+  // receives an unsupported role key.
+  const packRoles = packOfficerRuntimeRoles(pack.rolePack);
+  const roles: Role[] = packRoles.length > 0 ? packRoles : [...OFFICER_ROLES];
 
   return { definitionId, roles };
 }

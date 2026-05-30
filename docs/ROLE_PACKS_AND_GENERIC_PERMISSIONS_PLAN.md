@@ -124,9 +124,14 @@ bundle and lets `organizations.template` choose it.
 > **Known limitation (the gate, confirmed by the club pack):** the runtime engines
 > (`ROLE_LEVEL`, task assignment, `generateQuestionnaireTasks`'s `Role[]`) are keyed
 > by the **closed `Role` union**, so club's custom role keys are expressible as DATA
-> but not yet FUNCTIONAL through those engines — the resolver filters unknown keys
-> and falls back to the alpha officer set. Opening the union to org-defined keys is
-> the Supabase-gated step 4 / §8.
+> but not yet FUNCTIONAL through those engines. This boundary is now **explicit**:
+> `lib/rolePackRuntime.ts` (`isRuntimeRoleKey` / `runtimeRolesFromPackRoles` /
+> `packOfficerRuntimeRoles` / `packHasOnlyRuntimeRoles`) is the single guard that
+> narrows pack keys to runtime `Role`s and reports the unsupported ones, so no caller
+> accidentally forwards a custom key. `questionnaireGenerationPlan` uses it (falls
+> back to the alpha officer set when a pack has no runtime-supported officers).
+> Opening the union to org-defined keys — making custom roles truly functional — is
+> the Supabase-gated step 4 / §8; `rolePackRuntime` is the one place that changes then.
 
 1. **Keep the alpha role catalog as-is.** No rename, no behavior change. (now)
 2. **Introduce a type/adapter layer:** a `RolePack` interface (sketch added) and an
