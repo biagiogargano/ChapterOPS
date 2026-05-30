@@ -1,14 +1,21 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Goals v1 · PERMISSIONS PATCH · DRAFT — ⛔ DO NOT RUN. NOT APPLIED. ⛔
+-- Goals v1 · PERMISSIONS PATCH · ✅ APPLIED + VERIFIED on alpha (via Dashboard).
+--   Re-running is safe (the 3 functions are `create or replace`).
+--
+--   VERIFICATION (passed at apply time):
+--     • update_goal / complete_goal / archive_goal: prosecdef = true (SECURITY DEFINER)
+--     • EXECUTE granted to authenticated (+ anon platform default — SAFE)
+--     • goals table grants: ONLY postgres + service_role (no anon/authenticated)
+--     • create_goal / list_goals_for_org / list_my_goals untouched (still present)
 --
 --   Tightens WRITE auth on the three goal-mutation RPCs so that an officer can only
 --   edit/complete/archive goals THEY personally created — NOT goals merely owned by
---   their role (i.e. goals leadership assigned TO them are read-only to them).
+--   their role (i.e. goals leadership assigned TO them are read-only to them). The
+--   client (canManageGoal) and the server now agree.
 --
---   Applies on top of the already-applied supabase/goals_v1_draft.sql. Re-creates
---   ONLY update_goal / complete_goal / archive_goal via `create or replace` (safe to
---   re-run; does NOT touch the table, list/read RPCs, or create_goal). MUST NOT be
---   run until a separate, explicitly-approved apply checkpoint.
+--   Applied on top of supabase/goals_v1_draft.sql. Re-creates ONLY update_goal /
+--   complete_goal / archive_goal via `create or replace`; does NOT touch the table,
+--   list/read RPCs, or create_goal.
 --
 --   NEW WRITE RULE (DECISION: Goals permissions v1):
 --     allow update/complete/archive iff the caller is leadership/annotator
@@ -21,7 +28,7 @@
 --     SECURITY DEFINER + org scoping via auth_user_roles_for_org(uuid).
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. Safe to re-run (create or replace).
 
 -- ── update_goal (NEW auth: leadership/annotator OR goal creator) ────────────────
 create or replace function public.update_goal(
@@ -157,7 +164,7 @@ $$;
 revoke all on function public.archive_goal(uuid) from public;
 grant execute on function public.archive_goal(uuid) to authenticated;
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying)

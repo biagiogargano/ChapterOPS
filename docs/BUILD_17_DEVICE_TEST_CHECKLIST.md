@@ -70,16 +70,14 @@ real/persisted — a failed RPC must show an error, never a fake success.
       goals** + an **owner-role filter** (All / per-role chips); as a non-leadership
       **officer**, you see **only goals for your role** (and can create your own). As
       a non-officer, the create form is hidden and you see only your own (likely none).
-- [ ] **Permissions v1 (REQUIRES the patch SQL applied —
-      `supabase/goals_v1_permissions_patch_draft.sql`):**
+- [ ] **Permissions v1 (patch SQL APPLIED + verified on alpha —
+      `supabase/goals_v1_permissions_patch_draft.sql`):** the SERVER now enforces
+      creator-or-leadership management; the client guard (`canManageGoal`) matches it.
   - [ ] As **leadership**, create a goal **for an officer** (its owner role). Sign in
         as that **officer** → the goal is **visible but Edit/Complete/Archive are
         hidden** (read-only — they didn't create it).
   - [ ] As that **officer**, create your **own** goal → you **can** Edit/Complete/
         Archive it.
-  - [ ] Until the patch is applied, the SERVER still allows owner-role management even
-        though the client hides the buttons — so verify the patch is applied first
-        (the client guard alone is not the security boundary).
 - [ ] **Error honesty:** if an RPC fails (e.g. force offline) → an **inline/Alert
       error** appears and **no goal is created/changed**. NOTE: a failed *read*
       currently shows the **"No goals yet."** empty state (the read path returns []
