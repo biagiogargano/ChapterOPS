@@ -7,7 +7,7 @@
  */
 
 import {
-  buildTaskActionNotice, emitTaskActionNotice, buildGoalAssignedNotice,
+  buildTaskActionNotice, emitTaskActionNotice, buildGoalAssignedNotice, emitGoalAssignedNotice,
   getNoticesForRole, acknowledgeNotice,
   type TaskActionKind,
 } from './updateNoticeStore';
@@ -97,6 +97,37 @@ check('goal-assigned → null for "all"',
   buildGoalAssignedNotice({ goalId: 'g', goalTitle: 'x', ownerRole: 'all', actorRole: 'president' }) === null);
 check('goal-assigned → null with no goalId',
   buildGoalAssignedNotice({ goalId: '', goalTitle: 'x', ownerRole: 'social_chair', actorRole: 'president' }) === null);
+
+// ── emitGoalAssignedNotice → owner role sees it; actor/self/all do NOT ────────
+{
+  const goalId = 'goal_assign_emit_1';
+  emitGoalAssignedNotice({ goalId, goalTitle: 'Book venue', ownerRole: 'social_chair', actorRole: 'president' });
+  check('owner role sees the goal notice',
+    getNoticesForRole('social_chair').filter(n => n.entityId === goalId).length === 1);
+  check('actor (president) does NOT see it',
+    getNoticesForRole('president').every(n => n.entityId !== goalId));
+  check('unrelated role does NOT see it',
+    getNoticesForRole('kustos').every(n => n.entityId !== goalId));
+  const mine = getNoticesForRole('social_chair').find(n => n.entityId === goalId);
+  if (mine) acknowledgeNotice(mine.id, 'social_chair');
+  check('after dismiss, owner no longer sees it',
+    getNoticesForRole('social_chair').every(n => n.entityId !== goalId));
+}
+{
+  // Self-create (owner === actor) emits NOTHING.
+  const goalId = 'goal_assign_self';
+  emitGoalAssignedNotice({ goalId, goalTitle: 'x', ownerRole: 'quaestor', actorRole: 'quaestor' });
+  check('self-create emits no goal notice',
+    getNoticesForRole('quaestor').every(n => n.entityId !== goalId));
+}
+{
+  // 'all' owner emits nothing (no broad notice).
+  const goalId = 'goal_assign_all';
+  emitGoalAssignedNotice({ goalId, goalTitle: 'x', ownerRole: 'all', actorRole: 'president' });
+  check('"all" owner emits no broad notice',
+    getNoticesForRole('social_chair').every(n => n.entityId !== goalId) &&
+    getNoticesForRole('brother').every(n => n.entityId !== goalId));
+}
 
 console.log(`\nupdateNoticeStore.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

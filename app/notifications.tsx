@@ -57,6 +57,10 @@ export default function NotificationsScreen() {
       router.push(`/task/${n.entityId}` as any);
     } else if (n.entityType === 'event' && findEventById(n.entityId)) {
       router.push(`/event/${n.entityId}` as any);
+    } else if (n.entityType === 'goal') {
+      // No per-goal detail route yet — open the Goals tab (safe; the goal is listed
+      // there). Dismissal already happened above.
+      router.push('/(tabs)/goals' as any);
     }
   }
 

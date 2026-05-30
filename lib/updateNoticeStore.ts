@@ -200,11 +200,23 @@ export function buildGoalAssignedNotice(
   return {
     entityType:    'goal',
     entityId:      params.goalId,
-    summary:       `New goal for you: ${t}`,
+    summary:       `New goal assigned: ${t}`,
     severity:      'moderate',
     audienceRoles: [role],
     changedByRole: params.actorRole,
   };
+}
+
+/**
+ * Emit the in-app goal-assigned notice (no-ops safely when there's no real
+ * assignment — see buildGoalAssignedNotice). In-app only; never blocks the caller.
+ * Requires the update_notices 'goal' entity_type patch (applied on alpha).
+ */
+export function emitGoalAssignedNotice(
+  params: { goalId: string; goalTitle: string; ownerRole?: string | null; actorRole: string },
+): void {
+  const notice = buildGoalAssignedNotice(params);
+  if (notice) emitUpdateNotice(notice);
 }
 
 // ─── Acknowledge ────────────────────────────────────────────────────────────

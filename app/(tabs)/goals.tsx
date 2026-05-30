@@ -16,6 +16,7 @@ import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
 import { goalProgress, goalDisplay, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
+import { emitGoalAssignedNotice } from '@/lib/updateNoticeStore';
 import type { Goal, GoalCadence, GoalValueKind } from '@/lib/goals';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
@@ -114,6 +115,7 @@ export default function GoalsScreen() {
             ? <CreateGoalForm
                 orgId={activeOrgId ?? ''}
                 defaultOwnerRole={role}
+                actorRole={role}
                 canChooseOwner={isAdmin}
                 onCancel={() => setShowCreate(false)}
                 onCreated={() => { setShowCreate(false); void load(); }}
@@ -234,10 +236,11 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
 // ─── Create form ──────────────────────────────────────────────────────────────
 
 function CreateGoalForm({
-  orgId, defaultOwnerRole, canChooseOwner, onCancel, onCreated,
+  orgId, defaultOwnerRole, actorRole, canChooseOwner, onCancel, onCreated,
 }: {
   orgId: string;
   defaultOwnerRole: Role;
+  actorRole: Role;           // the creator's current role (for goal-assigned notices)
   canChooseOwner: boolean;   // leadership/annotator may pick the owner role
   onCancel: () => void;
   onCreated: () => void;
@@ -270,8 +273,12 @@ function CreateGoalForm({
     let firstError: string | null = null;
     for (const t of titles) {
       const r = await createGoal({ orgId, title: t, cadence, ownerRole, ...common });
-      if (r.ok) created++;
-      else if (!firstError) firstError = r.error ?? 'unknown';
+      if (r.ok) {
+        created++;
+        // In-app notice for the owner role when it's an ASSIGNMENT (builder no-ops
+        // when ownerRole === actorRole / 'all'). No push. Never blocks create.
+        if (r.goalId) emitGoalAssignedNotice({ goalId: r.goalId, goalTitle: t, ownerRole, actorRole });
+      } else if (!firstError) firstError = r.error ?? 'unknown';
     }
     setBusy(false);
 
