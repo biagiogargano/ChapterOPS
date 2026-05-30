@@ -128,25 +128,35 @@ Keep v1 minimal: create/list/update/complete/archive + reuse update RPCs.
 - **Do NOT rename** the live table/RPCs or the `report_*` code now — reuse under the
   existing names; a rename is a migration, deferred (possibly never if reuse holds).
 
-## 6. Open product decisions (needed before applying)
+## 6. Product decisions — RESOLVED for MVP
 
-1. **Owner: role vs person?** Support both columns now, or role-only for alpha?
-2. **Officer-only goals in alpha,** or can members create **personal goals**?
-3. **Reviewer defaults** — president? pro_consul? per-goal `reviewer_role`?
-4. **Does completion need approval** (reviewer marks done) or owner self-completes?
-5. **Advisor visibility** — stays excluded for v1?
-6. **Cadence/window defaults** — default weekly? default update window length?
-7. **Visibility model** — leadership+owner by default, or per-goal visibility list?
-8. **Bulk creation** — `create_goal` one-at-a-time + client loops `parseGoalPrompts`,
-   or a `create_goals(p_titles text[])` batch RPC?
-9. **Reuse vs new `goal_updates` table** — confirm v1 reuse is acceptable.
+All MVP-blocking decisions are decided and baked into the finished draft SQL:
 
-## 7. Draft SQL
+1. **Owner model:** ROLE-owned (`owner_role`). `owner_member_id` kept in the table
+   for future person-owned goals but **unused** in v1.
+2. **Create:** owner role may create for itself; president/pro_consul/annotator may
+   create for officer roles. Members cannot create yet (personal goals later).
+3. **Complete/archive:** owner role OR president/pro_consul/annotator. **No** separate
+   completion-approval workflow in v1 (future "request completion" via updates).
+4. **Bulk create:** client loops `create_goal` (no `create_goals(text[])` RPC).
+5. **Visibility:** owner role reads its own; president/pro_consul/annotator read all
+   org goals. Advisors excluded. No per-goal visibility list in v1.
+6. **Goal updates:** reuse `task_report_submissions` (no `goal_updates` table) for v1.
 
-`supabase/goals_v1_draft.sql` — **DRAFT ONLY, DO NOT RUN.** Sketches the `goals`
-table (RLS-on/no-policies/REVOKE) + the v1 RPCs in the reports pattern, with the
-open decisions flagged inline as `-- DECISION:` comments. It exists to make this
-plan concrete; it is **not** applied and **not** verified.
+Deferred (NOT MVP-blocking): person ownership, reviewer-approved completion, advisor
+visibility config, cadence/window defaults, per-goal visibility, a dedicated
+`goal_updates` table (v2 if history/trend queries need it).
+
+## 7. Draft SQL — APPLY-READY FOR REVIEW (not applied)
+
+`supabase/goals_v1_draft.sql` — **DRAFT, DO NOT RUN.** Now complete: the `goals`
+table (RLS-on/no-policies/REVOKE) + **six** SECURITY DEFINER RPCs
+(`create_goal`, `list_goals_for_org`, `list_my_goals`, `update_goal`,
+`complete_goal`, `archive_goal`) implementing the MVP decisions, with `begin/commit`
+restored, a VERIFICATION block (RLS on, 0 policies, all RPCs SECURITY DEFINER, table
+grants locked, constraints present, empty reads safe), and the rollback block. It is
+**not applied and not verified** — applying it is a separate, explicitly-approved
+checkpoint.
 
 ## 8. What remains gated
 
