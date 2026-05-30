@@ -25,6 +25,7 @@ const toPosix  = p => p.split(path.sep).join('/');
 const EXPECTED = [
   'agendaContributions',
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
+  'genericEventTemplates',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'questionnaireCycle',
   'questionnaireTemplates', 'reportDefinitions',

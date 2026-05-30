@@ -23,11 +23,31 @@ event kind  →  template (data)  →  generated tasks (concrete, tied to the ev
   eboard_meeting) are **default content**, not hardcoded core — a future org
   template supplies its own registry over the same shape.
 
+### Pack boundary (alpha defaults vs generic core)
+
+| Layer | What it is | Where |
+| ----- | ---------- | ----- |
+| **Generic core** | the engine: `EventTaskTemplate`/`EventTaskSpec` shape, builder, deterministic ids, date math, registry/merge, cascade enumeration | `lib/eventTemplates.ts`, `lib/customTemplatesStore.ts` |
+| **Sigma Chi alpha pack** | the 5 live templates + their role assignments + kind defaults | `EVENT_TEMPLATES`, `DEFAULT_TEMPLATE_BY_KIND` |
+| **Generic example pack** | org-neutral reference templates (Club Fundraiser, Team Practice, Business Meeting) proving the engine is not fraternity-only | `lib/genericEventTemplates.ts` — **not registered, not surfaced** |
+| **Later: org-type packs** | each org type (club/team/nonprofit/class/business) supplies its own registry + role pack over the same shape | future, gated on org-type/role packs |
+
+The **only** pack-specific piece inside a template is the role vocabulary
+(`assignedRole`/`reviewerRole` are typed as the current `Role` union, i.e. the
+Sigma Chi pack's roles). That already lives behind the `Role` type, not in the
+template engine. When org-type role packs exist, a template references its pack's
+roles; the engine is unchanged. `lib/genericEventTemplates.ts` demonstrates this:
+real non-fraternity templates on the same shape, reusing `Role` values as
+stand-ins, validated by the same invariants the live registry enforces — but kept
+out of `EVENT_TEMPLATES` so they never reach the picker, preview, defaults, or
+cascade.
+
 ## 2. Key files
 
 | File | Role |
 | ---- | ---- |
 | `lib/eventTemplates.ts` | Built-in template registry + pure builder (`buildTasksFromTemplate`, `templateTaskId`, `allTemplateTaskIdsForEvent`, `DEFAULT_TEMPLATE_BY_KIND`) |
+| `lib/genericEventTemplates.ts` | Org-neutral example templates (`GENERIC_TEMPLATE_EXAMPLES`) — reference/test data proving the engine is generic; **not registered, not surfaced** |
 | `lib/customTemplatesStore.ts` | User-built templates (local AsyncStorage v1); merges built-in + custom; `buildTasksForTemplateId` |
 | `lib/generatedTasks.ts` | The auto RSVP-review task (`buildRsvpReviewTask`) |
 | `app/event/create.tsx` | Applies the selected template + RSVP-review task on event create |
