@@ -34,7 +34,7 @@ const EXPECTED = [
   'templatePackView',
   'reportGeneration', 'reportSubmissionService', 'reportTasks', 'roles',
   'routeTarget', 'structuredResponses', 'taskAssignment', 'taskCompletion',
-  'taskListView', 'taskServiceMapping', 'todayFeed', 'updateNoticeStore',
+  'taskListView', 'taskServiceMapping', 'taskWindow', 'todayFeed', 'updateNoticeStore',
 ];
 
 // ── 1. Temp build config ──────────────────────────────────────────────────────
