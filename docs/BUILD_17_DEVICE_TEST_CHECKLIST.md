@@ -90,6 +90,17 @@ real/persisted — a failed RPC must show an error, never a fake success.
 - [ ] **Event Detail**: open an event → linked/prep tasks, RSVP, progress count all
       render; agenda card on meeting events.
 - [ ] **Tasks** tab: filters (To Do / Done / All) + search behave.
+- [ ] **Starter-pack read surfaces (behavior-identical for the Sigma Chi alpha — must
+      look UNCHANGED):**
+  - [ ] **Event Create** → the template picker shows the **same built-in templates**
+        in the same order (Date Party / Recruitment / Formal / Chapter Meeting /
+        E-Board Meeting), custom templates still listed after.
+  - [ ] **Templates screen** (Me → Manage event templates) → the **BUILT-IN** list is
+        unchanged.
+  - [ ] **Me → Create questionnaire tasks** → still defaults to **Weekly Officer
+        Report** for officer roles.
+  - [ ] **Create-organization** screen (if reachable) → template label reads
+        "Sigma Chi (fraternity) · default".
 
 ## 9. Push expectations + in-app notification mirroring
 - [ ] **No new push** is expected from questionnaire generation/submission or Goals —
