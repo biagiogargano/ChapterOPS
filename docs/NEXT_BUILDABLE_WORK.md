@@ -73,8 +73,13 @@ pack lists exactly `EVENT_TEMPLATES`); custom templates still merge/list after.
 list + edit/duplicate/delete actions — Category B mutation), and template
 RESOLUTION (`getTemplateById`/`buildTasksForTemplateId` must resolve any id so no
 existing task breaks).
+**Read-side wiring is now COMPLETE for safe sites** — see
+`docs/STARTER_PACK_MIGRATION_MAP.md`. No behavior-identical Category-A site remains;
+every remaining direct site is B (mutation / low-level) or C (Role-union / permission
+/ product-gated). **Stop wiring** until Build 17 device testing (#1) verifies the
+already-wired reads render identically.
 **Next:** (c) org-type selection UI — now meaningfully possible since a second pack
-exists, but still gated on wiring more read sites + a real product decision; (d)
+exists, but still gated on the Role-union opening + a real product decision; (d)
 opening the `Role` union for custom keys is **Supabase-gated**. Plan:
 `ORG_ONBOARDING_AND_SETUP_PLAN.md` §6 steps 2–4.
 
