@@ -14,9 +14,13 @@ import {
   getRoleLevel,
   compareLevels,
   canAssign,
+  canAssignWithExceptions,
+  getAssignableRoles,
+  SIGMA_CHI_ASSIGNMENT_EXCEPTIONS,
   type OrgLevel,
+  type AssignmentException,
 } from './orgLevels';
-import { ROLES } from './roles';
+import { ROLES, OFFICER_ROLES } from './roles';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
 
@@ -89,6 +93,93 @@ check('getRoleLevel(unknown) === null', getRoleLevel('archon') === null);
 check('canAssign(unknown, member) false', canAssign('archon', ROLES.BROTHER) === false);
 check('canAssign(executive, unknown) false', canAssign(ROLES.PRESIDENT, 'archon') === false);
 check('canAssign(unknown, unknown) false', canAssign('archon', 'sentinel') === false);
+
+// ── Exceptions ────────────────────────────────────────────────────────────────
+function eqSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',');
+}
+
+check('default exception list is empty (no implicit grants yet)',
+  SIGMA_CHI_ASSIGNMENT_EXCEPTIONS.length === 0);
+
+// With NO exceptions, canAssignWithExceptions == canAssign.
+check('no-exception same-level still denied',
+  canAssignWithExceptions(ROLES.PRESIDENT, ROLES.PRO_CONSUL) === false);
+check('no-exception downward still allowed',
+  canAssignWithExceptions(ROLES.PRESIDENT, ROLES.BROTHER) === true);
+
+// An explicit exception GRANTS a specific same-level pair.
+{
+  const ex: AssignmentException[] = [
+    { assignerRole: ROLES.PRO_CONSUL, targetRole: ROLES.ANNOTATOR, note: 'test grant' },
+  ];
+  check('exception allows specific same-level pair',
+    canAssignWithExceptions(ROLES.PRO_CONSUL, ROLES.ANNOTATOR, ex) === true);
+  // …but only that exact pair — a DIFFERENT same-level pair (still denied by the
+  // default rule, and not in the exception list) stays denied.
+  check('exception does not leak to other same-level pairs',
+    canAssignWithExceptions(ROLES.PRESIDENT, ROLES.PRO_CONSUL, ex) === false);
+  // Exceptions only GRANT — they never revoke a normally-allowed downward assign.
+  check('exception never revokes downward',
+    canAssignWithExceptions(ROLES.PRESIDENT, ROLES.BROTHER, ex) === true);
+}
+
+// ── getAssignableRoles ────────────────────────────────────────────────────────
+const ALL = [...OFFICER_ROLES, ROLES.BROTHER];
+
+// Self-assignment is always included.
+check('self-assignment always included (officer)',
+  getAssignableRoles(ROLES.SOCIAL_CHAIR, ALL).includes(ROLES.SOCIAL_CHAIR));
+check('self-assignment always included (member)',
+  getAssignableRoles(ROLES.BROTHER, ALL).includes(ROLES.BROTHER));
+
+// Executive sees self + all officers + members.
+{
+  const got = getAssignableRoles(ROLES.PRESIDENT, ALL);
+  const expected = [ROLES.PRESIDENT, ...OFFICER_ROLES.filter(r => getRoleLevel(r) === 'officers'), ROLES.BROTHER];
+  check('executive sees self + officers + members', eqSet(got, expected));
+  check('executive does NOT see the other executive',
+    !got.includes(ROLES.PRO_CONSUL));
+}
+
+// Officer sees self + members only (no peers, no upward).
+{
+  const got = getAssignableRoles(ROLES.SOCIAL_CHAIR, ALL);
+  check('officer sees self + members', eqSet(got, [ROLES.SOCIAL_CHAIR, ROLES.BROTHER]));
+  check('officer does NOT see peer officers', !got.includes(ROLES.ANNOTATOR));
+  check('officer does NOT see executives',    !got.includes(ROLES.PRESIDENT));
+}
+
+// Member sees only self.
+check('member sees only self',
+  eqSet(getAssignableRoles(ROLES.BROTHER, ALL), [ROLES.BROTHER]));
+
+// Same-level denied unless an exception allows it.
+{
+  const ex: AssignmentException[] = [
+    { assignerRole: ROLES.SOCIAL_CHAIR, targetRole: ROLES.ANNOTATOR },
+  ];
+  check('exception adds a same-level role to the assignable set',
+    getAssignableRoles(ROLES.SOCIAL_CHAIR, ALL, { exceptions: ex }).includes(ROLES.ANNOTATOR));
+}
+
+// Unknown candidate roles are skipped; unknown assigner yields only nothing
+// (self is unknown → not added).
+{
+  const got = getAssignableRoles(ROLES.PRESIDENT, [...ALL, 'archon', 'sentinel']);
+  check('unknown candidates excluded', !got.includes('archon') && !got.includes('sentinel'));
+  check('unknown assigner → empty set', getAssignableRoles('archon', ALL).length === 0);
+}
+
+// No duplicate roles (self also present as a candidate must not double-up).
+{
+  const got = getAssignableRoles(ROLES.PRESIDENT, [ROLES.PRESIDENT, ...ALL]);
+  check('no duplicate roles', new Set(got).size === got.length);
+}
+
+// includeSelf:false omits self.
+check('includeSelf:false omits self',
+  !getAssignableRoles(ROLES.SOCIAL_CHAIR, ALL, { includeSelf: false }).includes(ROLES.SOCIAL_CHAIR));
 
 console.log(`\norgLevels.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
