@@ -1,14 +1,22 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Tasks · report_definition_id column · DRAFT — ⛔ DO NOT RUN. NOT APPLIED. ⛔
+-- Tasks · report_definition_id column · ✅ APPLIED + VERIFIED on alpha (Dashboard).
+--   Safe to re-run (`add column if not exists`).
+--
+--   VERIFICATION (passed at apply time):
+--     • information_schema: report_definition_id | text | YES (nullable text column)
+--     • (column added; existing task rows unaffected — value NULL until written)
 --
 --   Adds a single nullable column so a questionnaire/report task can PERSIST which
---   structured-response definition it collects. Today MockTask.reportDefinitionId
---   is NOT written by taskService.mockTaskToRow and there is no column for it, so on
+--   structured-response definition it collects. Before this, MockTask.reportDefinitionId
+--   was NOT written by taskService.mockTaskToRow and there was no column for it, so on
 --   any Supabase round-trip (generate → reload, or another user fetching) the field
---   is lost → the Task Detail questionnaire form disappears and the task falls back
---   to generic "Save & Complete". This column fixes the persistence side.
+--   was lost → the Task Detail questionnaire form disappeared and the task fell back
+--   to generic "Save & Complete". This column fixes the persistence side; the client
+--   mapping shipped in commit 981b71e.
 --
---   MUST NOT be run until a separate, explicitly-approved apply checkpoint.
+--   NOTE: questionnaire persistence works on a build that includes commit 981b71e's
+--   client mapping. Build 17 predates that commit — a later build is needed to see
+--   the end-to-end fix on device.
 --
 --   SAFETY:
 --     • `add column if not exists` — idempotent, safe to re-run.
@@ -20,12 +28,12 @@
 --       questionnaire tasks degrade to the honest "unavailable" state.
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. Safe to re-run (add column if not exists).
 
 alter table public.tasks
   add column if not exists report_definition_id text;   -- nullable; StructuredResponseDefinition id
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying)

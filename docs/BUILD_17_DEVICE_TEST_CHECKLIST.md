@@ -11,13 +11,14 @@ is implied by this doc.** The point of Build 17 on device is to verify the
 >   (sections 4–6 below) works end to end on device.
 > - If the round-trip fails, the bundle is not ready — stop and report, don't widen.
 >
-> ⛔ **Known: questionnaire persistence needs a SQL patch.** Build 17 (and any build
->   before the patch) does NOT persist `reportDefinitionId` — `supabase/task_report_definition_patch_draft.sql`
->   adds the `tasks.report_definition_id` column and is **NOT applied yet**. Until it
->   is applied, a generated questionnaire task that round-trips through the DB will
->   show **"This questionnaire is unavailable…"** (honest error — no longer a blank
->   "Save & Complete"). So §4–6 below require that patch applied first; on Build 17
->   as-is you can expect the unavailable state, which itself is worth verifying.
+> ⛔ **Known: questionnaire persistence — column APPLIED, needs a NEW build.** The
+>   `tasks.report_definition_id` column (`supabase/task_report_definition_patch_draft.sql`)
+>   is **applied + verified on alpha**, and the client mapping shipped in commit
+>   `981b71e`. **But Build 17 predates `981b71e`**, so on Build 17 questionnaire tasks
+>   still won't persist their definition (you'd see "This questionnaire is
+>   unavailable…"). To verify §4–6 end-to-end you need a **new build** that includes
+>   `981b71e`. On Build 17 as-is, verifying the honest "unavailable" state is the
+>   most you can check.
 
 ---
 
