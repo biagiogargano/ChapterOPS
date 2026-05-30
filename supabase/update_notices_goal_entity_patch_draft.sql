@@ -1,7 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- update_notices · allow entity_type 'goal' · DRAFT — ⛔ DO NOT RUN. NOT APPLIED.
+-- update_notices · allow entity_type 'goal' · ✅ APPLIED + VERIFIED on alpha.
+--   Verified: entity_type CHECK now allows ('task','event','goal'); 28 rows intact.
 --
---   The in-app Notifications table currently constrains entity_type to ('task',
+--   The in-app Notifications table previously constrained entity_type to ('task',
 --   'event'). To show an in-app notice when leadership ASSIGNS a goal to an officer
 --   role (roadmap §7, in-app-only — NO push), the constraint must also allow 'goal'
 --   so the notice persists and tapping it can navigate to the Goals tab.
@@ -22,7 +23,7 @@
 --       the insert fails the CHECK and the notice can't persist (half-fake feature).
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. Safe to re-run.
 
 alter table public.update_notices
   drop constraint if exists update_notices_entity_type_check;
@@ -31,7 +32,7 @@ alter table public.update_notices
   add constraint update_notices_entity_type_check
   check (entity_type in ('task','event','goal'));
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying)

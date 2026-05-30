@@ -1,5 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Tasks · available_at column (update windows) · DRAFT — ⛔ DO NOT RUN. NOT APPLIED.
+-- Tasks · available_at column (update windows) · ✅ APPLIED + VERIFIED on alpha.
+--   Verified: available_at timestamptz column added, nullable; 0 non-null rows.
 --
 --   Adds an optional "available from" timestamp so a task (esp. a weekly update) can
 --   be NOT-YET-OPEN before its window starts — officers shouldn't submit at the start
@@ -18,12 +19,12 @@
 --       applied — never fake a lock the data can't persist.
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. Safe to re-run.
 
 alter table public.tasks
   add column if not exists available_at timestamptz;   -- nullable; null = always open
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying)

@@ -1,5 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Goals v2 · numeric|text value model · DRAFT — ⛔ DO NOT RUN. NOT APPLIED. ⛔
+-- Goals v2 · numeric|text value model · ✅ APPLIED + VERIFIED on alpha (Dashboard).
+--   Verified: value_kind/target_text/current_text columns added; create_goal and
+--   update_goal each have EXACTLY ONE overload (new text-param signatures) — the
+--   old v1 signatures were dropped, so 8-arg numeric calls resolve via defaults.
 --
 --   Lets a goal be NUMERIC (target/current numbers + progress %) OR TEXT/STATUS
 --   (e.g. "Book formal venue", current "Deposit paid, contract pending"). Today the
@@ -22,7 +25,7 @@
 --   applied — do not let the UI pretend to save text the DB can't persist.
 -- ════════════════════════════════════════════════════════════════════════════
 
-begin;   -- ⛔ DRAFT: do not run until an approved apply checkpoint.
+begin;   -- ✅ APPLIED + verified on alpha. Safe to re-run (idempotent).
 
 -- ── 1. columns ──────────────────────────────────────────────────────────────────
 alter table public.goals
@@ -142,7 +145,7 @@ $$;
 revoke all on function public.update_goal(uuid,text,numeric,numeric,text,text,text) from public;
 grant execute on function public.update_goal(uuid,text,numeric,numeric,text,text,text) to authenticated;
 
-commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
+commit;   -- ✅ APPLIED + verified on alpha.
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- VERIFICATION (run AFTER applying)

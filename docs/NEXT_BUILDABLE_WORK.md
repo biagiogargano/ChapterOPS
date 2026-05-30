@@ -31,10 +31,20 @@ Keep this doc current: when a lane finishes, move it to "Done" with its commit.
 - **Update windows** — pure `lib/taskWindow.ts` (open / not-yet-open / overdue). Locked UI gated on `supabase/task_available_at_patch_draft.sql` (DRAFT, not applied).
 - **Goal-assigned in-app notice** — pure `buildGoalAssignedNotice`. Emit gated on `supabase/update_notices_goal_entity_patch_draft.sql` (widen entity_type CHECK to 'goal'; DRAFT, not applied).
 
-**DRAFT SQL patches awaiting approval (apply checkpoints, in rough priority):**
-1. `goals_v2_value_kind_patch_draft.sql` — unlocks text/status goals.
-2. `task_available_at_patch_draft.sql` — unlocks update windows.
-3. `update_notices_goal_entity_patch_draft.sql` — unlocks goal-assigned in-app notices.
+**SQL patches — ✅ ALL THREE APPLIED + verified on alpha:**
+1. `goals_v2_value_kind_patch_draft.sql` — value_kind/target_text/current_text +
+   text-param create_goal/update_goal (exactly one overload each). → text/status goals.
+2. `task_available_at_patch_draft.sql` — tasks.available_at. → update windows.
+3. `update_notices_goal_entity_patch_draft.sql` — entity_type allows 'goal'. → goal notices.
+
+**NEXT CLIENT SPRINT now unblocked (storage live, safe to wire):**
+- Goals create/edit **text-value input** (valueKind toggle → target_text/current_text);
+  `goalDisplay`/`goalService` mapping already support it.
+- **Goal-assigned in-app notice** emit at the leadership goal-create site (the pure
+  `buildGoalAssignedNotice` builder exists) + Notifications nav for entityType 'goal'.
+- **Update-window** read display in Task Detail/Today via `taskWindow` once a
+  generation step sets `available_at` (still needs the weekly-update generation
+  product decision).
 
 **Requires further product decision (NOT just SQL):**
 - When/how the weekly goal-update task is generated (cadence + window + who triggers).
