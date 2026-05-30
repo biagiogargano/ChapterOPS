@@ -70,5 +70,27 @@ function baseTask(over: Partial<MockTask> = {}): MockTask {
   check('null column → reportDefinitionId undefined', t.reportDefinitionId === undefined);
 }
 
+// ── available_at ↔ availableAt mapping ────────────────────────────────────────
+{
+  const row = mockTaskToRow(baseTask({ availableAt: '2026-06-08' }));
+  check('task with window writes available_at', row.available_at === '2026-06-08');
+}
+{
+  const row = mockTaskToRow(baseTask());
+  check('ordinary task omits available_at key', !('available_at' in row));
+}
+{
+  const row: any = { ...mockTaskToRow(baseTask({ availableAt: '2026-06-08' })),
+    visible_to_all: false, escalation_chain: [], proof_content: '', rejection_note: '',
+    created_at: '', updated_at: '' };
+  check('row → availableAt restored', rowToMockTask(row).availableAt === '2026-06-08');
+}
+{
+  const row: any = { ...mockTaskToRow(baseTask()), available_at: null,
+    visible_to_all: false, escalation_chain: [], proof_content: '', rejection_note: '',
+    created_at: '', updated_at: '' };
+  check('null available_at → undefined (fail safe)', rowToMockTask(row).availableAt === undefined);
+}
+
 console.log(`\ntaskServiceMapping.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

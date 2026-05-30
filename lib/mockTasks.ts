@@ -91,6 +91,10 @@ export interface MockTask {
   // Created-task metadata (officer-created structured tasks — Phase: edit/delete)
   createdByRole?: Role;     // who created it (for edit/delete permission)
   dueAt?:         string;   // ISO date(+time) the due label was derived from
+  // Optional "available from" (update windows): before this, the task is not yet
+  // open to submit. Null/absent = always open (today's behavior). Persisted via the
+  // tasks.available_at column (applied on alpha). Read by lib/taskWindow.
+  availableAt?:   string;
 
   // Which structured-response / QUESTIONNAIRE definition this task collects (a
   // StructuredResponseDefinition.id). Generic by nature — the Weekly Officer Report

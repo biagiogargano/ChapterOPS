@@ -88,6 +88,8 @@ interface TaskRow {
   // (supabase/task_report_definition_patch_draft.sql). Until then it is absent on
   // fetched rows, so this is `?` and read defensively.
   report_definition_id?:  string | null;
+  // Optional "available from" (update windows); present once available_at is applied.
+  available_at?:          string | null;
   created_at:             string;
   updated_at:             string;
 }
@@ -152,6 +154,8 @@ function rowToMockTask(row: TaskRow): MockTask {
     // Questionnaire/report definition this task collects. Read defensively: absent
     // (column not yet applied) or null → undefined, so ordinary tasks are unaffected.
     reportDefinitionId: row.report_definition_id ?? undefined,
+    // Update window "available from" (read defensively; null/absent → undefined).
+    availableAt:        row.available_at ?? undefined,
   };
 }
 
@@ -169,8 +173,14 @@ function mockTaskToRow(task: MockTask): Record<string, unknown> {
   const reportDef = task.reportDefinitionId
     ? { report_definition_id: task.reportDefinitionId }
     : {};
+  // Same pattern for available_at — only sent when set, so ordinary task writes are
+  // unaffected (and safe even if the column weren't applied).
+  const window = task.availableAt
+    ? { available_at: task.availableAt }
+    : {};
   return {
     ...reportDef,
+    ...window,
     id:                     task.id,
     chapter_id:             getDataOrgId(),
     title:                  task.title,
