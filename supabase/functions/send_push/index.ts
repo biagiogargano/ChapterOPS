@@ -82,12 +82,16 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ sent: 0, reason: 'only_actor' }), { status: 200 });
   }
 
-  // Resolve roles → active members in this org → their push tokens.
-  // DRAFT QUERY: re-verify against live schema (members/positions/push_tokens)
-  // at wiring time. Kept as two simple steps for clarity over a single join.
+  // Resolve roles → active members in the ACTION org → their stable auth_user_id.
+  // The audience is ALWAYS determined from the action org (org_id); we only use
+  // it here to find WHO the recipients are. We then look up their device tokens
+  // by auth_user_id (NOT by token.org_id), because a device's push token is tied
+  // to the org that was active when it registered — which may be a DIFFERENT org.
+  // This is the cross-org delivery fix: a user assigned a task in org B is
+  // notified even if their token last registered while active in org A.
   const { data: members, error: mErr } = await admin
     .from('positions')
-    .select('member_id, members!inner(id, org_id, status)')
+    .select('member_id, members!inner(id, org_id, status, auth_user_id)')
     .eq('org_id', org_id)
     .eq('is_active', true)
     .in('role', recipientRoles);
@@ -96,20 +100,24 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: 'member_lookup_failed', detail: mErr.message }), { status: 500 });
   }
 
-  const memberIds = Array.from(
+  // Collect the stable auth_user_id of each ACTIVE, CLAIMED member in the action
+  // org. Unclaimed memberships (auth_user_id null) can't be matched to a device
+  // yet — they're skipped (correct: that person hasn't logged in as this member).
+  const authUserIds = Array.from(
     new Set((members ?? [])
-      .filter((m: any) => m.members?.status === 'active')
-      .map((m: any) => m.member_id)),
+      .filter((m: any) => m.members?.status === 'active' && m.members?.auth_user_id)
+      .map((m: any) => m.members.auth_user_id)),
   );
-  if (memberIds.length === 0) {
+  if (authUserIds.length === 0) {
     return new Response(JSON.stringify({ sent: 0, reason: 'no_members' }), { status: 200 });
   }
 
+  // Find tokens by auth_user_id — NO org_id filter. The token row's org_id is just
+  // whatever org was active at registration and must not gate cross-org delivery.
   const { data: tokenRows, error: tErr } = await admin
     .from('push_tokens')
     .select('expo_token')
-    .eq('org_id', org_id)
-    .in('member_id', memberIds);
+    .in('auth_user_id', authUserIds);
 
   if (tErr) {
     return new Response(JSON.stringify({ error: 'token_lookup_failed', detail: tErr.message }), { status: 500 });
