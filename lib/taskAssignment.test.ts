@@ -115,5 +115,35 @@ check('candidate roles = officers + brother',
   ASSIGNEE_CANDIDATE_ROLES.includes(ROLES.SOCIAL_CHAIR) &&
   !ASSIGNEE_CANDIDATE_ROLES.includes('all' as Role));
 
+// ── Regression: every catalog role has a safe assignment outcome ──────────────
+{
+  const allRoles = Object.values(ROLES) as Role[];
+  const validTargets = new Set<Role>([...ASSIGNEE_CANDIDATE_ROLES, ROLES.PRESIDENT, ...allRoles]);
+  let allSafe = true;
+  let selfAlways = true;
+  let neverAll = true;
+  for (const acting of allRoles) {
+    const list = getAssigneeRoleOptions(acting);
+    // No unknown role can ever appear.
+    if (!list.every(r => validTargets.has(r))) allSafe = false;
+    // Self-assignment is never lost (acting role is known → must include itself).
+    if (!list.includes(acting)) selfAlways = false;
+    // 'all' must never be produced.
+    if ((list as string[]).includes('all')) neverAll = false;
+  }
+  check('every catalog role yields only known targets', allSafe);
+  check('self-assignment never lost for any catalog role', selfAlways);
+  check('no role list ever contains "all"', neverAll);
+}
+
+// ── Regression: an unknown candidate exception cannot inject an unknown role ───
+{
+  const got = getAssigneeRoleOptions(ROLES.PRESIDENT, {
+    exceptions: [{ assignerRole: ROLES.PRESIDENT, targetRole: 'phantom' }],
+  });
+  // 'phantom' is not a candidate role, so it can't appear in the assignee list.
+  check('exception to a non-candidate role does not inject it', !(got as string[]).includes('phantom'));
+}
+
 console.log(`\ntaskAssignment.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);
