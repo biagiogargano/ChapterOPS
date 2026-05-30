@@ -114,6 +114,66 @@ export function emitUpdateNotice(params: {
   void upsertNotice(notice);   // fire-and-forget (no-op in mock fallback)
 }
 
+// ─── Task action notices (mirror the 4 task-responsibility pushes) ────────────
+// The four task pushes (assigned / submitted-for-review / approved / rejected) are
+// sent via pushTokens.sendActionPush. This builds the matching IN-APP notice so the
+// same event also appears in Notifications and can be dismissed. SAME audience as the
+// push (one concrete role; the store excludes the actor), so no new scope: no
+// all-member, no event/RSVP, no goal/questionnaire, no reminders.
+
+export type TaskActionKind = 'assigned' | 'submitted' | 'approved' | 'rejected';
+
+/** Copy per task action — mirrors the push titles. */
+const TASK_ACTION_SUMMARY: Record<TaskActionKind, (title: string) => string> = {
+  assigned:  t => `New task assigned: ${t}`,
+  submitted: t => `Task needs your review: ${t}`,
+  approved:  t => `Task approved: ${t}`,
+  rejected:  t => `Task needs changes: ${t}`,
+};
+
+/** Severity per task action (rejected is the most pressing). */
+const TASK_ACTION_SEVERITY: Record<TaskActionKind, UpdateSeverity> = {
+  assigned:  'moderate',
+  submitted: 'moderate',
+  approved:  'low',
+  rejected:  'critical',
+};
+
+/**
+ * Build the emitUpdateNotice params for a task action, or null if there is no
+ * concrete audience role (matches the push rule: skip when the target role is
+ * missing or 'all'). Pure; never throws. `audienceRole` is the SAME single role the
+ * push targets (assignee for assigned/approved/rejected; reviewer for submitted).
+ */
+export function buildTaskActionNotice(
+  kind: TaskActionKind,
+  params: { taskId: string; taskTitle: string; audienceRole?: string | null; actorRole: string },
+): Parameters<typeof emitUpdateNotice>[0] | null {
+  const role = params.audienceRole;
+  if (!params.taskId || !role || role === 'all') return null;   // no concrete target → no notice
+  return {
+    entityType:    'task',
+    entityId:      params.taskId,
+    summary:       TASK_ACTION_SUMMARY[kind](params.taskTitle),
+    severity:      TASK_ACTION_SEVERITY[kind],
+    audienceRoles: [role],
+    changedByRole: params.actorRole,
+  };
+}
+
+/**
+ * Emit the in-app notice mirroring a task push. No-ops safely (no audience, etc.).
+ * Call this right where the matching sendActionPush is fired. Never blocks the
+ * caller's task action (emit is synchronous + guarded; persistence is fire-and-forget).
+ */
+export function emitTaskActionNotice(
+  kind: TaskActionKind,
+  params: { taskId: string; taskTitle: string; audienceRole?: string | null; actorRole: string },
+): void {
+  const notice = buildTaskActionNotice(kind, params);
+  if (notice) emitUpdateNotice(notice);
+}
+
 // ─── Acknowledge ────────────────────────────────────────────────────────────
 
 /** Mark a notice acknowledged for one role (hides it for that role). */

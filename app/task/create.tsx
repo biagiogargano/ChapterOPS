@@ -18,7 +18,7 @@ import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
 import { sendActionPush } from '@/lib/pushTokens';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
-import { emitUpdateNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
+import { emitUpdateNotice, emitTaskActionNotice, type UpdateSeverity } from '@/lib/updateNoticeStore';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -549,6 +549,8 @@ export default function CreateTaskScreen() {
         body:          task.title,
         actorRole:     role,
       });
+      // Mirror the push as an in-app notice (same audience; never blocks create).
+      emitTaskActionNotice('assigned', { taskId: task.id, taskTitle: task.title, audienceRole: assignedRole, actorRole: role });
     }
 
     if (params.eventId) {

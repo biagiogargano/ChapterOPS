@@ -23,7 +23,7 @@ import {
 import { getTaskSubmission, removeTask, upsertTaskSubmission, type TaskSubmission } from '@/lib/taskService';
 import { AUTH_ENABLED, ORG_SCOPED_DATA } from '@/lib/flags';
 import { isSupabaseConfigured } from '@/lib/memberService';
-import { emitUpdateNotice } from '@/lib/updateNoticeStore';
+import { emitUpdateNotice, emitTaskActionNotice } from '@/lib/updateNoticeStore';
 import {
   getRsvpEntry,
   setRsvpEntry,
@@ -1013,6 +1013,7 @@ export default function TaskDetailScreen() {
         audienceRoles: [reviewer],
         title: 'Task needs your review', body: t.title, actorRole: role,
       });
+      emitTaskActionNotice('submitted', { taskId: t.id, taskTitle: t.title, audienceRole: reviewer, actorRole: role });
     } else if (next === 'approved' || next === 'rejected') {
       const assignee = t.assignedRole;
       if (!assignee || assignee === 'all') return;   // concrete role only
@@ -1022,6 +1023,7 @@ export default function TaskDetailScreen() {
         title: next === 'approved' ? 'Task approved' : 'Task needs changes',
         body: t.title, actorRole: role,
       });
+      emitTaskActionNotice(next === 'approved' ? 'approved' : 'rejected', { taskId: t.id, taskTitle: t.title, audienceRole: assignee, actorRole: role });
     }
   }
 

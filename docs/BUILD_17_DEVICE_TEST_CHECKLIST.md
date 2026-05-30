@@ -91,11 +91,23 @@ real/persisted — a failed RPC must show an error, never a fake success.
       render; agenda card on meeting events.
 - [ ] **Tasks** tab: filters (To Do / Done / All) + search behave.
 
-## 9. Push expectations
-- [ ] **No new push** is expected from questionnaire generation or submission — that
-      flow sends nothing. Only test the **existing** task-responsibility pushes
-      (from Build 14/15) if you're separately verifying those; Build 17 does not
-      change push scope.
+## 9. Push expectations + in-app notification mirroring
+- [ ] **No new push** is expected from questionnaire generation/submission or Goals —
+      those flows send nothing. Push **scope is unchanged** (still the 4 task
+      responsibility pushes).
+- [ ] **In-app mirroring (NEW):** each of the **four task pushes** now also creates an
+      in-app **Notifications** item. Test each:
+  - [ ] **Task assigned** → as the assignee, the **Notifications** screen shows
+        "New task assigned: <title>".
+  - [ ] **Submitted for review** → as the reviewer, shows "Task needs your review:
+        <title>".
+  - [ ] **Approved** → as the assignee, shows "Task approved: <title>".
+  - [ ] **Rejected** → as the assignee, shows "Task needs changes: <title>".
+  - [ ] **Dismiss** a notification (tap it) → it **disappears** from the list.
+  - [ ] **Actor does NOT get their own notification** (e.g. the President who
+        approved a task sees no "Task approved" notice for it).
+  - [ ] No **all-member / event / RSVP / goal / questionnaire** notifications appear —
+        only the four task actions are mirrored.
 
 ---
 
