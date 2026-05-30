@@ -1,10 +1,9 @@
 /**
- * goals.ts — TYPE-ONLY sketch of the future Goals / Progress Tracking system.
+ * goals.ts — types for the Goals / Progress Tracking system.
  *
- * ⚠️ INERT FOUNDATION. Nothing imports this; it adds NO runtime code and changes NO
- *    behavior (types are erased at compile time). It pins the shape of the
- *    goals-first product so the eventual layer (helpers → Supabase → Goals tab) has
- *    a target. See docs/GOALS_FIRST_SYSTEM_PLAN.md.
+ * Now LIVE: imported by lib/goalService, lib/goalHelpers, lib/goalUpdateTasks, and
+ * app/(tabs)/goals.tsx. Types only (erased at compile time) — the runtime lives in
+ * the service + helpers. See docs/GOALS_FIRST_SYSTEM_PLAN.md / GOALS_PERSISTENCE_PLAN.md.
  *
  * The model (doctrine: generic core, pack content on top):
  *   Goal (persistent object) → recurring update window → GoalUpdate (a structured
@@ -26,6 +25,14 @@ export type GoalCadence = 'daily' | 'weekly' | 'monthly' | 'custom';
 
 /** A goal's lifecycle status. Distinct from the task state machine. */
 export type GoalStatus = 'active' | 'completed' | 'archived';
+
+/**
+ * Whether a goal's target/current are NUMBERS (progress %) or TEXT/STATUS
+ * descriptions (e.g. "Book formal venue" → "Deposit paid, contract pending").
+ * Defaults to 'numeric' (backward-compatible). Text-value persistence requires the
+ * goals_v2_value_kind patch — see supabase/goals_v2_value_kind_patch_draft.sql.
+ */
+export type GoalValueKind = 'numeric' | 'text';
 
 /**
  * A persistent goal/progress object. Lives over time; tracked by current vs target.
@@ -54,11 +61,22 @@ export interface Goal {
    */
   createdBy?:    string;
 
-  /** Optional measurable target + current value (omit for milestone/boolean goals). */
+  /**
+   * Numeric vs text goal. 'numeric' (default) → use target/currentValue + progress %.
+   * 'text' → use target/currentText (status descriptions, no %). Optional for
+   * backward-compat; absent is treated as 'numeric'.
+   */
+  valueKind?:    GoalValueKind;
+
+  /** Optional measurable target + current value (numeric goals). */
   targetValue?:  number;
   currentValue?: number;
   /** Optional unit label (e.g. 'members', '$', 'hours'). */
   unit?:         string;
+
+  /** Target / current as TEXT (text goals; needs the goals_v2 column to persist). */
+  targetText?:   string;
+  currentText?:  string;
 
   /** How often an update is expected. */
   cadence:       GoalCadence;

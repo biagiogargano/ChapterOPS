@@ -15,7 +15,7 @@ import { ROLES, ROLE_LABELS, OFFICER_ROLES, isOfficer, type Role } from '@/lib/r
 import {
   listGoalsForOrg, listMyGoals, createGoal, updateGoal, completeGoal, archiveGoal,
 } from '@/lib/goalService';
-import { goalProgress, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
+import { goalProgress, goalDisplay, canManageGoal, parseGoalPrompts } from '@/lib/goalHelpers';
 import type { Goal, GoalCadence } from '@/lib/goals';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
@@ -191,21 +191,20 @@ function GoalCard({ goal, canManage, onChanged }: { goal: Goal; canManage: boole
     return <EditGoalForm goal={goal} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />;
   }
 
-  const measurable = progress.percent !== null;
+  // Unified display: numeric goals show "cur/tgt · NN%" + bar; text goals show a
+  // "current → target" status line and no bar.
+  const display = goalDisplay(goal);
+  const showBar = display.kind === 'numeric' && progress.percent !== null;
   const fillPct = progress.percent ?? 0;   // narrowed for the style width
   return (
     <View style={s.card}>
       <Text style={s.cardTitle}>{goal.title}</Text>
       <View style={s.metaRow}>
-        {measurable && (
-          <Text style={s.metaStrong}>
-            {goal.currentValue ?? 0}/{goal.targetValue}{goal.unit ? ` ${goal.unit}` : ''} · {Math.round(progress.percent as number)}%
-          </Text>
-        )}
+        {display.valueLine !== '' && <Text style={s.metaStrong}>{display.valueLine}</Text>}
         <Text style={s.metaDim}>{CADENCE_LABEL[goal.cadence] ?? goal.cadence}</Text>
         {goal.ownerRole && <Text style={s.metaDim}>{ROLE_LABELS[goal.ownerRole as Role] ?? goal.ownerRole}</Text>}
       </View>
-      {measurable && (
+      {showBar && (
         <View style={s.barTrack}><View style={[s.barFill, { width: `${fillPct}%` }]} /></View>
       )}
 
@@ -248,6 +247,11 @@ function CreateGoalForm({
   const [ownerRole, setOwnerRole] = useState<Role>(defaultOwnerRole);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState<string | null>(null);
+  // NOTE (gated): TEXT/status goal inputs are intentionally NOT shown here yet. The
+  // service + card + types support text goals, but persistence needs the
+  // goals_v2_value_kind patch applied first (supabase/goals_v2_value_kind_patch_draft.sql).
+  // Adding a text input now would let the UI pretend to save text the DB can't keep.
+  // Until applied, this form creates NUMERIC goals only.
 
   // Bulk: one goal per line or per ';'. Current/target apply to all created goals.
   const titles = parseGoalPrompts(title);

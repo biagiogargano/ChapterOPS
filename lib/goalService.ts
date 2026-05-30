@@ -22,7 +22,7 @@
 
 import { supabase } from './supabase';
 import { isSupabaseConfigured } from './memberService';
-import type { Goal, GoalCadence, GoalStatus } from './goals';
+import type { Goal, GoalCadence, GoalStatus, GoalValueKind } from './goals';
 
 /** Result of a goal mutation — never throws to the UI. */
 export interface GoalMutationResult {
@@ -42,6 +42,11 @@ export interface CreateGoalInput {
   ownerRole?:          string | null;
   updateDefinitionId?: string | null;
   reviewerRole?:       string | null;
+  // Text-value goals (needs the goals_v2 patch applied to persist). Omitted for
+  // numeric goals so they still create cleanly pre-patch.
+  valueKind?:          GoalValueKind;
+  targetText?:         string | null;
+  currentText?:        string | null;
 }
 
 export interface UpdateGoalInput {
@@ -49,6 +54,8 @@ export interface UpdateGoalInput {
   targetValue?:  number | null;
   currentValue?: number | null;
   cadence?:      GoalCadence | null;
+  targetText?:   string | null;
+  currentText?:  string | null;
 }
 
 /** Map a raw goals row (snake_case) into the Goal type. Defensive; never throws. */
@@ -69,6 +76,10 @@ function mapGoalRow(row: any): Goal {
     updateDefinitionId: row?.update_definition_id ?? undefined,
     status:             (row?.status ?? 'active') as GoalStatus,
     reviewerRole:       row?.reviewer_role ?? undefined,
+    // Value-kind columns (present only after the goals_v2 patch); default numeric.
+    valueKind:          row?.value_kind === 'text' ? 'text' : 'numeric',
+    targetText:         row?.target_text ?? undefined,
+    currentText:        row?.current_text ?? undefined,
   };
 }
 
@@ -109,6 +120,12 @@ export async function listMyGoals(orgId: string): Promise<Goal[]> {
 export async function createGoal(input: CreateGoalInput): Promise<GoalMutationResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: 'unconfigured' };
   if (!input.orgId || !input.title || !input.cadence) return { ok: false, error: 'missing_input' };
+  // Text params are sent ONLY for text goals — so numeric goals call the original
+  // create_goal signature and keep working before the goals_v2 patch is applied.
+  const isText = input.valueKind === 'text';
+  const textParams = isText
+    ? { p_value_kind: 'text', p_target_text: input.targetText ?? null, p_current_text: input.currentText ?? null }
+    : {};
   try {
     const { data, error } = await supabase.rpc('create_goal', {
       p_title:                input.title,
@@ -119,6 +136,7 @@ export async function createGoal(input: CreateGoalInput): Promise<GoalMutationRe
       p_update_definition_id: input.updateDefinitionId ?? null,
       p_reviewer_role:        input.reviewerRole ?? null,
       p_org_id:               input.orgId,
+      ...textParams,
     });
     if (error) { console.warn('[goalService] create_goal error:', error.message); return { ok: false, error: error.message }; }
     return { ok: true, goalId: typeof data === 'string' ? data : undefined };
@@ -132,6 +150,12 @@ export async function createGoal(input: CreateGoalInput): Promise<GoalMutationRe
 export async function updateGoal(goalId: string, input: UpdateGoalInput): Promise<GoalMutationResult> {
   if (!isSupabaseConfigured()) return { ok: false, error: 'unconfigured' };
   if (!goalId) return { ok: false, error: 'missing_input' };
+  // Text params sent only when provided (so numeric-goal edits stay on the original
+  // update_goal signature pre-patch).
+  const hasText = input.targetText !== undefined || input.currentText !== undefined;
+  const textParams = hasText
+    ? { p_target_text: input.targetText ?? null, p_current_text: input.currentText ?? null }
+    : {};
   try {
     const { error } = await supabase.rpc('update_goal', {
       p_goal_id:       goalId,
@@ -139,6 +163,7 @@ export async function updateGoal(goalId: string, input: UpdateGoalInput): Promis
       p_target_value:  input.targetValue ?? null,
       p_current_value: input.currentValue ?? null,
       p_cadence:       input.cadence ?? null,
+      ...textParams,
     });
     if (error) { console.warn('[goalService] update_goal error:', error.message); return { ok: false, error: error.message }; }
     return { ok: true, goalId };

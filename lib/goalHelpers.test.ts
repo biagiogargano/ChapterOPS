@@ -7,6 +7,7 @@
 import {
   parseGoalPrompts, goalProgress, goalPeriodKey, isGoalUpdateDue,
   isGoalActive, isGoalCompleted, canArchiveGoal, canManageGoal,
+  goalValueKind, goalDisplay,
 } from './goalHelpers';
 import type { Goal } from './goals';
 
@@ -118,6 +119,32 @@ check('cannot re-archive archived', canArchiveGoal({ status: 'archived' }) === f
   check('missing currentMemberId → false (fail safe)', canManageGoal(g('m_me'), 'social_chair', null) === false);
   check('missing both → false (fail safe)', canManageGoal(g(undefined), 'social_chair', undefined) === false);
 }
+
+// ── 6. goalValueKind + goalDisplay (numeric vs text goals) ────────────────────
+check('valueKind defaults numeric when unset', goalValueKind({}) === 'numeric');
+check('valueKind numeric explicit', goalValueKind({ valueKind: 'numeric' }) === 'numeric');
+check('valueKind text', goalValueKind({ valueKind: 'text' }) === 'text');
+{
+  const d = goalDisplay({ valueKind: 'numeric', currentValue: 5, targetValue: 10, unit: 'members' });
+  check('numeric display: progress present', d.progress !== null && d.progress.percent === 50);
+  check('numeric display: value line', d.valueLine === '5/10 members · 50%');
+  check('numeric display: kind', d.kind === 'numeric');
+}
+{
+  const d = goalDisplay({ valueKind: 'numeric' });   // no numbers
+  check('numeric goal with no numbers → empty value line', d.valueLine === '');
+}
+{
+  const d = goalDisplay({ valueKind: 'text', currentText: 'Deposit paid', targetText: 'Venue booked' });
+  check('text display: no progress', d.progress === null);
+  check('text display: current → target line', d.valueLine === 'Deposit paid → Venue booked');
+  check('text display: kind', d.kind === 'text');
+}
+{
+  const d = goalDisplay({ valueKind: 'text', currentText: 'In progress' });   // only current
+  check('text display: only current shown', d.valueLine === 'In progress');
+}
+check('text goal with no text → empty line', goalDisplay({ valueKind: 'text' }).valueLine === '');
 
 console.log(`\ngoalHelpers.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

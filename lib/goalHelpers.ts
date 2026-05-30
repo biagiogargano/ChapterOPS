@@ -11,7 +11,7 @@
  * reference date and the goal's last-updated period; this just compares buckets.
  */
 
-import type { Goal, GoalCadence } from './goals';
+import type { Goal, GoalCadence, GoalValueKind } from './goals';
 import { isoWeek, toISODate } from './questionnaireCycle';
 
 // ─── 1. Bulk goal prompt parsing ──────────────────────────────────────────────
@@ -70,6 +70,44 @@ export function goalProgress(goal: Pick<Goal, 'currentValue' | 'targetValue'>): 
     reached: (cur as number) >= (tgt as number),
     overTarget: (cur as number) > (tgt as number),
   };
+}
+
+// ─── 2b. Goal value kind + display (numeric OR text) ─────────────────────────
+
+/** Effective value kind — defaults to 'numeric' when unset (backward-compat). Pure. */
+export function goalValueKind(goal: Pick<Goal, 'valueKind'>): GoalValueKind {
+  return goal.valueKind === 'text' ? 'text' : 'numeric';
+}
+
+export interface GoalDisplay {
+  kind: GoalValueKind;
+  /** Numeric goals: progress (percent etc.); null for text goals. */
+  progress: GoalProgress | null;
+  /** A short "current → target" line for the card, for either kind. '' if nothing to show. */
+  valueLine: string;
+}
+
+/**
+ * Unified, presentation-ready view of a goal's value for both kinds. Numeric goals
+ * get a "cur/tgt unit · NN%" line + progress; text goals get a "current → target"
+ * status line and no percent. Pure; safe on any missing field.
+ */
+export function goalDisplay(
+  goal: Pick<Goal, 'valueKind' | 'currentValue' | 'targetValue' | 'unit' | 'currentText' | 'targetText'>,
+): GoalDisplay {
+  const kind = goalValueKind(goal);
+  if (kind === 'text') {
+    const cur = (goal.currentText ?? '').trim();
+    const tgt = (goal.targetText ?? '').trim();
+    const valueLine = cur && tgt ? `${cur} → ${tgt}` : (cur || tgt || '');
+    return { kind, progress: null, valueLine };
+  }
+  const progress = goalProgress(goal);
+  const hasNums = typeof goal.targetValue === 'number';
+  const unit = goal.unit ? ` ${goal.unit}` : '';
+  const pct = progress.percent !== null ? ` · ${Math.round(progress.percent)}%` : '';
+  const valueLine = hasNums ? `${goal.currentValue ?? 0}/${goal.targetValue}${unit}${pct}` : '';
+  return { kind, progress, valueLine };
 }
 
 // ─── 3. Cadence / update-due ──────────────────────────────────────────────────
