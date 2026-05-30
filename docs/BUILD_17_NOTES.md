@@ -107,7 +107,7 @@ officer-reports system. No live-user behavior change; no Supabase.
   (future goals layer, separate from tasks, Supabase-gated), and
   `docs/STRUCTURED_RESPONSE_ROADMAP.md`.
 
-## Supabase change applied this cycle
+## Supabase changes applied this cycle
 
 - `task_report_submissions` table + `upsert_task_report_submission` /
   `get_task_report_submission` SECURITY DEFINER RPCs. **RLS enabled, no table
@@ -116,6 +116,13 @@ officer-reports system. No live-user behavior change; no Supabase.
   Applied and verified on alpha 2026-05-30 (`docs/REPORTS_V1_PERSISTENCE_PLAN.md`,
   `supabase/reports_v1_task_report_submissions.sql`). No change to existing
   tables, existing RLS, auth, or org-scoping.
+- **`goals` table + 6 SECURITY DEFINER RPCs** (`create_goal`, `list_goals_for_org`,
+  `list_my_goals`, `update_goal`, `complete_goal`, `archive_goal`). Same posture:
+  **RLS on, no policies, REVOKE from anon/authenticated** — access via the RPCs
+  (create/manage = owner role or president/pro_consul/annotator; read = owner role,
+  or leadership/annotator see all org goals). Applied + verified on alpha
+  (`docs/GOALS_PERSISTENCE_PLAN.md`, `supabase/goals_v1_draft.sql`). New leaf table;
+  no change to existing tables/RLS/auth/org-scoping.
 
 ## What did NOT change
 
@@ -124,6 +131,18 @@ officer-reports system. No live-user behavior change; no Supabase.
 - Task state machine, proof/review mechanics, reviewer picker.
 - No Reports tab, no scheduler, no reminders, no new event systems, no template
   builder UI, no AI.
+
+### Goals tab (NEW — real persisted MVP; needs device testing)
+
+- A **Goals tab** (`app/(tabs)/goals.tsx`, Target icon) backed by the live `goals`
+  RPCs via `lib/goalService`. Lists active goals (leadership/annotator → all org
+  goals; other roles → goals they own), create / edit (title/current/target/cadence)
+  / complete / archive, with loading/error/empty states. **Real + persisted** — a
+  failed/unconfigured RPC shows an error, never a fake success.
+- **Out of scope (not built):** goal-update task generation, scheduler,
+  notifications, AI, charts, personal/member goals, agenda integration.
+- **Needs device testing** of the goal-CRUD RPC round-trip (see the device-test
+  checklist §7).
 
 ### Questionnaire generation trigger (NEW — wired, sandbox-testable)
 

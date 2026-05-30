@@ -51,14 +51,37 @@ is implied by this doc.** The point of Build 17 on device is to verify the
       is shown (deny-by-default holds).
 - [ ] Before any submit, a reader opening the task sees **"Not submitted yet."**
 
-## 7. Quick smoke check (no regressions)
+## 7. Goals tab (real persisted CRUD — needs the live RPCs)
+The Goals tab is backed by the live Goals v1 RPCs via `lib/goalService`. It is
+real/persisted — a failed RPC must show an error, never a fake success.
+- [ ] **Goals tab appears** in the tab bar (Target icon, between Tasks and Me).
+- [ ] As **leadership/Annotator** (President / Pro Consul / Annotator): **+ New goal**
+      is shown. **Create a goal** (title, current, target, a cadence chip) → it
+      **appears in the list** after refresh (persisted, not local).
+- [ ] **Current/target + percent + progress bar** render correctly for a measurable
+      goal; a goal with no target shows no bar (not "NaN%").
+- [ ] **Edit** a goal (change current/target/title/cadence) → values **persist** on
+      reopen.
+- [ ] **Complete** a goal → it leaves the active list. **Archive** a goal (confirm
+      dialog) → it leaves the active list.
+- [ ] **Leadership vs owner role:** as leadership, you see **all org goals**; as a
+      non-leadership **owner role**, you see **only goals for your role** (and can
+      manage your own). As an unrelated role, the create button is hidden and you see
+      only your own (likely none).
+- [ ] **Error honesty:** if an RPC fails (e.g. force offline) → an **inline/Alert
+      error** appears and **no goal is created/changed**. NOTE: a failed *read*
+      currently shows the **"No goals yet."** empty state (the read path returns []
+      on error) — if you expect goals and see "No goals yet.", suspect a read error,
+      not truly-empty. Flag this if it's confusing in practice.
+
+## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
       when overdue exists.
 - [ ] **Event Detail**: open an event → linked/prep tasks, RSVP, progress count all
       render; agenda card on meeting events.
 - [ ] **Tasks** tab: filters (To Do / Done / All) + search behave.
 
-## 8. Push expectations
+## 9. Push expectations
 - [ ] **No new push** is expected from questionnaire generation or submission — that
       flow sends nothing. Only test the **existing** task-responsibility pushes
       (from Build 14/15) if you're separately verifying those; Build 17 does not
