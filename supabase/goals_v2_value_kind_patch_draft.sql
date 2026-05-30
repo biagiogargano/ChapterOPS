@@ -31,7 +31,16 @@ alter table public.goals
   add column if not exists target_text  text,    -- target description (text goals)
   add column if not exists current_text text;    -- current status   (text goals)
 
--- ── 2. create_goal — gains optional text params (numeric behavior unchanged) ────
+-- ── 2. create_goal / update_goal — replace the OLD-signature functions ──────────
+-- IMPORTANT: drop the v1 signatures FIRST. We are CHANGING the arg lists (adding
+-- optional text params), and `create or replace` cannot change a signature — it
+-- would leave the old overload in place, making an 8-named-arg numeric call ambiguous
+-- (two candidate functions) and BREAK goal create/update. Dropping the old ones means
+-- the new functions are the only overload; an 8-arg call resolves via the new
+-- defaults. Safe: the function bodies are fully recreated below.
+drop function if exists public.create_goal(text,text,numeric,numeric,text,text,text,uuid);
+drop function if exists public.update_goal(uuid,text,numeric,numeric,text);
+
 -- DECISION: keep numeric the default; a text goal passes p_value_kind='text' +
 -- p_target_text/p_current_text. Auth block is IDENTICAL to goals_v1 create_goal.
 create or replace function public.create_goal(
@@ -87,8 +96,8 @@ end;
 $$;
 revoke all on function public.create_goal(text,text,numeric,numeric,text,text,text,uuid,text,text,text) from public;
 grant execute on function public.create_goal(text,text,numeric,numeric,text,text,text,uuid,text,text,text) to authenticated;
--- NOTE: the v1 create_goal(...,uuid) signature still exists (different arg list).
--- Clients should call the new 11-arg form; the old one can be dropped later (see rollback).
+-- The old 8-arg create_goal was dropped above, so this 11-arg form is the ONLY
+-- create_goal overload. An 8-named-arg numeric call resolves via the new defaults.
 
 -- ── 3. update_goal — gains optional text params (auth unchanged: creator-or-leadership)
 create or replace function public.update_goal(
@@ -152,11 +161,15 @@ commit;   -- ⛔ DRAFT — do not run until an approved apply checkpoint.
 -- ════════════════════════════════════════════════════════════════════════════
 -- ROLLBACK
 -- ════════════════════════════════════════════════════════════════════════════
+-- This patch DROPS the v1 create_goal/update_goal and creates new-signature ones,
+-- so a full rollback must (a) drop the new functions, (b) RE-CREATE the v1 functions
+-- from goals_v1_draft.sql (create_goal) + goals_v1_permissions_patch_draft.sql
+-- (update_goal — the creator-or-leadership version), then (c) drop the columns.
 -- begin;
--- -- restore the v1 RPC bodies from goals_v1_draft.sql + goals_v1_permissions_patch_draft.sql,
--- -- then drop the new-signature functions + columns:
 -- drop function if exists public.update_goal(uuid,text,numeric,numeric,text,text,text);
 -- drop function if exists public.create_goal(text,text,numeric,numeric,text,text,text,uuid,text,text,text);
+-- -- >>> re-create the v1 create_goal(...,uuid) body from goals_v1_draft.sql here <<<
+-- -- >>> re-create the v1 update_goal(uuid,...,text) body from goals_v1_permissions_patch_draft.sql here <<<
 -- alter table public.goals drop column if exists current_text;
 -- alter table public.goals drop column if exists target_text;
 -- alter table public.goals drop column if exists value_kind;
