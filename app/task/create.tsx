@@ -406,17 +406,15 @@ export default function CreateTaskScreen() {
   }, [navigation, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle an assignee chip. Edit mode = single-select (replace). Create mode =
-  // multi-select (keep at least one selected).
+  // multi-select; the last selected role CAN be deselected (so switching the
+  // assignee doesn't require selecting a second role first). Creation is still
+  // gated on >=1 assignee by canSubmit / the missing-fields hint.
   function toggleAssignee(r: Role) {
     if (reviewLocked) return;
     if (editing) { setAssignedRoles([r]); return; }
-    setAssignedRoles(prev => {
-      if (prev.includes(r)) {
-        const next = prev.filter(x => x !== r);
-        return next.length > 0 ? next : prev;   // never empty
-      }
-      return [...prev, r];
-    });
+    setAssignedRoles(prev =>
+      prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r],
+    );
   }
 
   const reviewerInvalid =
