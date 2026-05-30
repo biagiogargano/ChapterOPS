@@ -820,7 +820,7 @@ function ReportFormSection({
     setSubmitting(true);
     const ok = await upsertTaskReportSubmission(taskId, definition.id, answers);
     setSubmitting(false);
-    if (!ok) { setError('Couldn’t submit your report. Please try again.'); return; }
+    if (!ok) { setError('Couldn’t submit your response. Please try again.'); return; }
     onSubmitted();
   }
 
@@ -829,10 +829,10 @@ function ReportFormSection({
   if (readOnly) {
     return (
       <View>
-        <SLabel text={done ? 'SUBMITTED REPORT' : `${definition.label.toUpperCase()}`} />
+        <SLabel text={done ? 'SUBMITTED RESPONSE' : `${definition.label.toUpperCase()}`} />
         {done ? (
           <>
-            <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Report submitted</Text></View>
+            <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Submitted</Text></View>
             <View style={{ marginTop: 10, gap: 12 }}>
               {questions.map(q => {
                 const a = answers[q.key];
@@ -912,7 +912,7 @@ function ReportFormSection({
         onPress={handleSubmit}
         disabled={!progress.complete || submitting}
       >
-        <Text style={s.submitBtnText}>{submitting ? 'Submitting…' : 'Submit Report'}</Text>
+        <Text style={s.submitBtnText}>{submitting ? 'Submitting…' : 'Submit Response'}</Text>
       </Pressable>
       {!progress.complete && (
         <Text style={s.reportHint}>Answer the required questions to submit.</Text>

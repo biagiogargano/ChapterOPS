@@ -92,3 +92,29 @@ export function generateWeeklyOfficerReports(
 ): GenerateReportsResult {
   return generateReportTasks({ orgId, cycle, dueDate });
 }
+
+// ─── Generic vocabulary ───────────────────────────────────────────────────────
+// The core operation is "generate questionnaire / structured-response tasks from a
+// definition". The report-named functions above are the working implementation;
+// `generateQuestionnaireTasks` is the GENERIC entry point new callers (and any
+// future manual-generation UI) should prefer. It is definition-agnostic — pass any
+// definitionId; the Weekly Officer Report is just the default. No behavior change;
+// this is a naming seam toward the generic primitive (see
+// docs/STRUCTURED_RESPONSE_ROADMAP.md). Same idempotency + fail-safe guarantees.
+
+/** Generic input alias — a questionnaire generation request. */
+export type GenerateQuestionnaireInput = GenerateReportsInput;
+/** Generic result alias. */
+export type GenerateQuestionnaireResult = GenerateReportsResult;
+
+/**
+ * Generate questionnaire (structured-response) tasks for the given roles + cycle
+ * from a definition. Generic entry point; `generateReportTasks` is the same
+ * operation under the report-era name. Defaults to the Weekly Officer Report
+ * definition + all officer roles when unspecified. Idempotent; never throws.
+ */
+export function generateQuestionnaireTasks(
+  input: GenerateQuestionnaireInput,
+): GenerateQuestionnaireResult {
+  return generateReportTasks(input);
+}

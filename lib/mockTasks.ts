@@ -92,9 +92,13 @@ export interface MockTask {
   createdByRole?: Role;     // who created it (for edit/delete permission)
   dueAt?:         string;   // ISO date(+time) the due label was derived from
 
-  // Report tasks (foundation; lib/reportTasks): which structured-response
-  // definition this task collects. Optional + ignored by existing screens; read
-  // by the future report submit/read flow. No behavior change for non-report tasks.
+  // Which structured-response / QUESTIONNAIRE definition this task collects (a
+  // StructuredResponseDefinition.id). Generic by nature — the Weekly Officer Report
+  // is just one definition; this is NOT fraternity-specific. The field name keeps
+  // the report-era spelling for now (renaming to structuredResponseDefinitionId /
+  // questionnaireDefinitionId would churn ~8 files for no behavior gain — deferred,
+  // see docs/STRUCTURED_RESPONSE_ROADMAP.md). Optional + ignored by existing
+  // screens; read by the questionnaire form flow. No behavior change for plain tasks.
   reportDefinitionId?: string;
 }
 

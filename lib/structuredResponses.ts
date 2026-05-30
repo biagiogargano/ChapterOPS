@@ -89,6 +89,23 @@ export interface StructuredResponseDefinition {
   questions: StructuredQuestion[];
 }
 
+// ─── Generic vocabulary (the core primitive is a QUESTIONNAIRE) ───────────────
+// The product model: a "questionnaire" / "structured-response" task is the GENERIC
+// core. A "report" (e.g. the Weekly Officer Report) is just ONE definition/use case
+// over this primitive — not a separate system. These aliases let new code speak in
+// the generic vocabulary without churning the existing `StructuredResponse*` names
+// or the report-named modules (those stay until a rename is clearly worth it). See
+// docs/STRUCTURED_RESPONSE_ROADMAP.md.
+
+/** Generic alias: a questionnaire definition IS a structured-response definition. */
+export type QuestionnaireDefinition = StructuredResponseDefinition;
+/** Generic alias for a single question. */
+export type QuestionnaireQuestion = StructuredQuestion;
+/** Generic alias for one answer. */
+export type QuestionnaireAnswer = StructuredAnswer;
+/** Generic alias for a full answer set. */
+export type QuestionnaireAnswerMap = StructuredAnswerMap;
+
 // ─── Answers ──────────────────────────────────────────────────────────────────
 
 /**

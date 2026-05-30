@@ -8,6 +8,7 @@
 import {
   generateReportTasks,
   generateWeeklyOfficerReports,
+  generateQuestionnaireTasks,
 } from './reportGeneration';
 import { reportTaskId } from './reportTasks';
 import { WEEKLY_OFFICER_REPORT_ID } from './reportDefinitions';
@@ -82,6 +83,19 @@ const ORG = 'org-1';
     roles: [ROLES.TRIBUNE], definitionId: 'does_not_exist',
   });
   check('unknown definition creates nothing', res.created.length === 0 && res.skipped.length === 0);
+}
+
+// ── Generic wrapper: generateQuestionnaireTasks == generateReportTasks ─────────
+{
+  const cycle = '2099-W07';
+  const res = generateQuestionnaireTasks({ orgId: ORG, cycle, dueDate: '2099-02-15', roles: [ROLES.MAGISTER] });
+  check('generic wrapper creates a questionnaire task', res.created.length === 1);
+  check('generic wrapper uses the same deterministic id',
+    res.created[0]?.id === reportTaskId(ROLES.MAGISTER, cycle));
+  check('generic wrapper carries the definition', res.created[0]?.reportDefinitionId === WEEKLY_OFFICER_REPORT_ID);
+  // Idempotent across the alias boundary: report-named call then generic call skips.
+  const again = generateQuestionnaireTasks({ orgId: ORG, cycle, dueDate: '2099-02-15', roles: [ROLES.MAGISTER] });
+  check('generic wrapper is idempotent vs the existing task', again.created.length === 0);
 }
 
 console.log(`\nreportGeneration.test: ${passed} passed, ${failed} failed`);
