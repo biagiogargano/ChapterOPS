@@ -39,6 +39,13 @@ import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { getReportDefinition } from '@/lib/reportDefinitions';
 import { looksLikeReportTask } from '@/lib/reportTasks';
 import {
+  isGoalUpdateDefinitionId,
+  parseGoalUpdateId,
+  reconstructGoalUpdateDefinition,
+} from '@/lib/goalUpdateGeneration';
+import { listGoalsForOrg, listMyGoals } from '@/lib/goalService';
+import { taskWindowView } from '@/lib/taskWindow';
+import {
   orderedQuestions,
   responseProgress,
   validateAnswers,
@@ -989,6 +996,14 @@ export default function TaskDetailScreen() {
   const [submitting,   setSubmitting   ] = useState(false);
   const [remoteProof,  setRemoteProof  ] = useState<TaskSubmission | null>(null);
 
+  // Goal-update tasks carry a DYNAMIC definition id (goalupddef_…) that is NOT in the
+  // static registry, so it can't be looked up like an ordinary questionnaire. Instead
+  // we RECONSTRUCT the form at render time from the role's CURRENT active goals — the
+  // questions are re-derived from persisted goals (answers persist via the same RPC),
+  // so the form survives reload with no extra storage. null until the async load runs.
+  const [goalUpdateDef,     setGoalUpdateDef    ] = useState<StructuredResponseDefinition | null>(null);
+  const [goalUpdateLoading, setGoalUpdateLoading] = useState(false);
+
   // Real flag-on persistence mode (the alpha): proof submissions go through the
   // RPC-backed task_submissions primitive. Flag-off sandbox stays in-memory.
   const proofSyncRequired = AUTH_ENABLED && ORG_SCOPED_DATA && isSupabaseConfigured();
@@ -1028,6 +1043,33 @@ export default function TaskDetailScreen() {
       emitTaskActionNotice(next === 'approved' ? 'approved' : 'rejected', { taskId: t.id, taskTitle: t.title, audienceRole: assignee, actorRole: role });
     }
   }
+
+  // Reconstruct a goal-update task's form from live goals (see goalUpdateDef above).
+  // Runs only for goal-update tasks; ordinary questionnaires never enter this path.
+  // Leadership/Annotator read all org goals; the assignee reads their own — both
+  // filtered to the task's role + active, so the question set is identical for either
+  // viewer. Reconstruction always yields a valid definition (≥ the check-in), so a
+  // goal-update task is never "broken"; a failed goal fetch degrades to check-in only.
+  const reportDefId = task?.reportDefinitionId;
+  const isGoalUpdateTask = isGoalUpdateDefinitionId(reportDefId);
+  const assignedRole = task?.assignedRole;
+  useEffect(() => {
+    if (!isGoalUpdateTask || !reportDefId) { setGoalUpdateDef(null); return; }
+    const parsed = parseGoalUpdateId(reportDefId);
+    const targetRole = parsed?.role ?? assignedRole;
+    let cancelled = false;
+    setGoalUpdateLoading(true);
+    (async () => {
+      const canSeeOrgGoals = isLeadershipRole(role) || role === 'annotator';
+      const all = pushOrgId
+        ? (canSeeOrgGoals ? await listGoalsForOrg(pushOrgId) : await listMyGoals(pushOrgId))
+        : [];
+      const goals = all.filter(g => g.status === 'active' && g.ownerRole === targetRole);
+      const def = reconstructGoalUpdateDefinition(reportDefId, goals);
+      if (!cancelled) { setGoalUpdateDef(def); setGoalUpdateLoading(false); }
+    })().catch(() => { if (!cancelled) { setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, [])); setGoalUpdateLoading(false); } });
+    return () => { cancelled = true; };
+  }, [isGoalUpdateTask, reportDefId, assignedRole, role, pushOrgId]);
 
   function setTaskState(s: TaskState) {
     _setTaskState(s);
@@ -1153,13 +1195,24 @@ export default function TaskDetailScreen() {
   // Report task: carries a reportDefinitionId resolving to a known definition.
   // It's a structured-response form (no proof, no review) — handled by its own
   // section, so it's excluded from proof/approval/simple-complete below.
-  const reportDef     = task.reportDefinitionId ? getReportDefinition(task.reportDefinitionId) : null;
+  // Ordinary questionnaire → static registry. Goal-update task → the reconstructed
+  // definition (re-derived from live goals above), so it resolves across reload.
+  const staticReportDef = task.reportDefinitionId ? getReportDefinition(task.reportDefinitionId) : null;
+  const reportDef     = staticReportDef ?? goalUpdateDef;
   const isReportTask  = !!reportDef;
   // A task that LOOKS like a questionnaire (report_ id, or carried a definition id)
   // but whose definition can't be resolved — most likely its reportDefinitionId was
   // dropped on persistence because the report_definition_id column isn't applied yet.
-  // Show an honest "unavailable" state instead of the generic Save & Complete.
-  const isBrokenReport = looksLikeReportTask(task) && !reportDef;
+  // Show an honest "unavailable" state instead of the generic Save & Complete. A
+  // goal-update task is excluded while its definition is still being reconstructed
+  // (and it always resolves to a valid form), so it never flashes "unavailable".
+  const isBrokenReport = looksLikeReportTask(task) && !reportDef && !(isGoalUpdateTask && (goalUpdateLoading || !goalUpdateDef));
+
+  // Available-window: a goal-update task opens near end of week (availableAt) and is
+  // due shortly after (dueAt). Before it opens, the assignee can view but NOT submit.
+  // Ordinary tasks have no availableAt → 'open_no_window' → fully submittable (no change).
+  const windowView   = taskWindowView(task.availableAt, task.dueAt, new Date());
+  const windowLocked = !windowView.canSubmit;   // true only when 'not_yet_open'
   // Readers allowed to view a report (matches the RPC's read set; the RPC is the
   // real gate — this only decides whether to render the read-only view).
   const canReadReport = isAssignee || role === 'annotator' || isLeadershipRole(role);
@@ -1173,7 +1226,7 @@ export default function TaskDetailScreen() {
   // report — get a plain "Mark Complete" (sets 'approved'). Report tasks render
   // the report form instead.
   const showSimpleComplete =
-    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval && !isReportTask && !isBrokenReport;
+    task.type === 'structured' && isAssignee && !task.requiresProof && !task.requiresApproval && !isReportTask && !isBrokenReport && !isGoalUpdateTask;
   // Report section: the assignee's form, OR an allowed reader's read-only view.
   const showReport = isReportTask && canReadReport;
   const showProofReview = isReviewerOnly && taskState === 'submitted' && !isReportTask;
@@ -1357,6 +1410,30 @@ export default function TaskDetailScreen() {
           </>
         )}
 
+        {/* ── Goal-update form still reconstructing from live goals ── */}
+        {isGoalUpdateTask && goalUpdateLoading && !reportDef && (
+          <>
+            <Divider />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>Loading your goals…</Text>
+            </View>
+          </>
+        )}
+
+        {/* ── Not-yet-open window notice (assignee, before availableAt) ── */}
+        {showReport && reportDef && isAssignee && windowLocked && (
+          <>
+            <Divider />
+            <SLabel text="NOT OPEN YET" />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>
+                ⏳ This update isn’t open yet. {windowView.label || 'It opens later this week.'} You
+                can review the questions below, but you can’t submit until it opens.
+              </Text>
+            </View>
+          </>
+        )}
+
         {/* ── Report form (structured-response task) ── */}
         {showReport && reportDef && (
           <>
@@ -1364,7 +1441,7 @@ export default function TaskDetailScreen() {
             <ReportFormSection
               definition={reportDef}
               taskId={task.id}
-              editable={isAssignee}
+              editable={isAssignee && !windowLocked}
               done={taskState === 'approved'}
               onSubmitted={() => {
                 // Report submitted → mark the task complete (approved = done per
