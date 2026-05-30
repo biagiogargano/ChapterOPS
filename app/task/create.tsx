@@ -11,7 +11,8 @@ import {
   type MockTask,
   type ProofType,
 } from '@/lib/mockTasks';
-import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, canAssignToAnyOfficer, isOfficer, type Role } from '@/lib/roles';
+import { FLOOR_ROLE, LEADERSHIP_ROLES, OFFICER_ROLES, ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
+import { getAssignableRoles, SIGMA_CHI_ASSIGNMENT_EXCEPTIONS } from '@/lib/orgLevels';
 import { canManageEventTasks } from '@/lib/eventTaskPermissions';
 import SearchablePicker from '@/components/SearchablePicker';
 import { insertTask, updateTask } from '@/lib/taskService';
@@ -307,14 +308,20 @@ export default function CreateTaskScreen() {
   const effState     = existing ? getStoredState(existing.id, existing.state) : 'assigned';
   const reviewLocked = editing && (effState === 'submitted' || effState === 'approved' || effState === 'rejected');
 
-  // Who can assign to OTHER roles? Leadership (president/pro_consul) AND the
-  // annotator (Secretary) can assign to any officer role or a brother. Everyone
-  // else can only assign to themselves. (Brothers are assignable too.)
-  const canAssignBroadly = canAssignToAnyOfficer(role);
-  const assignableRoles  = useMemo<Role[]>(
-    () => (canAssignBroadly ? [...OFFICER_ROLES, FLOOR_ROLE] : [role]),
-    [canAssignBroadly, role],
+  // Assignable roles come from the org-level rule (lib/orgLevels): a role may
+  // assign DOWNWARD to lower levels, plus any default alpha exception, plus
+  // always itself (self-assignment). Candidates stay the current pack's roles
+  // (all officers + the floor/Brother role). Replaces the old flat
+  // canAssignToAnyOfficer gate.
+  const assignableRoles = useMemo<Role[]>(
+    () => getAssignableRoles(role, [...OFFICER_ROLES, FLOOR_ROLE], {
+      exceptions: SIGMA_CHI_ASSIGNMENT_EXCEPTIONS,
+    }) as Role[],
+    [role],
   );
+  // Whether this role can assign to anyone beyond itself (drives the multi-select
+  // hint text). Previously canAssignBroadly.
+  const canAssignBroadly = assignableRoles.length > 1;
 
   // ── Form state (prefilled from `existing` in edit mode) ──────────────────────
   const [title,        setTitle       ] = useState(existing?.title ?? '');

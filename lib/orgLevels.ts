@@ -54,8 +54,10 @@ export const LEVEL_RANK: Record<OrgLevel, number> = {
 // with lib/positions.ts ROLE_PRECEDENCE.
 
 export const ROLE_LEVEL: Record<Role, OrgLevel> = {
-  // Executives — broad cross-domain leadership.
-  [ROLES.PRESIDENT]:          'executives',
+  // Owner — the top authority (alpha: the Consul/President sits above all).
+  [ROLES.PRESIDENT]:          'owner',
+
+  // Executives — broad cross-domain leadership below the owner.
   [ROLES.PRO_CONSUL]:         'executives',
 
   // Officers — annotator (Secretary) + every chair/officer role.
@@ -121,12 +123,11 @@ export function canAssign(assignerRole: string, targetRole: string): boolean {
 // default rule would deny (e.g. a specific same-level pair). Exceptions can only
 // GRANT, never revoke — they widen what canAssign permits, never narrow it.
 //
-// ⚠️ TEMPORARY: this list is intentionally EMPTY for now. We are deliberately
-//    NOT deciding any same-level grants yet (e.g. Annotator peer-assignment or
-//    Pro Consul → Annotator). When the product decision is made, add pairs here;
-//    later this becomes owner-configurable data (out of scope today). Keeping it
-//    empty means canAssignWithExceptions == canAssign until a decision lands, so
-//    nothing changes behavior implicitly.
+// ⚠️ TEMPORARY / HARDCODED: this list is the alpha Sigma Chi pack's grants.
+//    Exceptions only GRANT (never revoke) — they widen what the default downward
+//    rule permits. Later this becomes owner-configurable data (out of scope
+//    today). Each entry is a single assigner→target pair the default rule would
+//    otherwise deny (here: assigning UPWARD to the owner/President).
 
 export interface AssignmentException {
   /** The role doing the assigning. */
@@ -138,11 +139,20 @@ export interface AssignmentException {
 }
 
 /**
- * Reserved Sigma Chi exception list. EMPTY by design right now (see note above).
- * Example of a FUTURE entry (commented, NOT active):
- *   { assignerRole: ROLES.PRO_CONSUL, targetRole: ROLES.ANNOTATOR, note: '…' }
+ * Reserved Sigma Chi alpha exception list. Two upward grants to the President
+ * (owner), which the default downward-only rule denies:
+ *   • Pro Consul → President  (the second can delegate up to the Consul)
+ *   • Annotator  → President  (the Secretary coordinates minutes/reports/action
+ *                              items and can assign the Consul follow-ups)
+ *
+ * NOTE: President → Pro Consul is NOT here — it is allowed by the normal
+ * owner→executives downward rule. Annotator → peer officers is NOT granted here
+ * (same-level assignment stays denied unless explicitly added later).
  */
-export const SIGMA_CHI_ASSIGNMENT_EXCEPTIONS: AssignmentException[] = [];
+export const SIGMA_CHI_ASSIGNMENT_EXCEPTIONS: AssignmentException[] = [
+  { assignerRole: ROLES.PRO_CONSUL, targetRole: ROLES.PRESIDENT, note: 'Pro Consul may delegate up to Consul (alpha)' },
+  { assignerRole: ROLES.ANNOTATOR,  targetRole: ROLES.PRESIDENT, note: 'Annotator coordinates Consul follow-ups (alpha)' },
+];
 
 /** True if an explicit exception allows this assigner→target pair. */
 function exceptionAllows(
