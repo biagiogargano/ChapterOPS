@@ -22,7 +22,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, View,
+  RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 
 // Roles that see ALL org goals + can create for officer roles (RPCs enforce this;
@@ -59,6 +59,7 @@ export default function GoalsScreen() {
 
   const [goals, setGoals]     = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);   // leadership-only
@@ -88,6 +89,17 @@ export default function GoalsScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  // Pull-to-refresh: re-read without the full-screen spinner (keeps the list visible),
+  // and recover from a transient read error via the standard gesture (matches Tasks/Today).
+  const onRefresh = useCallback(async () => {
+    if (!activeOrgId) return;
+    setRefreshing(true);
+    const res = isAdmin ? await listGoalsForOrgResult(activeOrgId) : await listMyGoalsResult(activeOrgId);
+    if (res.ok) { setGoals(res.goals); setError(null); }
+    else { setError('Couldn’t load goals. Check your connection and try again.'); }
+    setRefreshing(false);
+  }, [activeOrgId, isAdmin]);
+
   useFocusEffect(useCallback(() => {
     navigation.setOptions({ title: 'Goals' });
   }, [navigation]));
@@ -110,7 +122,11 @@ export default function GoalsScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.root}>
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
+      >
         <Text style={s.intro}>
           Track goals that progress over time. {isAdmin ? 'You see all org goals.' : 'You see goals for your role.'}
         </Text>
