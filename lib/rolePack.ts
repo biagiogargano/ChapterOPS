@@ -86,3 +86,34 @@ export interface RolePack {
  * adapter layer will want. Inert until something constructs a RolePack.
  */
 export type RoleLevelMap = Record<RoleKey, OrgLevel>;
+
+// ─── Setup pack (org-type → bundled defaults) ─────────────────────────────────
+// A SetupPack is what `organizations.template` selects at org-creation time: the
+// RolePack (roles/levels/exceptions — above) PLUS the small remainder a RolePack
+// doesn't already carry, namely the org type's default EVENT KINDS. Template /
+// questionnaire / agenda defaults already live on RolePack (its optional
+// default*Ids fields), so this deliberately does NOT re-declare them — it composes
+// the RolePack rather than duplicating it. See
+// docs/ORG_ONBOARDING_AND_SETUP_PLAN.md.
+//
+// ⚠️ STILL INERT / TYPE-ONLY. Nothing imports this; no loader, no registry, no
+//    runtime. It pins the shape `activePack(template)` will return later.
+
+/** The org-type id, aligned with `organizations.template` (e.g. 'sigma_chi', 'club'). */
+export type OrgType = string;
+
+/**
+ * Everything an org-type pack supplies at setup. The RolePack covers roles, levels,
+ * assignment, and (via its optional default*Ids) templates/questionnaires/agenda;
+ * SetupPack adds the org type's default event-kind keys and human metadata.
+ */
+export interface SetupPack {
+  /** Org-type id this pack is selected by (`organizations.template`). */
+  orgType: OrgType;
+  /** Human name (e.g. 'Sigma Chi (fraternity)', 'Student Club'). */
+  label:   string;
+  /** The role pack: roles, levels, leadership/officer/floor sets, exceptions. */
+  rolePack: RolePack;
+  /** Default event-kind keys this org type uses (the one thing RolePack omits). */
+  defaultEventKinds: string[];
+}
