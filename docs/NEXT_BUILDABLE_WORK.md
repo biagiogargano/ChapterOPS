@@ -1,5 +1,9 @@
 # Next Buildable Work — ordered index
 
+> **Governed by `docs/MASTER_ROADMAP.md`** (the canonical development + business
+> roadmap). This index is the near-term task tracker under it. If the two disagree
+> on direction, the master roadmap wins.
+
 The single "what's next" list, so sessions stop re-doing finished work. Each item
 says: what it is, its gate, and the doc that already plans it. **If something below
 is marked done, do not rebuild it — only fix a specific bug or stale doc.**
