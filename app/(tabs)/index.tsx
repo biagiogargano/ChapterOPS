@@ -43,6 +43,7 @@ import {
 } from '@/lib/reminders';
 import { ROLE_LABELS, isOfficer, type Role } from '@/lib/roles';
 import { isTaskCompleted, isRsvpTaskExpired } from '@/lib/taskCompletion';
+import { todaySummaryText, todayIsUrgent } from '@/lib/todayFeed';
 import { usePushRegistration } from '@/lib/usePushRegistration';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
@@ -635,10 +636,20 @@ export default function TodayScreen() {
   // Completed tasks (answered RSVP, saved date name, approved) are hidden — Today
   // shows open work only.
   // Hide answered tasks AND expired RSVP/date tasks (event already passed).
-  const isOpen     = (t: typeof mine[number]) => !isTaskCompleted(t, role) && !isRsvpTaskExpired(t);
-  const urgentMine = mine.filter(t => isOpen(t) && (() => { const u = urgencyOf(t); return u === 'overdue' || u === 'today'; })());
-  const weekMine   = mine.filter(t => isOpen(t) && urgencyOf(t) === 'week');
-  const reviewOpen = review.filter(t => isOpen(t));
+  const isOpen      = (t: typeof mine[number]) => !isTaskCompleted(t, role) && !isRsvpTaskExpired(t);
+  const openMine    = mine.filter(isOpen);
+  // Overdue first, then due-today — both belong to TODAY'S TASKS; week-out tasks
+  // go to "Coming up". Overdue surfaces an urgent (red) section header.
+  const overdueMine = openMine.filter(t => urgencyOf(t) === 'overdue');
+  const todayMine   = openMine.filter(t => urgencyOf(t) === 'today');
+  const urgentMine  = [...overdueMine, ...todayMine];   // overdue rendered first
+  const weekMine    = openMine.filter(t => urgencyOf(t) === 'week');
+  const reviewOpen  = review.filter(isOpen);
+
+  // Today section label state (pure helpers; testable).
+  const todayBuckets   = { overdue: overdueMine.length, today: todayMine.length, week: weekMine.length };
+  const todaySummary   = todaySummaryText(todayBuckets, reviewOpen.length);
+  const todayUrgent    = todayIsUrgent(todayBuckets);
 
   // ── Live event lists — refresh whenever screen gains focus ──────────────────
   // Org id for data scoping (DEMO_CHAPTER_ID while ORG_SCOPED_DATA is false).
@@ -775,7 +786,10 @@ export default function TodayScreen() {
             per-role section sprawl, no separate review/approval/alert queues. ── */}
         {todaysTaskCount > 0 ? (
           <View style={s.section}>
-            <SLabel text="TODAY'S TASKS" count={todaysTaskCount} />
+            <SLabel text="TODAY'S TASKS" count={todaysTaskCount} urgent={todayUrgent} />
+            {todaySummary !== '' && (
+              <Text style={[s.todaySummary, todayUrgent && s.todaySummaryUrgent]}>{todaySummary}</Text>
+            )}
             {urgentMine.map(renderMineTask)}
             {reviewOpen.map(t => (
               <TodayTaskCard key={t.id} task={t} showAssignee reviewTag onPress={() => navTask(t)} />
@@ -886,6 +900,10 @@ const s = StyleSheet.create({
   slBadgeUrgent:     { backgroundColor: '#450a0a' },
   slBadgeText:       { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
   slBadgeTextUrgent: { color: '#f87171' },
+
+  // Today's-tasks summary subtitle (e.g. "2 overdue · 1 due today · 3 to review")
+  todaySummary:       { fontSize: 12, color: '#64748b', fontWeight: '600', marginTop: -4, marginBottom: 12 },
+  todaySummaryUrgent: { color: '#f87171' },
 
   // ── Quick-action card ────────────────────────────────────────────────────────
   qaCard: {
