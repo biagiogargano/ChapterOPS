@@ -314,6 +314,41 @@ export const DEFAULT_TEMPLATE_BY_KIND: Partial<Record<EventKind, string>> = {
   recruitment: 'recruitment',
 };
 
+/**
+ * Typed accessor for a kind's recommended default template id (or null if the
+ * kind has no auto-default). Prefer this over indexing DEFAULT_TEMPLATE_BY_KIND
+ * directly at call sites — it makes adding future kind-defaults a one-line map
+ * change behind a stable function, and never throws on an unmapped kind.
+ *
+ * Pure. Does NOT generate tasks or change behavior — only reports the mapping.
+ */
+export function getDefaultTemplateIdForKind(kind: EventKind): string | null {
+  return DEFAULT_TEMPLATE_BY_KIND[kind] ?? null;
+}
+
+/** True if this kind auto-suggests a template at event-create time. */
+export function kindHasDefaultTemplate(kind: EventKind): boolean {
+  return getDefaultTemplateIdForKind(kind) !== null;
+}
+
+/**
+ * Diagnostic: which event kinds currently have an auto-default template and which
+ * don't, given the kinds in play. Pure, read-only — for future-default planning
+ * and tests, NOT used to auto-create anything. Callers pass the kind list (e.g.
+ * from mockEvents) to avoid a circular import here.
+ */
+export function defaultTemplateCoverage(kinds: EventKind[]): {
+  withDefault:    EventKind[];
+  withoutDefault: EventKind[];
+} {
+  const withDefault:    EventKind[] = [];
+  const withoutDefault: EventKind[] = [];
+  for (const k of kinds) {
+    (kindHasDefaultTemplate(k) ? withDefault : withoutDefault).push(k);
+  }
+  return { withDefault, withoutDefault };
+}
+
 // ─── Date math ────────────────────────────────────────────────────────────────
 
 /** Shift an ISO "YYYY-MM-DD" date by `delta` days (local-time, tz-safe). */

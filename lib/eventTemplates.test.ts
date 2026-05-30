@@ -12,6 +12,9 @@ import {
   allTemplateTaskIdsForEvent,
   buildTasksFromTemplate,
   getEventTemplate,
+  getDefaultTemplateIdForKind,
+  kindHasDefaultTemplate,
+  defaultTemplateCoverage,
   templateTaskId,
   type EventTemplateInput,
 } from './eventTemplates';
@@ -178,6 +181,40 @@ for (const t of EVENT_TEMPLATES) {
 {
   const ids = allTemplateTaskIdsForEvent('evt-x');
   check('all generated ids unique per event', new Set(ids).size === ids.length);
+}
+
+// ── Kind-default accessors (typed; behavior-neutral) ──────────────────────────
+check('getDefaultTemplateIdForKind(social) = date_party',
+  getDefaultTemplateIdForKind('social') === 'date_party');
+check('getDefaultTemplateIdForKind(recruitment) = recruitment',
+  getDefaultTemplateIdForKind('recruitment') === 'recruitment');
+check('getDefaultTemplateIdForKind(chapter) = null (no auto-default)',
+  getDefaultTemplateIdForKind('chapter') === null);
+check('getDefaultTemplateIdForKind(philanthropy) = null',
+  getDefaultTemplateIdForKind('philanthropy') === null);
+check('kindHasDefaultTemplate(social) true',  kindHasDefaultTemplate('social') === true);
+check('kindHasDefaultTemplate(academic) false', kindHasDefaultTemplate('academic') === false);
+// Accessor agrees with the underlying map for every mapped kind.
+check('accessor matches DEFAULT_TEMPLATE_BY_KIND',
+  Object.entries(DEFAULT_TEMPLATE_BY_KIND).every(
+    ([k, v]) => getDefaultTemplateIdForKind(k as any) === v));
+
+// ── Coverage diagnostic ───────────────────────────────────────────────────────
+{
+  const ALL_KINDS = [
+    'chapter', 'eboard', 'social', 'academic', 'recruitment', 'philanthropy',
+    'risk', 'finance', 'education', 'ritual', 'communications', 'facility',
+  ] as const;
+  const cov = defaultTemplateCoverage([...ALL_KINDS] as any);
+  check('coverage: social + recruitment have defaults',
+    cov.withDefault.includes('social') && cov.withDefault.includes('recruitment'));
+  check('coverage: only the two mapped kinds have defaults',
+    cov.withDefault.length === 2);
+  check('coverage: partition is complete + disjoint',
+    cov.withDefault.length + cov.withoutDefault.length === ALL_KINDS.length &&
+    !cov.withDefault.some(k => cov.withoutDefault.includes(k)));
+  check('coverage: every mapped default resolves to a real template',
+    cov.withDefault.every(k => !!getEventTemplate(getDefaultTemplateIdForKind(k)!)));
 }
 
 console.log(`\neventTemplates.test: ${passed} passed, ${failed} failed`);
