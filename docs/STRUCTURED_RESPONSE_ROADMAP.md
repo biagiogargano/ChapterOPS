@@ -68,12 +68,13 @@ Rule: **never rename the live table/RPCs outside an approved Supabase lane.**
 
 ## What is NOT done / gated
 
-- **No generation trigger UI.** `generateQuestionnaireTasks` has no caller. A
-  manual entry point is planned for the Me → Leadership card; copy must be generic
-  ("Generate structured-response tasks" / "Create questionnaire tasks") with
-  Weekly Officer Report as the default template — **not** a one-off "Generate
-  weekly officer reports" button. Gated: it creates tasks for real officers
-  (product decision) and the RPC round-trip is device-unverified.
+- **No generation trigger UI.** `generateQuestionnaireTasks` has no caller. The
+  manual entry point is fully designed in
+  `docs/QUESTIONNAIRE_GENERATION_UI_PLAN.md` (Me → Leadership card; copy "Create
+  questionnaire tasks"; Weekly Officer Report as the default-selected template —
+  **not** a one-off "Generate weekly officer reports" button). Gated: it creates
+  tasks for real officers (product decision) and the RPC round-trip is
+  device-unverified.
 - **Form + RPC never run on device** — needs a build (gate).
 - **No live report→agenda wiring** — pure extraction exists; agenda screen does
   not fetch submissions yet.
