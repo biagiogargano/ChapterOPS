@@ -64,12 +64,13 @@ keys are data-expressible but not yet functional through the runtime engines.
 **Also done:** the pack→runtime boundary is explicit (`lib/rolePackRuntime.ts`), and
 packs are integrity-checked (`lib/starterPackValidation.ts`, test-enforced). The
 create-org screen reads its template label/value from the registry
-(`DEFAULT_STARTER_PACK_ID`), and the **Event Create template picker** now reads its
-built-in options from the active pack via `lib/templatePackView.ts`
-(`getTemplateOptionsForOrgTemplate`) — behavior-identical for alpha (the sigma_chi
-pack lists exactly `EVENT_TEMPLATES`); custom templates still merge after.
+(`DEFAULT_STARTER_PACK_ID`), and the **Event Create template picker** and the **Templates screen BUILT-IN list**
+(`templates/index.tsx`, display-only) now read built-in templates from the active
+pack via `lib/templatePackView.ts` — behavior-identical for alpha (the sigma_chi
+pack lists exactly `EVENT_TEMPLATES`); custom templates still merge/list after.
 **Still direct (intentional):** Event Detail's apply-template picker
-(`event/[id].tsx`), `templates/index.tsx` + `templates/edit.tsx`, and template
+(`event/[id].tsx`), template EDIT/CREATE (`templates/edit.tsx`, plus the custom
+list + edit/duplicate/delete actions — Category B mutation), and template
 RESOLUTION (`getTemplateById`/`buildTasksForTemplateId` must resolve any id so no
 existing task breaks).
 **Next:** (c) org-type selection UI — now meaningfully possible since a second pack

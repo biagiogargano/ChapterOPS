@@ -3,7 +3,9 @@ import {
   getCustomTemplates,
   useCustomTemplatesVersion,
 } from '@/lib/customTemplatesStore';
-import { EVENT_TEMPLATES, type EventTaskTemplate } from '@/lib/eventTemplates';
+import { type EventTaskTemplate } from '@/lib/eventTemplates';
+import { getBuiltInEventTemplatesForOrgTemplate } from '@/lib/templatePackView';
+import { useIdentity } from '@/lib/identityStore';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -59,6 +61,10 @@ export default function TemplatesScreen() {
 
   useCustomTemplatesVersion();              // re-render on create/edit/delete
   const custom = getCustomTemplates();
+  // Built-in list comes from the org's active starter pack (behavior-identical for
+  // the Sigma Chi alpha — that pack lists exactly EVENT_TEMPLATES). Display-only.
+  const { organization } = useIdentity();
+  const builtIns = getBuiltInEventTemplatesForOrgTemplate(organization?.template);
 
   useEffect(() => {
     navigation.setOptions({
@@ -101,7 +107,7 @@ export default function TemplatesScreen() {
       )}
 
       <Text style={[s.sectionLabel, { marginTop: 24 }]}>BUILT-IN</Text>
-      {EVENT_TEMPLATES.map(t => (
+      {builtIns.map(t => (
         <TemplateRow
           key={t.id}
           template={t}
