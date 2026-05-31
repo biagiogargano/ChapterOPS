@@ -173,5 +173,17 @@ check('agenda-finalized → default title when blank',
   check('coalesced severity is the max (critical)', forRole[0]?.severity === 'critical');
 }
 
+// ── expiry: a 0-day notice is filtered out of getNoticesForRole ───────────────
+{
+  const entityId = 'expiry_entity_1';
+  emitUpdateNotice({ entityType: 'task', entityId, summary: 'expired', severity: 'low', audienceRoles: ['tribune'], changedByRole: 'president', expiresInDays: 0 });
+  check('an already-expired notice is not returned',
+    getNoticesForRole('tribune').every(n => n.entityId !== entityId));
+  // A live (positive-expiry) notice IS returned, confirming the filter is about expiry.
+  const live = 'expiry_entity_live';
+  emitUpdateNotice({ entityType: 'task', entityId: live, summary: 'live', severity: 'low', audienceRoles: ['tribune'], changedByRole: 'president', expiresInDays: 7 });
+  check('a live notice IS returned', getNoticesForRole('tribune').some(n => n.entityId === live));
+}
+
 console.log(`\nupdateNoticeStore.test: ${passed} passed, ${failed} failed`);
 proc.exit(failed > 0 ? 1 : 0);

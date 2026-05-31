@@ -87,6 +87,20 @@ function answers(over: (a: StructuredAnswerMap) => StructuredAnswerMap): Structu
   check('nullish list → empty groups (no throw)', (() => { const g = agendaContributionsFromSubmissions(undefined as any); return g.announcements.length === 0 && g.helpNeeded.length === 0; })());
 }
 
+// ── null/omitted answers on a snapshot-backed submission → no throw, no items ──
+{
+  const subs: UpdateSubmissionLike[] = [
+    { definitionSnapshot: snapshot, answers: null as any, submittedRole: 'social_chair' },
+    { definitionSnapshot: snapshot, answers: undefined as any, submittedRole: 'quaestor' },
+  ];
+  let threw = false;
+  let cg, pri;
+  try { cg = agendaContributionsFromSubmissions(subs); pri = officerPriorityItems(subs); } catch { threw = true; }
+  check('null/undefined answers never throw', threw === false);
+  check('null answers → no contributions', !!cg && cg.announcements.length === 0 && cg.helpNeeded.length === 0);
+  check('null answers → no officer priorities', !!pri && pri.length === 0);
+}
+
 // ── integration: submissions → contributions → assembled agenda (as the screen does) ──
 const emptyAgenda: Agenda = { oldBusiness: [], newBusiness: [], unresolved: [], brotherWide: [] };
 {
