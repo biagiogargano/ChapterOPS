@@ -4,6 +4,7 @@ import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
 import { canAccessReviewInbox, pendingReviewTasks, returnedUpdateTasks } from '@/lib/reviewInbox';
+import { myOverdueTasks, myDueSoonTasks, myGoalUpdateTasks, myReturnedUpdates, myWorkCounts } from '@/lib/myWork';
 import { getAllTasks, type MockTask } from '@/lib/mockTasks';
 import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { AUTH_ENABLED } from '@/lib/flags';
@@ -248,13 +249,22 @@ export default function MeScreen() {
   const { memberships, activeOrgId, setActiveOrg, member, organization } = useIdentity();
   const router = useRouter();
 
-  // Live count for the Review Inbox card (leadership only) — reactive to task-state changes.
+  // Live counts for the Me-tab action cards — reactive to task-state changes.
   useTaskStateVersion();
-  const reviewInboxCount = (() => {
-    if (!canAccessReviewInbox(role)) return 0;
-    const tasks = getAllTasks();
-    const stateOf = (t: MockTask) => getStoredState(t.id, t.state);
-    return pendingReviewTasks(tasks, role, stateOf).length + returnedUpdateTasks(tasks, role, stateOf).length;
+  const _tasks   = getAllTasks();
+  const _stateOf = (t: MockTask) => getStoredState(t.id, t.state);
+  const reviewInboxCount = canAccessReviewInbox(role)
+    ? pendingReviewTasks(_tasks, role, _stateOf).length + returnedUpdateTasks(_tasks, role, _stateOf).length
+    : 0;
+  const myWorkCount = (() => {
+    const now = new Date();
+    const c = myWorkCounts({
+      overdue: myOverdueTasks(_tasks, role, _stateOf, now).length,
+      dueSoon: myDueSoonTasks(_tasks, role, _stateOf, now).length,
+      returned: myReturnedUpdates(_tasks, role, _stateOf).length,
+      openUpdates: myGoalUpdateTasks(_tasks, role, _stateOf, now).length,
+    });
+    return c.actionNow;
   })();
 
   // Real identity when auth is on; demo values in the flag-off sandbox.
@@ -348,6 +358,18 @@ export default function MeScreen() {
           </View>
         </View>
       )}
+
+      {/* ── My Work (everyone) ── */}
+      <Pressable style={s.linkCard} onPress={() => router.push('/my-work' as any)}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.linkTitle}>My Work</Text>
+          <Text style={s.linkSub}>Tasks, weekly update, goals, and notices for your role</Text>
+        </View>
+        {myWorkCount > 0 && (
+          <View style={s.reviewBadge}><Text style={s.reviewBadgeText}>{myWorkCount}</Text></View>
+        )}
+        <Text style={s.linkChevron}>›</Text>
+      </Pressable>
 
       {/* ── Leadership Review Inbox (Consul / Pro Consul / Annotator) ── */}
       {canAccessReviewInbox(role) && (
