@@ -11,6 +11,7 @@ import {
   generateWeeklyGoalUpdateTasks,
 } from './goalUpdateGeneration';
 import { parseGoalFieldKey } from './goalUpdateDefinition';
+import { canApproveTask } from './mockTasks';
 import type { Goal } from './goals';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
@@ -95,9 +96,21 @@ function goal(over: Partial<Goal> = {}): Goal {
   check('task availableAt set', !!t && t.availableAt === WINDOW.availableAt);
   check('task dueAt set', !!t && t.dueAt === WINDOW.dueAt);
   check('task is structured', !!t && t.type === 'structured');
-  check('task no proof / no approval', !!t && t.requiresProof === false && t.requiresApproval === false);
+  check('task has no proof', !!t && t.requiresProof === false);
+  // Review-required: reviewer = Annotator (runtime), so the update goes to PENDING REVIEW
+  // (not auto-complete) on submit. canApproveTask also grants leadership override.
+  check('task requires approval (review gate on)', !!t && t.requiresApproval === true);
+  check('task reviewerRole = annotator', !!t && t.reviewerRole === 'annotator');
   check('task assigned to the role', !!t && t.assignedRole === 'quaestor');
   check('task visible to owner role', !!t && t.visibleTo.includes('quaestor'));
+  check('task visible to the reviewer (annotator)', !!t && t.visibleTo.includes('annotator'));
+
+  // Review mechanics (existing canApproveTask): Annotator + leadership can review; others can't.
+  check('annotator can review the goal update', !!t && canApproveTask(t, 'annotator'));
+  check('president (leadership) can review', !!t && canApproveTask(t, 'president'));
+  check('pro_consul (leadership) can review', !!t && canApproveTask(t, 'pro_consul'));
+  check('an ordinary officer cannot review', !!t && !canApproveTask(t, 'social_chair'));
+  check('the assignee role itself is not auto-reviewer (unless leadership)', !!t && !canApproveTask(t, 'kustos'));
 }
 
 // ── generation: one task per role with active goals, idempotent ────────────────

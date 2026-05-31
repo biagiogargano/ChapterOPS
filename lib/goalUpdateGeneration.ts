@@ -32,6 +32,7 @@ import { deriveDueMeta, deriveVisibleTo, type MockTask } from './mockTasks';
 import { ROLE_LABELS, type Role } from './roles';
 import { isRuntimeRoleKey } from './rolePackRuntime';
 import { definitionFromSnapshot } from './goalUpdateSnapshot';
+import { GOAL_UPDATE_REVIEWER_ROLE } from './goalUpdateReview';
 import type { StructuredResponseDefinition } from './structuredResponses';
 import type { Goal } from './goals';
 
@@ -136,9 +137,14 @@ export function goalUpdateTaskDescription(): string {
 /**
  * Build the weekly goal-update task for ONE role + period. The role must have ≥1
  * active goal (the caller groups goals); the task carries a goal-update DEFINITION id
- * (reconstructed at render, see above), availableAt (opens) + dueAt (due), no proof,
- * no approval, visibleTo = owner role + leadership. Pure. Returns null only if the
- * role is not a runtime-supported Role.
+ * (reconstructed at render), availableAt (opens) + dueAt (due), and is REVIEW-REQUIRED:
+ * reviewerRole = Annotator (when that role is runtime-supported), requiresApproval = true,
+ * so it submits → pending review (not auto-complete). Leadership (president/pro_consul) can
+ * also review via canApproveTask's leadership override. No proof. visibleTo = owner role +
+ * leadership + reviewer. Pure. Returns null only if the role is not a runtime-supported Role.
+ *
+ * Custom packs with NO annotator role → no reviewer → requiresApproval false (the update
+ * auto-completes on submit, as before) — graceful, documented; no risky invented permission.
  */
 export function buildGoalUpdateTaskForRole(
   role: Role,
@@ -147,6 +153,8 @@ export function buildGoalUpdateTaskForRole(
 ): MockTask | null {
   if (!isRuntimeRoleKey(role)) return null;
   const { dueLabel, urgency } = deriveDueMeta(window.dueAt);
+  // Reviewer = Annotator when runtime-supported (Sigma Chi alpha has it). Else no review gate.
+  const reviewerRole: Role | undefined = isRuntimeRoleKey(GOAL_UPDATE_REVIEWER_ROLE) ? GOAL_UPDATE_REVIEWER_ROLE : undefined;
   return {
     id:               goalUpdateTaskId(role, periodKey),
     title:            goalUpdateTaskTitle(),
@@ -158,10 +166,11 @@ export function buildGoalUpdateTaskForRole(
     availableAt:      window.availableAt,
     assignedRole:     role,
     assignedTo:       ROLE_LABELS[role],
-    visibleTo:        deriveVisibleTo(role),
+    visibleTo:        deriveVisibleTo(role, reviewerRole),
     description:      goalUpdateTaskDescription(),
     requiresProof:    false,
-    requiresApproval: false,
+    requiresApproval: !!reviewerRole,
+    ...(reviewerRole ? { reviewerRole } : {}),
     createdByRole:    role,
     reportDefinitionId: goalUpdateDefinitionId(role, periodKey),
   };

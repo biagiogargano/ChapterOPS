@@ -691,12 +691,21 @@ function ProofReviewSection({
   reviewerLabel,
   onApprove,
   onReject,
+  hideSubmissionBox,
+  approveLabel,
+  rejectLabel,
 }: {
   proofType?:    ProofType;
   proofContent:  string;
   reviewerLabel: string;
   onApprove: () => void;
   onReject:  (note: string) => void;
+  /** Suppress the proof/ready box (e.g. a report review where the answers are shown above). */
+  hideSubmissionBox?: boolean;
+  /** Override the approve button label (e.g. "Approve update"). */
+  approveLabel?: string;
+  /** Override the reject button label (e.g. "Request changes"). */
+  rejectLabel?: string;
 }) {
   const [showReject, setShowReject] = useState(false);
   const [rejNote,    setRejNote   ] = useState('');
@@ -711,7 +720,7 @@ function ProofReviewSection({
 
   return (
     <View>
-      {hasProof ? (
+      {hideSubmissionBox ? null : hasProof ? (
         <>
           <SLabel text="SUBMITTED PROOF" />
           <View style={s.proofDisplay}>
@@ -745,10 +754,10 @@ function ProofReviewSection({
         {!showReject ? (
           <View style={s.reviewBtns}>
             <Pressable style={s.approveBtn} onPress={onApprove}>
-              <Text style={s.approveBtnText}>Approve</Text>
+              <Text style={s.approveBtnText}>{approveLabel ?? 'Approve'}</Text>
             </Pressable>
             <Pressable style={s.rejectBtn} onPress={() => setShowReject(true)}>
-              <Text style={s.rejectBtnText}>Reject</Text>
+              <Text style={s.rejectBtnText}>{rejectLabel ?? 'Reject'}</Text>
             </Pressable>
           </View>
         ) : (
@@ -845,15 +854,27 @@ function ReportFormSection({
     onSubmitted();
   }
 
-  // ── Read-only view: a reader, or the assignee after it's submitted/done ──
+  // ── Read-only view: a reader, or the assignee after submit/done ──
   const readOnly = !editable || done;
+  // A submission exists (answers persisted) once the task is submitted/approved/rejected —
+  // show the answers to readers (incl. the reviewer) in all three, not just when complete.
+  const hasSubmission = done || taskState === 'submitted' || taskState === 'rejected';
+  const readHeader =
+    done                       ? 'SUBMITTED RESPONSE'
+    : taskState === 'submitted' ? 'SUBMITTED — PENDING REVIEW'
+    : taskState === 'rejected'  ? 'RETURNED — NEEDS CHANGES'
+    : definition.label.toUpperCase();
   if (readOnly) {
     return (
       <View>
-        <SLabel text={done ? 'SUBMITTED RESPONSE' : `${definition.label.toUpperCase()}`} />
-        {done ? (
+        <SLabel text={readHeader} />
+        {hasSubmission ? (
           <>
-            <View style={s.actionDone}><Text style={s.actionDoneText}>✓  Submitted</Text></View>
+            <View style={s.actionDone}>
+              <Text style={s.actionDoneText}>
+                {done ? '✓  Submitted' : taskState === 'submitted' ? '⏳  Submitted — waiting for review' : '↩  Returned for changes'}
+              </Text>
+            </View>
             <View style={{ marginTop: 10, gap: 12 }}>
               {questions.map(q => {
                 const a = answers[q.key];
@@ -874,15 +895,8 @@ function ReportFormSection({
             </View>
           </>
         ) : (
-          // Not done. Today a report/goal-update task goes submit → approved (done), so a
-          // not-done read-only view means nothing was submitted yet. If/when review is wired
-          // (submit → 'submitted' → reviewer approves), reflect that review stage instead of a
-          // misleading "Not submitted yet." (drives goalUpdateReview copy; harmless today).
-          <Text style={s.reportHint}>
-            {taskState === 'submitted' || taskState === 'rejected'
-              ? reviewStageHint(goalUpdateReviewStage(taskState))
-              : 'Not submitted yet.'}
-          </Text>
+          // Nothing submitted yet (assigned/overdue/etc.) — a reader sees this.
+          <Text style={s.reportHint}>Not submitted yet.</Text>
         )}
       </View>
     );
@@ -1293,6 +1307,10 @@ export default function TaskDetailScreen() {
   // Report section: the assignee's form, OR an allowed reader's read-only view.
   const showReport = isReportTask && canReadReport;
   const showProofReview = isReviewerOnly && taskState === 'submitted' && !isReportTask;
+  // Review-required REPORT tasks (weekly goal updates) get their own reviewer affordance:
+  // the submitted answers render above (read-only); this adds Approve / Request changes.
+  // In-app only — NO push (the goal-update review flow never pushes).
+  const showReportReview = isReviewerOnly && taskState === 'submitted' && isReportTask && canReadReport;
   const showEscalation  = !!(task.escalationChain && task.escalationChain.length > 1);
   const showWorkflow    = !!task.isWorkflowParent;
 
@@ -1302,6 +1320,20 @@ export default function TaskDetailScreen() {
     setRejNote(note);
     setTaskState('rejected');
     if (task) pushForTransition(task, 'rejected');   // notify assignee
+  }
+
+  // Goal-update review actions — IN-APP notice only (NO push). Mirror the task-action
+  // in-app notice to the officer (assignee role); the store excludes the actor.
+  function handleReportApprove() {
+    if (!task) return;
+    setTaskState('approved');
+    emitTaskActionNotice('approved', { taskId: task.id, taskTitle: task.title, audienceRole: task.assignedRole, actorRole: role });
+  }
+  function handleReportReject(note: string) {
+    if (!task) return;
+    setRejNote(note);
+    setTaskState('rejected');
+    emitTaskActionNotice('rejected', { taskId: task.id, taskTitle: task.title, audienceRole: task.assignedRole, actorRole: role });
   }
 
   return (
@@ -1547,15 +1579,23 @@ export default function TaskDetailScreen() {
             <ReportFormSection
               definition={reportDef}
               taskId={task.id}
-              editable={isAssignee && !windowLocked}
+              editable={isAssignee && !windowLocked && taskState !== 'submitted'}
               done={taskState === 'approved'}
               snapshot={goalUpdateSnapshot ?? undefined}
               taskState={taskState}
               onSubmitted={() => {
-                // Report submitted → mark the task complete (approved = done per
-                // isTaskCompleted; reports have no review gate), then return. The
-                // answers persist via the RPC; this only flips task state.
-                setTaskState('approved');
+                // Answers persist via the RPC; this only flips task state.
+                if (task.requiresApproval) {
+                  // Review-required (weekly goal updates) → PENDING REVIEW, not auto-complete.
+                  setTaskState('submitted');
+                  // In-app only (NO push): tell the reviewer it's ready. Store excludes the actor.
+                  if (task.reviewerRole) {
+                    emitTaskActionNotice('submitted', { taskId: task.id, taskTitle: task.title, audienceRole: task.reviewerRole, actorRole: role });
+                  }
+                } else {
+                  // Ordinary questionnaire (no review gate) → complete on submit.
+                  setTaskState('approved');
+                }
                 router.back();
               }}
             />
@@ -1604,6 +1644,26 @@ export default function TaskDetailScreen() {
               reviewerLabel={ROLE_LABELS[role]}
               onApprove={() => { setTaskState('approved'); pushForTransition(task, 'approved'); }}
               onReject={handleReject}
+            />
+          </>
+        )}
+
+        {/* ── Goal-update / report review (reviewer only, when submitted) ── */}
+        {showReportReview && (
+          <>
+            <Divider />
+            <Text style={s.reportHint}>
+              {reviewStageHint(goalUpdateReviewStage(taskState))} Approve to mark it reviewed, or request changes to send it back.
+            </Text>
+            <ProofReviewSection
+              proofType={undefined}
+              proofContent=""
+              reviewerLabel={ROLE_LABELS[role]}
+              hideSubmissionBox
+              approveLabel="Approve update"
+              rejectLabel="Request changes"
+              onApprove={handleReportApprove}
+              onReject={handleReportReject}
             />
           </>
         )}
