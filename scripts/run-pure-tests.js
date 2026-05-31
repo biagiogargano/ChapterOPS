@@ -24,6 +24,7 @@ const toPosix  = p => p.split(path.sep).join('/');
 // The suites that must run (matches the lib/*.test.ts set we maintain).
 const EXPECTED = [
   'agendaContributions', 'agendaDocument', 'agendaDocumentService', 'agendaGoals',
+  'agendaUpdateContributions',
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
   'genericEventTemplates',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
