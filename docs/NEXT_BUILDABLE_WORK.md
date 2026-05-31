@@ -124,19 +124,19 @@ base goal-update round-trip first.
 docs read-only. Pure immutable helpers in `lib/agendaDocument.ts` (set/add/remove/prune, 36
 tests). (`app/agenda/[eventId].tsx`.)
 
+**✅ Agenda contributions read path — APPLIED (2026-05-30), wiring UNBLOCKED:**
+`list_submissions_for_org_cycle` is live (definer reader; annotator/president/pro_consul
+read-set; deny-by-default intact). The client wrapper
+`reportSubmissionService.listSubmissionsForOrgCycle` + the pure composer
+`agendaUpdateContributions.agendaContributionsFromSubmissions` are ready. **Next (no longer
+gated):** at agenda generate, `listSubmissionsForOrgCycle(org, period)` →
+`agendaContributionsFromSubmissions(...)` → pass `contributions` to `assembleAgendaDocument`
+so the Help-Needed / Announcements sections populate. (Use the run's period key —
+`weeklyGoalUpdatePeriodKey(now)`.)
+
 **Still gated / next:**
-- **Agenda announcements + help-needed sections** — read path DRAFTED:
-  `supabase/list_submissions_for_org_cycle_patch_draft.sql` (**SQL gate — unapplied**) + the
-  ready wrapper `reportSubmissionService.listSubmissionsForOrgCycle` (returns [] until applied).
-  On apply: at generate, `listSubmissionsForOrgCycle(org, period)` → per-submission
-  `pickGoalUpdateDefinition` → `extractAgendaContributions` → `groupAgendaContributions` →
-  pass to `assembleAgendaDocument`. All the pure pieces are tested.
 - **Leadership/Annotator review wiring** (`lib/goalUpdateReview.ts` ready) — held until the
   base goal-update submit round-trip is device-verified.
-
-**Drafted SQL awaiting approval (do NOT apply without explicit greenlight):**
-- `list_submissions_for_org_cycle_patch_draft.sql` — agenda contributions read path (definer
-  reader; leadership/annotator read-set; deny-by-default unchanged).
 
 ---
 

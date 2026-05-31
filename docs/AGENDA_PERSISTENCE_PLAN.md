@@ -15,13 +15,13 @@ Update-derived sections (announcements/help-needed) drafted but unapplied. Gover
 - Goals-needing-attention folded in at generate time (leadership reads goals; members see it
   via the saved doc).
 
-**Deferred (read path DRAFTED, unapplied):**
-- **Announcements / help-needed sections** — DRAFT
-  `supabase/list_submissions_for_org_cycle_patch_draft.sql` (definer LIST reader for an org +
-  cycle; leadership/annotator read-set). Client wrapper
-  `reportSubmissionService.listSubmissionsForOrgCycle` is ready (returns [] until applied).
-  On apply, wire at generate: list → `pickGoalUpdateDefinition` per submission →
-  `extractAgendaContributions` → `groupAgendaContributions` → `assembleAgendaDocument`.
+**Read path APPLIED — wiring is the next step:**
+- **Announcements / help-needed sections** — `list_submissions_for_org_cycle` is **APPLIED**
+  (2026-05-30). Client wrapper `reportSubmissionService.listSubmissionsForOrgCycle` + pure
+  composer `agendaUpdateContributions.agendaContributionsFromSubmissions` are ready + tested.
+  **Next (no longer gated):** at agenda generate (leadership), `listSubmissionsForOrgCycle(org,
+  period)` → `agendaContributionsFromSubmissions(...)` → pass `contributions` to
+  `assembleAgendaDocument`. Fail-safe: an empty/failed list just omits the sections.
 - **Minutes / versioning** — still out of scope; `finalized_at` is the baseline hook.
 
 ## Problem

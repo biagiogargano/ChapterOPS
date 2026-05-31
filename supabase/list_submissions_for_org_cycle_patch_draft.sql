@@ -1,8 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- DRAFT (UNAPPLIED) · list_submissions_for_org_cycle (agenda contributions read path)
+-- list_submissions_for_org_cycle (agenda contributions read path)
 --
---   ⛔ NOT APPLIED. Draft only — do NOT run via CLI. Apply later via the Dashboard
---      SQL Editor on explicit approval, then run the VERIFICATION block.
+--   ✅ APPLIED to the alpha Supabase project (2026-05-30) via the Dashboard SQL Editor,
+--      verified: one overload (2 args, SECURITY DEFINER), EXECUTE granted to authenticated
+--      (anon also auto-granted — SAFE: the function raises 'unauthenticated' on null
+--      auth.uid()), and task_report_submissions still has NO direct anon/authenticated grant
+--      (deny-by-default intact). INERT until the agenda contributions wiring lands (a later
+--      step): the client wrapper reportSubmissionService.listSubmissionsForOrgCycle is ready.
 --
 -- WHY:
 --   The meeting agenda wants the Help-Needed + Announcements items from EVERY officer's
