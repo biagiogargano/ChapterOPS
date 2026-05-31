@@ -219,6 +219,42 @@ export function emitGoalAssignedNotice(
   if (notice) emitUpdateNotice(notice);
 }
 
+// ─── Agenda-finalized notice (in-app only; 'event' entity — no schema needed) ──
+// When leadership FINALIZES a meeting agenda, the officers who run/attend the meeting
+// should see that the agenda is locked. In-app only (no push). Bounded audience (the
+// caller passes officer roles, NOT 'all') so it's never all-member spam. The store
+// excludes the actor, so the finalizer themself isn't notified. entityType 'event' →
+// tapping opens the meeting (already supported by Notifications routing).
+
+/**
+ * Build the emitUpdateNotice params for a finalized agenda, or null when there's no
+ * concrete (non-'all') audience role. Pure; never throws.
+ */
+export function buildAgendaFinalizedNotice(
+  params: { eventId: string; eventTitle?: string; audienceRoles: string[]; actorRole: string },
+): Parameters<typeof emitUpdateNotice>[0] | null {
+  if (!params.eventId) return null;
+  const audience = Array.from(new Set((params.audienceRoles ?? []).filter(r => r && r !== 'all')));
+  if (audience.length === 0) return null;
+  const t = (params.eventTitle ?? '').trim() || 'the meeting';
+  return {
+    entityType:    'event',
+    entityId:      params.eventId,
+    summary:       `Meeting agenda finalized: ${t}`,
+    severity:      'low',
+    audienceRoles: audience,
+    changedByRole: params.actorRole,
+  };
+}
+
+/** Emit the in-app agenda-finalized notice (no-ops safely; in-app only; never blocks). */
+export function emitAgendaFinalizedNotice(
+  params: { eventId: string; eventTitle?: string; audienceRoles: string[]; actorRole: string },
+): void {
+  const notice = buildAgendaFinalizedNotice(params);
+  if (notice) emitUpdateNotice(notice);
+}
+
 // ─── Acknowledge ────────────────────────────────────────────────────────────
 
 /** Mark a notice acknowledged for one role (hides it for that role). */

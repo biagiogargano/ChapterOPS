@@ -8,6 +8,7 @@
 
 import {
   buildTaskActionNotice, emitTaskActionNotice, buildGoalAssignedNotice, emitGoalAssignedNotice,
+  buildAgendaFinalizedNotice, emitAgendaFinalizedNotice, emitUpdateNotice,
   getNoticesForRole, acknowledgeNotice,
   type TaskActionKind,
 } from './updateNoticeStore';
@@ -127,6 +128,49 @@ check('goal-assigned → null with no goalId',
   check('"all" owner emits no broad notice',
     getNoticesForRole('social_chair').every(n => n.entityId !== goalId) &&
     getNoticesForRole('brother').every(n => n.entityId !== goalId));
+}
+
+// ── buildAgendaFinalizedNotice (in-app only; entity_type 'event') ─────────────
+{
+  const n = buildAgendaFinalizedNotice({ eventId: 'e1', eventTitle: 'Chapter Meeting', audienceRoles: ['president', 'social_chair'], actorRole: 'annotator' });
+  check('agenda-finalized → builds a notice', n !== null);
+  check('agenda notice entityType=event', !!n && n.entityType === 'event');
+  check('agenda notice entityId', !!n && n.entityId === 'e1');
+  check('agenda notice summary mentions the meeting', !!n && n.summary.includes('Chapter Meeting'));
+  check('agenda notice keeps the multi-role audience', !!n && n.audienceRoles.includes('president') && n.audienceRoles.includes('social_chair'));
+  check('agenda notice is low severity', !!n && n.severity === 'low');
+  check('agenda notice changedBy = actor', !!n && n.changedByRole === 'annotator');
+}
+check('agenda-finalized → null with no eventId',
+  buildAgendaFinalizedNotice({ eventId: '', eventTitle: 'x', audienceRoles: ['president'], actorRole: 'annotator' }) === null);
+check('agenda-finalized → null with empty audience',
+  buildAgendaFinalizedNotice({ eventId: 'e', eventTitle: 'x', audienceRoles: [], actorRole: 'annotator' }) === null);
+check('agenda-finalized → null when only "all" in audience (no broad notice)',
+  buildAgendaFinalizedNotice({ eventId: 'e', eventTitle: 'x', audienceRoles: ['all'], actorRole: 'annotator' }) === null);
+check('agenda-finalized → default title when blank',
+  (buildAgendaFinalizedNotice({ eventId: 'e', eventTitle: '   ', audienceRoles: ['president'], actorRole: 'annotator' })?.summary ?? '').includes('the meeting'));
+
+// ── emitAgendaFinalizedNotice → officers see it; actor does NOT ────────────────
+{
+  const eventId = 'agenda_final_emit_1';
+  emitAgendaFinalizedNotice({ eventId, eventTitle: 'E-Board', audienceRoles: ['president', 'pro_consul', 'social_chair'], actorRole: 'president' });
+  check('an officer audience role sees the agenda-finalized notice',
+    getNoticesForRole('social_chair').filter(n => n.entityId === eventId).length === 1);
+  check('the actor (president) does NOT see it',
+    getNoticesForRole('president').every(n => n.entityId !== eventId));
+  check('a non-audience role does NOT see it',
+    getNoticesForRole('brother').every(n => n.entityId !== eventId));
+}
+
+// ── coalescing: a 2nd notice for the same entity REPLACES (not stacks) + maxes severity ──
+{
+  const entityId = 'coalesce_entity_1';
+  emitUpdateNotice({ entityType: 'task', entityId, summary: 'first', severity: 'low', audienceRoles: ['kustos'], changedByRole: 'president' });
+  emitUpdateNotice({ entityType: 'task', entityId, summary: 'second', severity: 'critical', audienceRoles: ['kustos'], changedByRole: 'president' });
+  const forRole = getNoticesForRole('kustos').filter(n => n.entityId === entityId);
+  check('only ONE live notice per entity (coalesced)', forRole.length === 1);
+  check('coalesced notice shows the latest summary', forRole[0]?.summary === 'second');
+  check('coalesced severity is the max (critical)', forRole[0]?.severity === 'critical');
 }
 
 console.log(`\nupdateNoticeStore.test: ${passed} passed, ${failed} failed`);

@@ -43,7 +43,8 @@ import { findEventById, getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getEventDate } from '@/lib/mockEvents';
 import { getStoredProof, getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
-import { isLeadershipRole } from '@/lib/roles';
+import { isLeadershipRole, OFFICER_ROLES } from '@/lib/roles';
+import { emitAgendaFinalizedNotice } from '@/lib/updateNoticeStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useFocusEffect } from '@react-navigation/native';
@@ -190,8 +191,11 @@ export default function AgendaScreen() {
     setBusy(true); setActionError(null);
     const res = await finalizeAgendaDocument(event!.id);
     setBusy(false);
-    if (!res.ok) setActionError('Couldn’t finalize the agenda. Please try again.');
-    else await loadDoc();
+    if (!res.ok) { setActionError('Couldn’t finalize the agenda. Please try again.'); return; }
+    // In-app only (no push): let officers know the meeting agenda is locked. Bounded to
+    // officer roles (never 'all'); the store excludes the finalizer. Fire-and-forget.
+    emitAgendaFinalizedNotice({ eventId: event!.id, eventTitle: event!.title, audienceRoles: OFFICER_ROLES, actorRole: role });
+    await loadDoc();
   }
 
   // ── Inline editing (leadership; unfinalized saved doc) ──
