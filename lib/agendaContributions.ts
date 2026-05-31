@@ -102,3 +102,25 @@ export function mergeAgendaContributions(
   for (const list of perSubmission) out.push(...list);
   return out;
 }
+
+/** Contributions grouped into the agenda's render-ready sections. */
+export interface GroupedAgendaContributions {
+  announcements: AgendaContribution[];
+  helpNeeded:    AgendaContribution[];
+}
+
+/**
+ * Split a flat contribution list into the agenda's sections (announcements +
+ * help-needed), preserving order within each. One pass; pure. Render-ready: the agenda
+ * screen iterates each section directly. Extend alongside AgendaContributionSection.
+ */
+export function groupAgendaContributions(
+  contributions: AgendaContribution[],
+): GroupedAgendaContributions {
+  const grouped: GroupedAgendaContributions = { announcements: [], helpNeeded: [] };
+  for (const c of contributions) {
+    if (c.section === 'announcement') grouped.announcements.push(c);
+    else if (c.section === 'help_needed') grouped.helpNeeded.push(c);
+  }
+  return grouped;
+}

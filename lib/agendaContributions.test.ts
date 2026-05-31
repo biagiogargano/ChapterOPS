@@ -9,6 +9,7 @@ import {
   extractAgendaContributions,
   contributionsForSection,
   mergeAgendaContributions,
+  groupAgendaContributions,
 } from './agendaContributions';
 import { withAnswerValue, withAnswerNoUpdate, type StructuredResponseDefinition } from './structuredResponses';
 import { WEEKLY_OFFICER_REPORT } from './reportDefinitions';
@@ -94,6 +95,27 @@ function check(name: string, cond: boolean): void {
     merged[0].text === 'A' && merged[0].source === 'Pres' &&
     merged[1].text === 'B' && merged[1].source === 'Treasurer');
   check('merge of empty lists → empty', mergeAgendaContributions([[], []]).length === 0);
+}
+
+// ── groupAgendaContributions: split into render-ready sections, keep order ─────
+{
+  const mk = (key: string, text: string, source: string) => {
+    let answers = {};
+    answers = withAnswerValue(answers, key, text);
+    return extractAgendaContributions({ definition: WEEKLY_OFFICER_REPORT, answers, source });
+  };
+  const merged = mergeAgendaContributions([
+    mk('announcements', 'Formal is May 30', 'Pres'),
+    mk('blockers', 'Need a venue', 'Social'),
+    mk('announcements', 'Dues due Friday', 'Quaestor'),
+  ]);
+  const grouped = groupAgendaContributions(merged);
+  check('announcements grouped', grouped.announcements.length === 2);
+  check('helpNeeded grouped', grouped.helpNeeded.length === 1);
+  check('announcement order preserved', grouped.announcements[0].text === 'Formal is May 30' && grouped.announcements[1].text === 'Dues due Friday');
+  check('helpNeeded content', grouped.helpNeeded[0].text === 'Need a venue' && grouped.helpNeeded[0].section === 'help_needed');
+  const empty = groupAgendaContributions([]);
+  check('empty → both sections empty', empty.announcements.length === 0 && empty.helpNeeded.length === 0);
 }
 
 console.log(`\nagendaContributions.test: ${passed} passed, ${failed} failed`);
