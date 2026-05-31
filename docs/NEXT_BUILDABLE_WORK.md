@@ -78,15 +78,14 @@ Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-
   prefers it). See the WIRED section below.
 - **Editable agenda + update-derived sections + Officer Priorities + agenda-finalized in-app
   notice** — ✅ WIRED. See the WIRED section below.
-- **Leadership/Annotator review** — the one **NOT wired** piece. `lib/goalUpdateReview.ts`
-  (22 tests) + the read-only "submitted/awaiting review" copy are ready, but turning on a real
-  review GATE flips goal-update submit from auto-complete (→approved) to review-gated
-  (→submitted, reviewer approves). That is a **PRODUCT DECISION** (does a weekly update need
-  leadership sign-off to count as done?) + behavior change to an unverified flow — held. When
-  decided: generation sets `reviewerRole`='annotator' + `requiresApproval`; the form's
-  onSubmitted sets `submitted` (not `approved`, no push); Task Detail shows the reviewer
-  approve/reject affordance for goal-update tasks (drop the `!isReportTask` gate). No SQL,
-  no permission change, no push needed.
+- **Leadership/Annotator review** — ✅ WIRED (product decision approved). Goal-update tasks are
+  review-required: generation sets `reviewerRole`='annotator' + `requiresApproval`; submit →
+  `submitted` (pending review, no auto-complete, no push) with an in-app reviewer notice; the
+  Annotator (or leadership override) sees the answers read-only + **Approve update / Request
+  changes**; approve→`approved`, request-changes→`rejected` (officer revises + resubmits). All
+  via existing task states + `canApproveTask` — no SQL, no permission change, no push. Ordinary
+  questionnaires unchanged. (`lib/goalUpdateGeneration.ts`, `app/task/[id].tsx`,
+  `lib/goalUpdateReview.ts`.)
 
 **SQL — ✅ BOTH APPLIED + verified on alpha (2026-05-30):**
 1. `task_report_submission_snapshot_patch_draft.sql` — `definition_snapshot` column +
@@ -130,9 +129,6 @@ folds each officer's "priorities for next period" into an Officer Priorities sec
 store excludes the actor). (`app/agenda/[eventId].tsx`, `lib/updateNoticeStore.ts`.)
 
 **Still gated / next:**
-- **Leadership/Annotator review wiring** — held; it's a **product decision** (does a weekly
-  update need leadership sign-off to count as done?) + a behavior change to an unverified
-  flow. Model + read-copy are ready (`lib/goalUpdateReview.ts`); see the detailed gate above.
 - **Agenda announcements/help-needed from Weekly Officer Reports** (not just goal updates) —
   the list RPC matches only `goalupdrole_*`; widening it is a separate SQL lane.
 - **Meeting-anchored agenda cycle** (vs current weekly) — a later product decision.

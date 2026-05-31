@@ -181,6 +181,26 @@ live goals (not stored), so it must survive reload.
 - [ ] **Survives reload:** fill + submit (when open) → reopen the task → your answers
       **persist** and the questions are still there (reconstructed from goals + answers
       from the RPC — **not** "This questionnaire is unavailable").
+
+### Review flow (NEW — weekly updates require leadership review)
+- [ ] **Submit → pending review (not auto-complete):** as the officer, fill + **Submit
+      Response** → the task does **not** flip to Done. Reopen → it shows **"SUBMITTED —
+      PENDING REVIEW"** with your answers read-only (you can't re-edit while pending).
+- [ ] **Reviewer notice (in-app, no push):** as the **Annotator**, the **Notifications**
+      screen shows **"Task needs your review: Weekly goal update"**. No push fires.
+- [ ] **Approve:** as **Annotator** (or **Consul/Pro Consul** via leadership override), open
+      the submitted task → the answers show read-only + an **"Approve update" / "Request
+      changes"** review block. Tap **Approve update** → the task becomes **Done/Approved**;
+      the officer gets an in-app **"Task approved"** notice (no push).
+- [ ] **Request changes:** instead tap **Request changes**, enter a reason → the task goes to
+      **RETURNED — NEEDS CHANGES**; the officer gets an in-app **"Task needs changes"** notice
+      (no push) and, reopening, sees the **"WHAT TO FIX"** note + an **editable** form to
+      revise and **resubmit** (→ pending review again).
+- [ ] **Leadership override:** a **Consul/Pro Consul** (not the Annotator) can also approve/
+      request changes. An **ordinary officer** (not the reviewer/leadership) sees **no** review
+      block.
+- [ ] **Ordinary questionnaires unchanged:** a Weekly Officer Report task still completes on
+      submit (no review gate).
 - [ ] **Goal-load failure warns (don't silently drop goals):** force offline, open an
       *open* goal-update task → a **"⚠️ Couldn't load your goals…"** warning shows above
       the form (so you don't submit a check-in-only form thinking you have no goals).
@@ -300,11 +320,12 @@ real document via `agenda_documents`. No fake save.
   - [ ] **Dismiss** a notification (tap it) → it **disappears** from the list.
   - [ ] **Actor does NOT get their own notification** (e.g. the President who
         approved a task sees no "Task approved" notice for it).
-- [ ] **In-app-only notices (NO push) — the complete set beyond the 4 task actions:**
-      **"New goal assigned: <title>"** (§7) and **"Meeting agenda finalized: <meeting>"**
-      (§7c, officer-bounded). Both are **in-app only** — they must **not** fire a push.
-      No **RSVP / questionnaire / goal-update-generation / all-member** notifications appear
-      at all (in-app or push).
+- [ ] **In-app-only notices (NO push) beyond the 4 push-mirrored task actions:**
+      **"New goal assigned: <title>"** (§7), **"Meeting agenda finalized: <meeting>"** (§7c,
+      officer-bounded), and the **weekly goal-update review** notices — "Task needs your
+      review" (to the Annotator on submit), "Task approved" / "Task needs changes" (to the
+      officer on review). All **in-app only** — they must **not** fire a push. No **RSVP /
+      questionnaire / goal-update-generation / all-member** notifications appear (in-app or push).
 
 ---
 
