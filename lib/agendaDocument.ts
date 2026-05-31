@@ -63,7 +63,15 @@ export const AGENDA_SECTION_DEFS: { key: string; title: string }[] = [
   { key: 'goals_attention', title: 'Goals Needing Attention' },
   { key: 'help_needed',     title: 'Help Needed' },
   { key: 'announcements',   title: 'Announcements' },
+  { key: 'officer_updates', title: 'Officer Priorities' },
 ];
+
+/** A one-line officer update for the agenda (e.g. their "priorities for next period"). */
+export interface OfficerUpdateLine {
+  text:    string;
+  /** Attribution (officer role label). */
+  source?: string;
+}
 
 export interface AssembleAgendaInput {
   /** From buildAgenda (events + tasks). */
@@ -72,6 +80,8 @@ export interface AssembleAgendaInput {
   goalsNeedingAttention?: AgendaGoalItem[];
   /** From agendaContributions.groupAgendaContributions (optional — omit if no submissions). */
   contributions?: GroupedAgendaContributions;
+  /** Officer priorities from weekly updates (optional — omit if no submissions). */
+  officerPriorities?: OfficerUpdateLine[];
   /**
    * Include canonical sections even when empty (a stable editable skeleton). Default true.
    * Set false to omit empty sections (a tight read-only render).
@@ -88,6 +98,7 @@ export function assembleAgendaDocument(input: AssembleAgendaInput): AgendaDocume
   const includeEmpty = input.includeEmpty !== false;
   const goalsAttn = input.goalsNeedingAttention ?? [];
   const contrib = input.contributions ?? { announcements: [], helpNeeded: [] };
+  const priorities = input.officerPriorities ?? [];
 
   const itemsByKey: Record<string, AgendaDocItem[]> = {
     old_business:    input.agenda.oldBusiness.map((e, i) => ({ id: `old_business:${i}`,  text: e.title, meta: e.meta, kind: 'event', refId: e.id })),
@@ -97,6 +108,7 @@ export function assembleAgendaDocument(input: AssembleAgendaInput): AgendaDocume
     goals_attention: goalsAttn.map((g, i) =>                ({ id: `goals_attention:${i}`, text: g.title, meta: agendaGoalReasonLabel(g.reason), kind: 'goal', refId: g.goalId })),
     help_needed:     contrib.helpNeeded.map((c, i) =>       ({ id: `help_needed:${i}`,   text: c.text, ...(c.source ? { meta: c.source } : {}), kind: 'contribution', refId: c.questionKey })),
     announcements:   contrib.announcements.map((c, i) =>    ({ id: `announcements:${i}`, text: c.text, ...(c.source ? { meta: c.source } : {}), kind: 'contribution', refId: c.questionKey })),
+    officer_updates: priorities.map((p, i) =>              ({ id: `officer_updates:${i}`, text: p.text, ...(p.source ? { meta: p.source } : {}), kind: 'contribution' })),
   };
 
   const sections: AgendaDocSection[] = [];

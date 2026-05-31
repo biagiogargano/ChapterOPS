@@ -20,8 +20,13 @@ import {
   extractAgendaContributions, mergeAgendaContributions, groupAgendaContributions,
   type GroupedAgendaContributions,
 } from './agendaContributions';
+import type { OfficerUpdateLine } from './agendaDocument';
 import { ROLE_LABELS, type Role } from './roles';
 import type { StructuredAnswerMap } from './structuredResponses';
+
+/** The check-in question whose answer becomes an "Officer Priorities" agenda line.
+ *  Matches lib/goalUpdateDefinition's check-in 'priorities' question. */
+const PRIORITIES_KEY = 'priorities';
 
 /** The minimal submission shape needed (matches reportSubmissionService.ReportSubmission). */
 export interface UpdateSubmissionLike {
@@ -57,4 +62,25 @@ export function agendaContributionsFromSubmissions(
     }));
   }
   return groupAgendaContributions(mergeAgendaContributions(perSubmission));
+}
+
+/**
+ * Pull each officer's "priorities for next period" from a cycle's goal-update submissions, as
+ * agenda "Officer Priorities" lines (text + role attribution). Only snapshot-backed
+ * submissions with a non-blank, non-"No update" priorities answer contribute. Pure; never
+ * throws. (Unlike help-needed/announcements, priorities aren't agenda-tagged questions — they
+ * are summarized here directly.)
+ */
+export function officerPriorityItems(submissions: UpdateSubmissionLike[]): OfficerUpdateLine[] {
+  const out: OfficerUpdateLine[] = [];
+  for (const sub of submissions ?? []) {
+    if (!definitionFromSnapshot(sub?.definitionSnapshot)) continue;   // only snapshot-backed goal updates
+    const a = sub.answers?.[PRIORITIES_KEY];
+    if (!a || a.noUpdate) continue;
+    const text = (a.value ?? '').trim();
+    if (!text) continue;
+    const source = sourceLabel(sub.submittedRole);
+    out.push(source ? { text, source } : { text });
+  }
+  return out;
 }

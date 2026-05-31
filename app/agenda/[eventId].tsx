@@ -35,7 +35,7 @@ import {
   getAgendaDocument, upsertAgendaDocument, finalizeAgendaDocument, type AgendaReadResult,
 } from '@/lib/agendaDocumentService';
 import { goalsNeedingAttention } from '@/lib/agendaGoals';
-import { agendaContributionsFromSubmissions } from '@/lib/agendaUpdateContributions';
+import { agendaContributionsFromSubmissions, officerPriorityItems } from '@/lib/agendaUpdateContributions';
 import { listGoalsForOrgResult } from '@/lib/goalService';
 import { listSubmissionsForOrgCycle } from '@/lib/reportSubmissionService';
 import { weeklyGoalUpdatePeriodKey } from '@/lib/goalUpdateRun';
@@ -154,23 +154,26 @@ export default function AgendaScreen() {
     // read just omits the section (honest; never blocks the save).
     let goalsAttn: ReturnType<typeof goalsNeedingAttention> = [];
     let contributions;
+    let officerPriorities;
     if (orgId) {
       const gr = await listGoalsForOrgResult(orgId);
       if (gr.ok) goalsAttn = goalsNeedingAttention(gr.goals);
 
-      // Fold Help-Needed / Announcements from this cycle's weekly goal-update submissions.
-      // The list reader is leadership/Annotator-gated (the generate button already is), and
-      // each submission carries its own snapshot so contributions need no per-role goals.
-      // Fail-safe: the wrapper returns [] on error/empty → those sections are simply omitted
-      // (assemble drops empty sections); never blocks the save, never fakes data.
-      // PERIOD: uses the CURRENT weekly period (when leadership generates). Weekly update
-      // tasks key on the same now-relative period. TODO: when meetings get a calendar-anchored
-      // cycle, derive the period from the meeting's week instead of "now".
+      // Fold Help-Needed / Announcements + Officer Priorities from this cycle's weekly
+      // goal-update submissions. The list reader is leadership/Annotator-gated (the generate
+      // button already is), and each submission carries its own snapshot so contributions need
+      // no per-role goals. Fail-safe: the wrapper returns [] on error/empty → those sections
+      // are simply omitted (assemble drops empty sections); never blocks the save, never fakes.
+      // PERIOD: uses the CURRENT weekly period (when leadership generates). Weekly update tasks
+      // key on the same now-relative period. TODO: when meetings get a calendar-anchored cycle,
+      // derive the period from the meeting's week instead of "now".
       const period = weeklyGoalUpdatePeriodKey(new Date());
-      contributions = agendaContributionsFromSubmissions(await listSubmissionsForOrgCycle(orgId, period));
+      const subs = await listSubmissionsForOrgCycle(orgId, period);
+      contributions = agendaContributionsFromSubmissions(subs);
+      officerPriorities = officerPriorityItems(subs);
     }
 
-    const sections = assembleAgendaDocument({ agenda, goalsNeedingAttention: goalsAttn, contributions, includeEmpty: false });
+    const sections = assembleAgendaDocument({ agenda, goalsNeedingAttention: goalsAttn, contributions, officerPriorities, includeEmpty: false });
     const res = await upsertAgendaDocument({
       eventId: event!.id,
       title:   `${event!.title} — Agenda`,

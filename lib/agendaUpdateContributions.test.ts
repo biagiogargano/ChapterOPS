@@ -3,7 +3,7 @@
  * Dependency-free; asserts via console + process.exit (matches the pure runner).
  */
 
-import { agendaContributionsFromSubmissions, type UpdateSubmissionLike } from './agendaUpdateContributions';
+import { agendaContributionsFromSubmissions, officerPriorityItems, type UpdateSubmissionLike } from './agendaUpdateContributions';
 import { buildGoalUpdateDefinition } from './goalUpdateDefinition';
 import { buildGoalUpdateSnapshot } from './goalUpdateSnapshot';
 import { assembleAgendaDocument } from './agendaDocument';
@@ -112,6 +112,38 @@ const emptyAgenda: Agenda = { oldBusiness: [], newBusiness: [], unresolved: [], 
   check('empty submissions → no help_needed/announcements sections',
     !doc.sections.some(s => s.key === 'help_needed' || s.key === 'announcements'));
   check('empty submissions → empty document (nothing else either)', doc.sections.length === 0);
+}
+
+// ── officerPriorityItems: pull 'priorities' from snapshot-backed submissions ──
+{
+  const a = answers(m => {
+    m = withAnswerValue(m, 'priorities', 'Lock the formal venue');
+    m = withAnswerValue(m, 'accomplishments', 'Ran 2 events');   // not priorities → ignored
+    return m;
+  });
+  const items = officerPriorityItems([{ definitionSnapshot: snapshot, answers: a, submittedRole: 'social_chair' }]);
+  check('officer priorities extracted with attribution', items.length === 1 && items[0].text === 'Lock the formal venue' && items[0].source === 'Social Chair');
+
+  // "No update" / blank / no-snapshot → nothing.
+  const noUpd = answers(m => withAnswerNoUpdate(m, 'priorities', true));
+  check('No-update priorities → nothing', officerPriorityItems([{ definitionSnapshot: snapshot, answers: noUpd, submittedRole: 'quaestor' }]).length === 0);
+  const blank = answers(m => withAnswerValue(m, 'priorities', '   '));
+  check('blank priorities → nothing', officerPriorityItems([{ definitionSnapshot: snapshot, answers: blank, submittedRole: 'quaestor' }]).length === 0);
+  check('no-snapshot submission → nothing', officerPriorityItems([{ definitionSnapshot: null, answers: a, submittedRole: 'president' }]).length === 0);
+  check('empty list → []', officerPriorityItems([]).length === 0);
+}
+
+// ── officer priorities land in the assembled agenda ───────────────────────────
+{
+  const a = answers(m => withAnswerValue(m, 'priorities', 'Recruit chairs'));
+  const officerPriorities = officerPriorityItems([{ definitionSnapshot: snapshot, answers: a, submittedRole: 'recruitment_chair' }]);
+  const doc = assembleAgendaDocument({ agenda: emptyAgenda, officerPriorities, includeEmpty: false });
+  const sec = doc.sections.find(s => s.key === 'officer_updates');
+  check('assembled doc includes officer_updates section', !!sec && sec.title === 'Officer Priorities');
+  check('officer priority text + source land', !!sec && sec.items[0].text === 'Recruit chairs' && sec.items[0].meta === 'Recruitment Chair');
+  // No priorities → section omitted.
+  const empty = assembleAgendaDocument({ agenda: emptyAgenda, officerPriorities: [], includeEmpty: false });
+  check('no officer priorities → section omitted', !empty.sections.some(s => s.key === 'officer_updates'));
 }
 
 console.log(`\nagendaUpdateContributions.test: ${passed} passed, ${failed} failed`);
