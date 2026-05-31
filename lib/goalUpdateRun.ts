@@ -29,6 +29,25 @@ export function weeklyGoalUpdatePeriodKey(now: Date): string {
   return `${year}-W${week < 10 ? `0${week}` : week}`;
 }
 
+/** True for a usable Date (instanceof + finite time). Pure. */
+function isValidDate(d: unknown): d is Date {
+  return d instanceof Date && Number.isFinite(d.getTime());
+}
+
+/**
+ * The reporting period key an AGENDA should use for its update-derived sections: the ISO
+ * week of the MEETING EVENT's date, falling back to `fallbackDate`'s week when the event
+ * date is missing/invalid. Pure.
+ *
+ * ALPHA DEFAULT: a meeting's agenda pulls the weekly updates for the meeting's own week
+ * (not blindly "now"). With the current client event model (dayOffset within the current
+ * week), this coincides with the current week; it becomes meaningfully different once events
+ * carry absolute dates. A fully org-configurable reporting calendar is future work.
+ */
+export function agendaReportingPeriodKey(eventDate: Date | null | undefined, fallbackDate: Date): string {
+  return weeklyGoalUpdatePeriodKey(isValidDate(eventDate) ? eventDate : fallbackDate);
+}
+
 /**
  * The open/due window for a weekly goal-update run, relative to `now` (pure):
  *   • availableAt = now + 4 days  → opens near the END of the week (officers update

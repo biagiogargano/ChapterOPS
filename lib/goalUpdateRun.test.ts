@@ -8,6 +8,7 @@
 
 import {
   weeklyGoalUpdatePeriodKey, weeklyGoalUpdateWindow, runWeeklyGoalUpdateGeneration,
+  agendaReportingPeriodKey,
 } from './goalUpdateRun';
 import { goalUpdateTaskId } from './goalUpdateGeneration';
 import { findTaskById } from './mockTasks';
@@ -35,6 +36,25 @@ export async function runAsync(): Promise<{ passed: number; failed: number }> {
     check('period key deterministic', k1 === weeklyGoalUpdatePeriodKey(new Date(2026, 4, 30)));
     // Early January week padded to 2 digits.
     check('period key zero-pads early weeks', /^\d{4}-W0\d$/.test(weeklyGoalUpdatePeriodKey(new Date(2026, 0, 5))));
+  }
+
+  // ── agendaReportingPeriodKey: meeting week, with fallback ────────────────────
+  {
+    const meeting  = new Date(2026, 4, 13);  // 2026-05-13 (a Wednesday) → some ISO week
+    const fallback = new Date(2026, 7, 1);   // 2026-08-01 → a different ISO week
+    check('uses the event date when present',
+      agendaReportingPeriodKey(meeting, fallback) === weeklyGoalUpdatePeriodKey(meeting));
+    check('event-date result differs from fallback when weeks differ',
+      agendaReportingPeriodKey(meeting, fallback) !== weeklyGoalUpdatePeriodKey(fallback));
+    check('falls back when event date is null',
+      agendaReportingPeriodKey(null, fallback) === weeklyGoalUpdatePeriodKey(fallback));
+    check('falls back when event date is undefined',
+      agendaReportingPeriodKey(undefined, fallback) === weeklyGoalUpdatePeriodKey(fallback));
+    check('falls back when event date is invalid',
+      agendaReportingPeriodKey(new Date('not-a-date'), fallback) === weeklyGoalUpdatePeriodKey(fallback));
+    // ISO week-year boundary: Jan 1 2027 belongs to ISO week 53 of 2026 (week-year ≠ calendar year).
+    check('ISO week-year boundary handled (Jan 1 2027 → 2026-W53)',
+      agendaReportingPeriodKey(new Date(2027, 0, 1), fallback) === '2026-W53');
   }
 
   // ── window: opens 4 days out, due 7 days out ─────────────────────────────────

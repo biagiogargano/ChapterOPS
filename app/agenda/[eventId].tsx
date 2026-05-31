@@ -38,7 +38,7 @@ import { goalsNeedingAttention } from '@/lib/agendaGoals';
 import { agendaContributionsFromSubmissions, officerPriorityItems } from '@/lib/agendaUpdateContributions';
 import { listGoalsForOrgResult } from '@/lib/goalService';
 import { listSubmissionsForOrgCycle } from '@/lib/reportSubmissionService';
-import { weeklyGoalUpdatePeriodKey } from '@/lib/goalUpdateRun';
+import { agendaReportingPeriodKey } from '@/lib/goalUpdateRun';
 import { findEventById, getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getEventDate } from '@/lib/mockEvents';
@@ -165,10 +165,10 @@ export default function AgendaScreen() {
       // button already is), and each submission carries its own snapshot so contributions need
       // no per-role goals. Fail-safe: the wrapper returns [] on error/empty → those sections
       // are simply omitted (assemble drops empty sections); never blocks the save, never fakes.
-      // PERIOD: uses the CURRENT weekly period (when leadership generates). Weekly update tasks
-      // key on the same now-relative period. TODO: when meetings get a calendar-anchored cycle,
-      // derive the period from the meeting's week instead of "now".
-      const period = weeklyGoalUpdatePeriodKey(new Date());
+      // PERIOD: the MEETING's own week (agendaReportingPeriodKey from the event date), falling
+      // back to the current week when the date is unavailable. With the current dayOffset event
+      // model this equals the current week; it diverges once events carry absolute dates.
+      const period = agendaReportingPeriodKey(getEventDate(event!.dayOffset), new Date());
       const subs = await listSubmissionsForOrgCycle(orgId, period);
       contributions = agendaContributionsFromSubmissions(subs);
       officerPriorities = officerPriorityItems(subs);
