@@ -105,6 +105,22 @@ function goalUpdate(over: Partial<MockTask> = {}): MockTask {
   check('plain task is not a goal-update', !myGoalUpdateTasks(tasks, 'social_chair', stateOf, NOW).some(t => t.id === 'plain_open'));
 }
 
+// ── chapter-wide ('all') tasks are mine; goal-update overlap is the screen's to split ──
+{
+  const tasks: MockTask[] = [
+    task({ id: 'all_overdue', assignedRole: 'all', dueAt: iso(2026,5,18) }),       // chapter-wide overdue → mine
+    goalUpdate({ id: 'gu_overdue', state: 'rejected', dueAt: iso(2026,5,18) }),     // returned + overdue goal update
+  ];
+  const stateOf = (t: MockTask) => t.state;
+  const open = myOpenTasks(tasks, 'social_chair', stateOf, NOW);
+  check("chapter-wide 'all' task is mine + open", open.some(t => t.id === 'all_overdue'));
+  // A rejected goal-update with a past due date is BOTH overdue (generic helper) AND returned;
+  // the screen de-dups by filtering goal-updates out of the needs-action buckets.
+  check('generic myOverdueTasks includes the overdue goal-update', myOverdueTasks(tasks, 'social_chair', stateOf, NOW).some(t => t.id === 'gu_overdue'));
+  check('it is also in myReturnedUpdates', myReturnedUpdates(tasks, 'social_chair', stateOf).some(t => t.id === 'gu_overdue'));
+  check('but NOT in myGoalUpdateTasks (returned excluded there)', !myGoalUpdateTasks(tasks, 'social_chair', stateOf, NOW).some(t => t.id === 'gu_overdue'));
+}
+
 // ── counts ────────────────────────────────────────────────────────────────────
 {
   const c = myWorkCounts({ overdue: 2, dueSoon: 1, returned: 1, openUpdates: 1, inReview: 3, notOpen: 1 });

@@ -20,7 +20,10 @@ import { listMyGoalsResult } from '@/lib/goalService';
 import { goalDisplay } from '@/lib/goalHelpers';
 import { goalsNeedingAttention } from '@/lib/agendaGoals';
 import type { Goal } from '@/lib/goals';
-import { getNoticesForRole, acknowledgeNotice, useUpdateNoticesVersion, type UpdateNotice } from '@/lib/updateNoticeStore';
+import {
+  getNoticesForRole, acknowledgeNotice, partitionNoticesByPriority, useUpdateNoticesVersion,
+  type UpdateNotice,
+} from '@/lib/updateNoticeStore';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -52,7 +55,10 @@ export default function MyWorkScreen() {
   const returned    = myReturnedUpdates(tasks, role, stateOf);
   const notOpen     = myNotOpenTasks(tasks, role, stateOf, now).filter(isGoalUpdateTask);
 
-  const notices = getNoticesForRole(role);
+  // Notices for my role, attention (critical/moderate) first, then FYI.
+  const _notices = getNoticesForRole(role);
+  const _parts = partitionNoticesByPriority(_notices);
+  const notices = [..._parts.attention, ..._parts.fyi];
 
   // ── Async: my goals ──
   const [goals, setGoals]   = useState<Goal[]>([]);
