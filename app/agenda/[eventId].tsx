@@ -10,8 +10,18 @@
  *
  * Real persistence only — no fake save. Inline text/item editing of a saved document is a
  * documented follow-up (the service stores an arbitrary AgendaDocument; a future editor
- * mutates it and calls upsert). Goals-needing-attention / announcements / help-needed
- * sections arrive once those reads are wired (Lane 5).
+ * mutates it and calls upsert).
+ *
+ * GOALS-NEEDING-ATTENTION is folded in at GENERATE time: leadership (who can read org
+ * goals) fetches them and the section is persisted into the document, so members see it by
+ * reading the saved doc — no member-side goals read needed.
+ *
+ * ANNOUNCEMENTS / HELP-NEEDED (from officers' weekly goal-update submissions) are NOT yet
+ * included. Missing read path: there is only a per-task get_task_report_submission RPC —
+ * no "list submissions for an org + cycle". Options: (a) a new
+ * list_submissions_for_org_cycle RPC (cleanest), or (b) enumerate the cycle's
+ * goalupdrole_<role>__<period> task ids and fetch each, then extractAgendaContributions +
+ * groupAgendaContributions (both pure + tested). Deferred until that read path lands.
  */
 
 import { buildAgenda } from '@/lib/buildAgenda';
@@ -19,11 +29,14 @@ import { assembleAgendaDocument, type AgendaDocItem, type AgendaDocSection } fro
 import {
   getAgendaDocument, upsertAgendaDocument, finalizeAgendaDocument, type AgendaReadResult,
 } from '@/lib/agendaDocumentService';
+import { goalsNeedingAttention } from '@/lib/agendaGoals';
+import { listGoalsForOrgResult } from '@/lib/goalService';
 import { findEventById, getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getEventDate } from '@/lib/mockEvents';
 import { getStoredProof, getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { isLeadershipRole } from '@/lib/roles';
+import { useActiveDataOrgId } from '@/lib/useActiveDataOrgId';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
@@ -37,6 +50,7 @@ export default function AgendaScreen() {
   const navigation  = useNavigation();
   const router      = useRouter();
   const { role }    = useDevRole();
+  const orgId       = useActiveDataOrgId();
 
   // Re-render when task state / proof changes so the live preview stays current.
   useTaskStateVersion();
@@ -109,11 +123,23 @@ export default function AgendaScreen() {
   async function generate() {
     if (busy) return;
     setBusy(true); setActionError(null);
+
+    // Leadership generates → fetch the org's goals (leadership-readable) and fold
+    // "goals needing attention" into the SAVED document. Members then see that section by
+    // reading the saved doc — no member-side goals read is required. A failed/empty goals
+    // read just omits the section (honest; never blocks the save).
+    let goalsAttn: ReturnType<typeof goalsNeedingAttention> = [];
+    if (orgId) {
+      const gr = await listGoalsForOrgResult(orgId);
+      if (gr.ok) goalsAttn = goalsNeedingAttention(gr.goals);
+    }
+
+    const sections = assembleAgendaDocument({ agenda, goalsNeedingAttention: goalsAttn, includeEmpty: false });
     const res = await upsertAgendaDocument({
       eventId: event!.id,
       title:   `${event!.title} — Agenda`,
-      sections: assembleAgendaDocument({ agenda, includeEmpty: false }),
-      generatedFrom: { source: 'buildAgenda', sections: previewDoc.sections.map(x => x.key) },
+      sections,
+      generatedFrom: { source: 'buildAgenda+goals', sections: sections.sections.map(x => x.key) },
     });
     setBusy(false);
     if (!res.ok) setActionError('Couldn’t save the agenda. Please try again.');
