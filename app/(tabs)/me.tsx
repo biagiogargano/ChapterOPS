@@ -3,7 +3,9 @@ import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
-import { canAccessReviewInbox } from '@/lib/reviewInbox';
+import { canAccessReviewInbox, pendingReviewTasks, returnedUpdateTasks } from '@/lib/reviewInbox';
+import { getAllTasks, type MockTask } from '@/lib/mockTasks';
+import { getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { generateQuestionnaireTasks } from '@/lib/reportGeneration';
 import { getQuestionnaireDefinition } from '@/lib/reportDefinitions';
@@ -246,6 +248,15 @@ export default function MeScreen() {
   const { memberships, activeOrgId, setActiveOrg, member, organization } = useIdentity();
   const router = useRouter();
 
+  // Live count for the Review Inbox card (leadership only) — reactive to task-state changes.
+  useTaskStateVersion();
+  const reviewInboxCount = (() => {
+    if (!canAccessReviewInbox(role)) return 0;
+    const tasks = getAllTasks();
+    const stateOf = (t: MockTask) => getStoredState(t.id, t.state);
+    return pendingReviewTasks(tasks, role, stateOf).length + returnedUpdateTasks(tasks, role, stateOf).length;
+  })();
+
   // Real identity when auth is on; demo values in the flag-off sandbox.
   const userName = (AUTH_ENABLED ? member?.fullName : DEMO_USER.full_name) || 'Member';
   const orgName  = (AUTH_ENABLED ? organization?.name : DEMO_CHAPTER.name) || '';
@@ -345,6 +356,9 @@ export default function MeScreen() {
             <Text style={s.linkTitle}>Review Inbox</Text>
             <Text style={s.linkSub}>Updates to review, goals needing attention, agendas to prepare</Text>
           </View>
+          {reviewInboxCount > 0 && (
+            <View style={s.reviewBadge}><Text style={s.reviewBadgeText}>{reviewInboxCount}</Text></View>
+          )}
           <Text style={s.linkChevron}>›</Text>
         </Pressable>
       )}
@@ -534,6 +548,8 @@ const s = StyleSheet.create({
   linkTitle:   { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
   linkSub:     { fontSize: 12, color: '#64748b', marginTop: 2 },
   linkChevron: { fontSize: 22, color: '#475569' },
+  reviewBadge:     { backgroundColor: '#4f46e5', borderRadius: 11, minWidth: 22, height: 22, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  reviewBadgeText: { fontSize: 12, fontWeight: '800', color: '#ffffff' },
 
   // Questionnaire generator card
   genCard:     { backgroundColor: '#1e293b', borderRadius: 16, padding: 20, gap: 6 },
