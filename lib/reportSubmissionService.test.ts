@@ -39,6 +39,13 @@ export async function runAsync(): Promise<{ passed: number; failed: number }> {
   check('upsert false on empty definitionId',
     (await upsertTaskReportSubmission('t1', '', answers)) === false);
 
+  // ── Optional snapshot arg: same fallback-safe contract (no throw) ─────────────
+  check('upsert with snapshot → false when unconfigured',
+    (await upsertTaskReportSubmission('goalupdrole_social_chair__2026-W23', 'goalupddef_social_chair__2026-W23', answers,
+      { v: 1, definition: { id: 'goalupddef_social_chair__2026-W23', label: 'X', questions: [] }, goals: [] })) === false);
+  check('upsert with undefined snapshot behaves like the 3-arg call',
+    (await upsertTaskReportSubmission('t1', 'd1', answers, undefined)) === false);
+
   // ── Fallback-safe reads ─────────────────────────────────────────────────────
   check('get returns null when unconfigured',
     (await getTaskReportSubmission('report_social_chair_2026-W23')) === null);

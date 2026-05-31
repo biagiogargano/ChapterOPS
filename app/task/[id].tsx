@@ -43,6 +43,11 @@ import {
   parseGoalUpdateId,
   reconstructGoalUpdateDefinition,
 } from '@/lib/goalUpdateGeneration';
+import {
+  buildGoalUpdateSnapshot,
+  definitionFromSnapshot,
+  type GoalUpdateSnapshot,
+} from '@/lib/goalUpdateSnapshot';
 import { listGoalsForOrgResult, listMyGoalsResult, type GoalListResult } from '@/lib/goalService';
 import { taskWindowView } from '@/lib/taskWindow';
 import {
@@ -792,12 +797,16 @@ function ReportFormSection({
   editable,
   done,
   onSubmitted,
+  snapshot,
 }: {
   definition:  StructuredResponseDefinition;
   taskId:      string;
   editable:    boolean;        // assignee may edit + submit; others read-only
   done:        boolean;        // task already complete (approved)
   onSubmitted: () => void;     // parent flips task state + navigates back
+  /** Durable definition snapshot to persist on submit (goal-update tasks). Undefined for
+   *  ordinary questionnaires → upsert behaves exactly as before. */
+  snapshot?:   unknown;
 }) {
   const [answers, setAnswers]       = useState<StructuredAnswerMap>({});
   const [submitting, setSubmitting] = useState(false);
@@ -826,7 +835,7 @@ function ReportFormSection({
     }
     setError(null);
     setSubmitting(true);
-    const ok = await upsertTaskReportSubmission(taskId, definition.id, answers);
+    const ok = await upsertTaskReportSubmission(taskId, definition.id, answers, snapshot);
     setSubmitting(false);
     if (!ok) { setError('Couldn’t submit your response. Please try again.'); return; }
     onSubmitted();
@@ -1006,6 +1015,12 @@ export default function TaskDetailScreen() {
   // True when the goal fetch FAILED (vs. the role genuinely having no goals). Drives a
   // warning so an officer doesn't submit a check-in-only form thinking they have no goals.
   const [goalUpdateError,   setGoalUpdateError  ] = useState(false);
+  // The snapshot to PERSIST on submit (built from the reconstructed def + goals). Null once
+  // a stored snapshot already backs the view (already submitted) or for ordinary tasks.
+  const [goalUpdateSnapshot,     setGoalUpdateSnapshot    ] = useState<GoalUpdateSnapshot | null>(null);
+  // True when the rendered form came from a STORED snapshot (history-accurate) rather than
+  // live reconstruction — drives the "from the saved snapshot" read-view copy.
+  const [goalUpdateFromSnapshot, setGoalUpdateFromSnapshot] = useState(false);
 
   // Real flag-on persistence mode (the alpha): proof submissions go through the
   // RPC-backed task_submissions primitive. Flag-off sandbox stays in-memory.
@@ -1056,14 +1071,34 @@ export default function TaskDetailScreen() {
   const reportDefId = task?.reportDefinitionId;
   const isGoalUpdateTask = isGoalUpdateDefinitionId(reportDefId);
   const assignedRole = task?.assignedRole;
+  const taskIdForEffect = task?.id;
   useEffect(() => {
-    if (!isGoalUpdateTask || !reportDefId) { setGoalUpdateDef(null); setGoalUpdateError(false); return; }
+    if (!isGoalUpdateTask || !reportDefId) {
+      setGoalUpdateDef(null); setGoalUpdateError(false);
+      setGoalUpdateSnapshot(null); setGoalUpdateFromSnapshot(false);
+      return;
+    }
     const parsed = parseGoalUpdateId(reportDefId);
     const targetRole = parsed?.role ?? assignedRole;
     let cancelled = false;
     setGoalUpdateLoading(true);
     setGoalUpdateError(false);
     (async () => {
+      // 1) Prefer a DURABLE snapshot stored at submit time → render the form exactly as
+      //    it was answered (history-accurate), with no dependence on current goals.
+      const submission = taskIdForEffect ? await getTaskReportSubmission(taskIdForEffect) : null;
+      if (cancelled) return;
+      const snapDef = definitionFromSnapshot(submission?.definitionSnapshot);
+      if (snapDef) {
+        setGoalUpdateDef(snapDef);
+        setGoalUpdateFromSnapshot(true);
+        setGoalUpdateSnapshot(null);          // already persisted — nothing to send
+        setGoalUpdateError(false);
+        setGoalUpdateLoading(false);
+        return;
+      }
+      // 2) No stored snapshot (pre-submit, or a pre-snapshot submission) → reconstruct from
+      //    CURRENT goals, and build a snapshot to persist when this update is submitted.
       const canSeeOrgGoals = isLeadershipRole(role) || role === 'annotator';
       let res: GoalListResult;
       if (!pushOrgId) res = { ok: true, goals: [] };
@@ -1071,20 +1106,24 @@ export default function TaskDetailScreen() {
       else res = await listMyGoalsResult(pushOrgId);
       if (cancelled) return;
       const goals = res.goals.filter(g => g.status === 'active' && g.ownerRole === targetRole);
-      // Always reconstruct (≥ the check-in) so the task is never "broken"; flag the
-      // error so the UI can warn that goals may be missing from the form.
-      setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, goals));
+      const def = reconstructGoalUpdateDefinition(reportDefId, goals);
+      setGoalUpdateDef(def);
+      setGoalUpdateFromSnapshot(false);
+      setGoalUpdateSnapshot(def ? buildGoalUpdateSnapshot(def, goals) : null);
       setGoalUpdateError(!res.ok);
       setGoalUpdateLoading(false);
     })().catch(() => {
       if (!cancelled) {
-        setGoalUpdateDef(reconstructGoalUpdateDefinition(reportDefId, []));
+        const def = reconstructGoalUpdateDefinition(reportDefId, []);
+        setGoalUpdateDef(def);
+        setGoalUpdateFromSnapshot(false);
+        setGoalUpdateSnapshot(def ? buildGoalUpdateSnapshot(def, []) : null);
         setGoalUpdateError(true);
         setGoalUpdateLoading(false);
       }
     });
     return () => { cancelled = true; };
-  }, [isGoalUpdateTask, reportDefId, assignedRole, role, pushOrgId]);
+  }, [isGoalUpdateTask, reportDefId, assignedRole, role, pushOrgId, taskIdForEffect]);
 
   function setTaskState(s: TaskState) {
     _setTaskState(s);
@@ -1466,13 +1505,27 @@ export default function TaskDetailScreen() {
         )}
 
         {/* ── Goal fetch failed: warn before the (check-in-only) form ── */}
-        {isGoalUpdateTask && showReport && reportDef && goalUpdateError && (
+        {isGoalUpdateTask && showReport && reportDef && goalUpdateError && !goalUpdateFromSnapshot && (
           <>
             <Divider />
             <View style={s.reportUnavailable}>
               <Text style={s.reportUnavailableText}>
                 ⚠️ Couldn’t load your goals, so the form below may be missing them. Pull to refresh
                 and reopen this task before submitting, so your goal updates are included.
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* ── Snapshot-backed read: this is the update as it was submitted ── */}
+        {isGoalUpdateTask && showReport && reportDef && goalUpdateFromSnapshot && (
+          <>
+            <Divider />
+            <SLabel text="WEEKLY GOAL UPDATE" />
+            <View style={s.reportUnavailable}>
+              <Text style={s.reportUnavailableText}>
+                📌 Showing this weekly goal update as it was submitted — the goals and questions below
+                are from the saved snapshot for that week, not later edits to the goals.
               </Text>
             </View>
           </>
@@ -1487,6 +1540,7 @@ export default function TaskDetailScreen() {
               taskId={task.id}
               editable={isAssignee && !windowLocked}
               done={taskState === 'approved'}
+              snapshot={goalUpdateSnapshot ?? undefined}
               onSubmitted={() => {
                 // Report submitted → mark the task complete (approved = done per
                 // isTaskCompleted; reports have no review gate), then return. The

@@ -26,6 +26,14 @@ export interface ReportSubmission {
   taskId:        string;
   definitionId:  string;
   answers:       StructuredAnswerMap;
+  /**
+   * Durable definition snapshot stored at submit time (jsonb), or null. For goal-update
+   * tasks this is a lib/goalUpdateSnapshot.GoalUpdateSnapshot — when present, readers
+   * render the historical form from it instead of reconstructing from current goals.
+   * Raw/unparsed (validate with isGoalUpdateSnapshot before use). Null for older
+   * submissions / ordinary questionnaires.
+   */
+  definitionSnapshot: unknown;
   submittedRole: string;
   submittedAt:   string;
   updatedAt:     string;
@@ -43,15 +51,21 @@ export async function upsertTaskReportSubmission(
   taskId: string,
   definitionId: string,
   answers: StructuredAnswerMap,
+  definitionSnapshot?: unknown,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
   if (!taskId || !definitionId) return false;
   try {
-    const { error } = await supabase.rpc('upsert_task_report_submission', {
+    // The applied RPC takes an optional 4th param (p_definition_snapshot default null).
+    // Omit the key when there's no snapshot so the call is identical to the old behavior
+    // (ordinary questionnaires, or pre-snapshot clients) — backward-compatible.
+    const params: Record<string, unknown> = {
       p_task_id:       taskId,
       p_definition_id: definitionId,
       p_answers:       answers ?? {},
-    });
+    };
+    if (definitionSnapshot != null) params.p_definition_snapshot = definitionSnapshot;
+    const { error } = await supabase.rpc('upsert_task_report_submission', params);
     if (error) {
       console.warn('[reportSubmissionService] upsert error:', error.message);
       return false;
@@ -80,12 +94,13 @@ export async function getTaskReportSubmission(taskId: string): Promise<ReportSub
     }
     const row = (Array.isArray(data) ? data[0] : data) as
       | {
-          task_id?:        string | null;
-          definition_id?:  string | null;
-          answers?:        unknown;
-          submitted_role?: string | null;
-          submitted_at?:   string | null;
-          updated_at?:     string | null;
+          task_id?:             string | null;
+          definition_id?:       string | null;
+          answers?:             unknown;
+          definition_snapshot?: unknown;
+          submitted_role?:      string | null;
+          submitted_at?:        string | null;
+          updated_at?:          string | null;
         }
       | undefined;
     if (!row) return null;
@@ -96,6 +111,8 @@ export async function getTaskReportSubmission(taskId: string): Promise<ReportSub
       answers:       (row.answers && typeof row.answers === 'object'
                         ? (row.answers as StructuredAnswerMap)
                         : {}),
+      // Raw snapshot value (or null/undefined). Column absent on a pre-patch read → undefined.
+      definitionSnapshot: row.definition_snapshot ?? null,
       submittedRole: row.submitted_role ?? '',
       submittedAt:   row.submitted_at ?? '',
       updatedAt:     row.updated_at ?? '',

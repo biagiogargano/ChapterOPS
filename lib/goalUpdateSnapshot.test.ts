@@ -8,6 +8,7 @@ import {
   buildGoalUpdateSnapshot, isGoalUpdateSnapshot, definitionFromSnapshot, goalTitleFromSnapshot,
 } from './goalUpdateSnapshot';
 import { buildGoalUpdateDefinition } from './goalUpdateDefinition';
+import { pickGoalUpdateDefinition, goalUpdateDefinitionId } from './goalUpdateGeneration';
 import type { StructuredResponseDefinition } from './structuredResponses';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
@@ -90,6 +91,30 @@ const def = buildGoalUpdateDefinition({ goals, id: 'goalupddef_social_chair__202
   const snap = buildGoalUpdateSnapshot(ciDef, []);
   check('check-in-only snapshot valid', isGoalUpdateSnapshot(snap) && snap.goals.length === 0);
   check('check-in-only keeps the 4 check-in questions', snap.definition.questions.length === 4);
+}
+
+// ── pickGoalUpdateDefinition: snapshot preferred, reconstruction fallback ──────
+{
+  const id = goalUpdateDefinitionId('social_chair', '2026-W22');
+  const liveGoals = [{ id: 'g9', title: 'A live goal' }];
+  const snap = buildGoalUpdateSnapshot(def, goals);   // def is the W22 social_chair def, 2 goals
+
+  // With a valid snapshot → returns the snapshot's definition (history), NOT current goals.
+  const picked = pickGoalUpdateDefinition(snap, id, liveGoals)!;
+  check('pick prefers the snapshot definition', picked.id === def.id && picked.questions.length === def.questions.length);
+  // It must reflect the SNAPSHOT goals (g1,g2), not the live goal (g9).
+  check('pick uses snapshot goals not live goals', picked.questions.some(q => q.key.startsWith('goal_g1_')) && !picked.questions.some(q => q.key.startsWith('goal_g9_')));
+
+  // No snapshot → reconstruct from the supplied current goals.
+  const reconstructed = pickGoalUpdateDefinition(null, id, liveGoals)!;
+  check('pick reconstructs when no snapshot', reconstructed.questions.some(q => q.key.startsWith('goal_g9_')));
+
+  // Invalid snapshot value → fall back to reconstruction.
+  const fallback = pickGoalUpdateDefinition({ bogus: true }, id, liveGoals)!;
+  check('pick falls back on invalid snapshot', fallback.questions.some(q => q.key.startsWith('goal_g9_')));
+
+  // Non-goal-update id and no snapshot → null.
+  check('pick → null for non-goal-update id + no snapshot', pickGoalUpdateDefinition(null, 'weekly_officer_report', []) === null);
 }
 
 console.log(`\ngoalUpdateSnapshot.test: ${passed} passed, ${failed} failed`);

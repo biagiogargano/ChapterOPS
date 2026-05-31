@@ -31,6 +31,7 @@ import { buildGoalUpdateDefinition } from './goalUpdateDefinition';
 import { deriveDueMeta, deriveVisibleTo, type MockTask } from './mockTasks';
 import { ROLE_LABELS, type Role } from './roles';
 import { isRuntimeRoleKey } from './rolePackRuntime';
+import { definitionFromSnapshot } from './goalUpdateSnapshot';
 import type { StructuredResponseDefinition } from './structuredResponses';
 import type { Goal } from './goals';
 
@@ -107,6 +108,21 @@ export function reconstructGoalUpdateDefinition(
     label: goalUpdateDefinitionLabel(parsed.role),
     includeCheckIn: true,
   });
+}
+
+/**
+ * Choose the definition to RENDER for a goal-update task, preferring a durable snapshot
+ * (the form as actually submitted) over live reconstruction from current goals. Pure:
+ *   • a valid snapshot value (lib/goalUpdateSnapshot) → its stored definition (history-accurate);
+ *   • otherwise → reconstruct from the supplied current goals (live, pre-submit or pre-snapshot).
+ * Returns null only when neither yields a definition (e.g. a non-goal-update id and no snapshot).
+ */
+export function pickGoalUpdateDefinition(
+  snapshotValue: unknown,
+  definitionId: string,
+  goals: Pick<Goal, 'id' | 'title'>[],
+): StructuredResponseDefinition | null {
+  return definitionFromSnapshot(snapshotValue) ?? reconstructGoalUpdateDefinition(definitionId, goals);
 }
 
 /** A fixed title/description for the weekly goal-update task. Pure. */
