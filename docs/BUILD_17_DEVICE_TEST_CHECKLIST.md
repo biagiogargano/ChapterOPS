@@ -217,6 +217,18 @@ real document via `agenda_documents`. No fake save.
       agenda document"** → it persists and the banner flips to **"Saved agenda"**. The
       **Goals Needing Attention** section appears if any active goal is not-started / needs
       a target / ready-to-complete.
+- [ ] **Update-derived sections (NEW):** first, have ≥1 officer **submit a weekly goal
+      update** (this week) whose **"Announcements"** and/or **"Blockers / help needed"**
+      answers have text (and a per-goal "need help"). Then **generate** the agenda → the saved
+      doc shows a **HELP NEEDED** and/or **ANNOUNCEMENTS** section with those lines, each
+      attributed to the officer's role (e.g. "— Social Chair"). "No update"/blank answers
+      contribute nothing.
+- [ ] **Saves with no submissions:** with **no** weekly-update submissions for the week,
+      generate → the agenda still **saves** and simply has **no** Help Needed / Announcements
+      sections (honest omission, no empty placeholders, no error).
+- [ ] **Regenerate updates sections:** submit/another update with a new announcement →
+      **Regenerate from current** → the agenda's Announcements/Help-Needed reflect the latest
+      submissions.
 - [ ] **Member view:** on a **non-leadership** account, open the same meeting's agenda →
       the **saved** document renders read-only (no Save/Finalize buttons).
 - [ ] **Edit (NEW):** as leadership, tap **"Edit agenda"** → an **"Editing agenda"** banner
@@ -240,10 +252,13 @@ real document via `agenda_documents`. No fake save.
 - [ ] **No push:** generating / editing / finalizing an agenda fires **no** push.
 
 **Known agenda limitations (expected):**
-- **Announcements / Help-needed sections are not populated yet** — they need the
-  list-submissions-for-cycle RPC (**DRAFT, unapplied** —
-  `supabase/list_submissions_for_org_cycle_patch_draft.sql`). The client wrapper + pure
-  extraction are ready; until applied, those sections are honestly omitted (never faked).
+- **Update-derived sections use the CURRENT weekly period** (when leadership generates), not
+  a meeting-anchored week. If the meeting is for a different week than "now", the
+  Announcements/Help-Needed reflect this week's submissions. (Calendar-anchored per-meeting
+  cycles are a later decision.)
+- **Help-Needed / Announcements come only from snapshot-backed submissions** — updates
+  submitted before snapshot persistence shipped contribute nothing (they have no stored
+  definition to attribute questions). New submissions are fine.
 
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only

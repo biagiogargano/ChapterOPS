@@ -1,8 +1,7 @@
 # Agenda Persistence Plan (editable meeting agenda)
 
-Status: **SQL APPLIED + WIRED (generate / view / inline edit / finalize).**
-Update-derived sections (announcements/help-needed) drafted but unapplied. Governed by
-`docs/MASTER_ROADMAP.md` (Phase E).
+Status: **SQL APPLIED + WIRED (generate / view / inline edit / finalize +
+update-derived Help-Needed/Announcements).** Governed by `docs/MASTER_ROADMAP.md` (Phase E).
 
 **Implemented:**
 - `lib/agendaDocumentService.ts` — fallback-safe get/upsert/finalize wrappers (11 tests).
@@ -15,14 +14,17 @@ Update-derived sections (announcements/help-needed) drafted but unapplied. Gover
 - Goals-needing-attention folded in at generate time (leadership reads goals; members see it
   via the saved doc).
 
-**Read path APPLIED — wiring is the next step:**
-- **Announcements / help-needed sections** — `list_submissions_for_org_cycle` is **APPLIED**
-  (2026-05-30). Client wrapper `reportSubmissionService.listSubmissionsForOrgCycle` + pure
-  composer `agendaUpdateContributions.agendaContributionsFromSubmissions` are ready + tested.
-  **Next (no longer gated):** at agenda generate (leadership), `listSubmissionsForOrgCycle(org,
-  period)` → `agendaContributionsFromSubmissions(...)` → pass `contributions` to
-  `assembleAgendaDocument`. Fail-safe: an empty/failed list just omits the sections.
-- **Minutes / versioning** — still out of scope; `finalized_at` is the baseline hook.
+**Implemented (continued):**
+- **Announcements / help-needed sections** — WIRED. `list_submissions_for_org_cycle` applied
+  (2026-05-30); agenda generate/regenerate calls `listSubmissionsForOrgCycle(org,
+  weeklyGoalUpdatePeriodKey(now))` → `agendaContributionsFromSubmissions(...)` →
+  `assembleAgendaDocument`. Fail-safe: empty/failed list omits the sections; only
+  snapshot-backed submissions contribute; role-attributed.
+
+**Deferred:**
+- **Meeting-anchored cycle** — update-derived sections currently use the current weekly period
+  (when generated), not the meeting's week. A calendar-anchored decision is future work.
+- **Minutes / versioning** — out of scope; `finalized_at` is the baseline hook.
 
 ## Problem
 The meeting agenda is read-only and derived live (`lib/buildAgenda` from events+tasks;
