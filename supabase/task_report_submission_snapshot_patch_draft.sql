@@ -1,8 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- DRAFT (UNAPPLIED) · task_report_submissions · definition_snapshot column
+-- task_report_submissions · definition_snapshot column
 --
---   ⛔ NOT APPLIED. Draft only — do NOT run via CLI. Apply later via the Dashboard
---      SQL Editor on explicit approval, then run the VERIFICATION block.
+--   ✅ APPLIED to the alpha Supabase project (2026-05-30) via the Dashboard SQL Editor,
+--      verified: column present (jsonb, nullable), snapshot-object CHECK validated, exactly
+--      one overload each (upsert 4-arg, get 1-arg, both SECURITY DEFINER), existing
+--      submissions preserved (with_snapshot=0), table still has NO anon/authenticated grant.
+--      Backward-compatible with the deployed app (named-arg RPC + default param + ignored
+--      extra return column), so it is INERT until the client snapshot write/read is wired.
 --
 -- WHY:
 --   A goal-update task's questionnaire definition is RECONSTRUCTED at render time from

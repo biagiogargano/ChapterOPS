@@ -97,9 +97,19 @@ base goal-update round-trip first.
   RLS + definer RPCs; edit=leadership/annotator, view=any member, finalize lock). Plan:
   `docs/AGENDA_PERSISTENCE_PLAN.md`. No editor until applied + read path verified.
 
-**Drafted SQL awaiting approval (do NOT apply without explicit greenlight):**
-1. `task_report_submission_snapshot_patch_draft.sql` — goal-update history.
-2. `agenda_documents_patch_draft.sql` — editable meeting agenda.
+**SQL — ✅ BOTH APPLIED + verified on alpha (2026-05-30):**
+1. `task_report_submission_snapshot_patch_draft.sql` — `definition_snapshot` column +
+   4-arg upsert / snapshot-returning get. Backward-compatible; inert until the client
+   snapshot write/read is wired. → goal-update history.
+2. `agenda_documents_patch_draft.sql` — `agenda_documents` table + 3 definer RPCs (RLS on,
+   0 policies, no client grant). Inert until the agenda editor/read path is wired. →
+   editable meeting agenda.
+
+**Now UNBLOCKED to wire (no longer SQL-gated; still respect device-verify of the base flow):**
+- **Goal-update snapshot write/read** — at submit, pass `buildGoalUpdateSnapshot(...)` to the
+  (now 4-arg) upsert; on read, prefer `definitionFromSnapshot(...)` over live reconstruction.
+- **Editable agenda** — wire `agendaDocument` ↔ the new `get/upsert/finalize_agenda_document`
+  RPCs behind a leadership editor on meeting Event Detail.
 
 ---
 

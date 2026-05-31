@@ -1,8 +1,11 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- DRAFT (UNAPPLIED) · agenda_documents (editable meeting-agenda persistence)
+-- agenda_documents (editable meeting-agenda persistence)
 --
---   ⛔ NOT APPLIED. Draft only — do NOT run via CLI. Apply later via the Dashboard
---      SQL Editor on explicit approval, then run the VERIFICATION block.
+--   ✅ APPLIED to the alpha Supabase project (2026-05-30) via the Dashboard SQL Editor,
+--      verified: RLS on + 0 policies, 3 RPCs SECURITY DEFINER, table has NO
+--      anon/authenticated grant (only postgres/service_role), indexes present
+--      (agenda_documents_event_uidx unique-per-event + agenda_documents_org_idx).
+--      INERT for users until the agenda editor/read path is wired (a later step).
 --
 -- WHY:
 --   The meeting agenda is currently READ-ONLY and derived live (lib/buildAgenda from
