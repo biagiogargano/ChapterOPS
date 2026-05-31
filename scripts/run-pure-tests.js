@@ -27,7 +27,7 @@ const EXPECTED = [
   'buildAgenda', 'claimStatus', 'customTemplatesStore', 'eventOps', 'eventTaskPermissions',
   'genericEventTemplates',
   'eventTemplates', 'generatedTasks', 'identityResolution', 'initRoute', 'mockTasks',
-  'goalHelpers', 'goalService', 'goalUpdateDefinition', 'goalUpdateGeneration', 'goalUpdateRun', 'goalUpdateSnapshot',
+  'goalHelpers', 'goalService', 'goalUpdateDefinition', 'goalUpdateGeneration', 'goalUpdateReview', 'goalUpdateRun', 'goalUpdateSnapshot',
   'orgLevels', 'orgPreference', 'orgScope', 'positions', 'questionnaireCycle',
   'questionnaireGenerationFlow', 'questionnaireGenerationPlan', 'questionnaireTemplates',
   'reportDefinitions', 'rolePackRuntime', 'starterPacks', 'starterPackValidation',
