@@ -6,6 +6,8 @@
 import {
   AGENDA_DOCUMENT_VERSION, AGENDA_SECTION_DEFS,
   assembleAgendaDocument, isAgendaDocumentEmpty,
+  setSectionTitle, setItemText, addManualItem, removeItem,
+  withAllCanonicalSections, pruneEmptySections,
 } from './agendaDocument';
 import type { Agenda } from './buildAgenda';
 import type { AgendaGoalItem } from './agendaGoals';
@@ -84,6 +86,62 @@ const contributions: GroupedAgendaContributions = {
   const doc = assembleAgendaDocument({ agenda: fullAgenda, goalsNeedingAttention: goalsAttn, contributions });
   const round = JSON.parse(JSON.stringify(doc));
   check('document JSON round-trips', JSON.stringify(round) === JSON.stringify(doc));
+}
+
+// ── editing helpers: immutable, no-throw, deterministic ───────────────────────
+{
+  const base = assembleAgendaDocument({ agenda: fullAgenda });   // all canonical sections, some populated
+
+  // setSectionTitle
+  const t = setSectionTitle(base, 'old_business', 'Carried Over');
+  check('setSectionTitle changes the title', t.sections.find(s => s.key === 'old_business')!.title === 'Carried Over');
+  check('setSectionTitle is immutable', base.sections.find(s => s.key === 'old_business')!.title === 'Old Business');
+  check('setSectionTitle unknown key → no-op', setSectionTitle(base, 'nope', 'x').sections.length === base.sections.length);
+
+  // setItemText
+  const firstId = base.sections.find(s => s.key === 'old_business')!.items[0].id;
+  const e = setItemText(base, 'old_business', firstId, 'Edited line');
+  check('setItemText edits the item', e.sections.find(s => s.key === 'old_business')!.items[0].text === 'Edited line');
+  check('setItemText immutable', base.sections.find(s => s.key === 'old_business')!.items[0].text === 'Mixer');
+  check('setItemText unknown item → unchanged', setItemText(base, 'old_business', 'zzz', 'x').sections.find(s => s.key === 'old_business')!.items[0].text === 'Mixer');
+
+  // addManualItem — deterministic note ids, survive removal
+  let d = addManualItem(base, 'announcements', 'Bring dues');
+  let ann = d.sections.find(s => s.key === 'announcements')!;
+  check('addManualItem appends a note', ann.items[ann.items.length - 1].text === 'Bring dues' && ann.items[ann.items.length - 1].kind === 'note');
+  check('first note id is announcements:note:1', ann.items.some(i => i.id === 'announcements:note:1'));
+  d = addManualItem(d, 'announcements', 'Second note');
+  ann = d.sections.find(s => s.key === 'announcements')!;
+  check('second note id is announcements:note:2', ann.items.some(i => i.id === 'announcements:note:2'));
+  // Remove note 1, add again → next id is 3 (max+1), no collision.
+  d = removeItem(d, 'announcements', 'announcements:note:1');
+  d = addManualItem(d, 'announcements', 'Third note');
+  ann = d.sections.find(s => s.key === 'announcements')!;
+  check('post-removal note id avoids collision (note:3)', ann.items.some(i => i.id === 'announcements:note:3') && !ann.items.some(i => i.id === 'announcements:note:1'));
+
+  // removeItem
+  const r = removeItem(base, 'open_tasks', base.sections.find(s => s.key === 'open_tasks')!.items[0].id);
+  check('removeItem drops the item', r.sections.find(s => s.key === 'open_tasks')!.items.length === 0);
+}
+
+// ── withAllCanonicalSections / pruneEmptySections ─────────────────────────────
+{
+  const sparse = assembleAgendaDocument({ agenda: fullAgenda, includeEmpty: false });   // only populated sections
+  const full = withAllCanonicalSections(sparse);
+  check('withAllCanonicalSections adds every canonical section', full.sections.length === AGENDA_SECTION_DEFS.length);
+  check('withAllCanonicalSections preserves existing content', full.sections.find(s => s.key === 'old_business')!.items[0].text === 'Mixer');
+
+  // Prune: empty + default-title sections dropped; renamed-empty kept; blank items removed.
+  let doc = withAllCanonicalSections(assembleAgendaDocument({ agenda: emptyAgenda }));   // all empty
+  doc = addManualItem(doc, 'announcements', '  Real note  ');
+  doc = addManualItem(doc, 'help_needed', '   ');                 // whitespace-only → dropped on prune
+  doc = setSectionTitle(doc, 'new_business', 'Kept Empty');        // renamed empty → kept
+  const pruned = pruneEmptySections(doc);
+  check('prune keeps a section with a real item', pruned.sections.some(s => s.key === 'announcements' && s.items[0].text === 'Real note'));
+  check('prune trims item text', pruned.sections.find(s => s.key === 'announcements')!.items[0].text === 'Real note');
+  check('prune drops whitespace-only items', !pruned.sections.some(s => s.key === 'help_needed' && s.items.length > 0));
+  check('prune drops empty default-title sections', !pruned.sections.some(s => s.key === 'old_business'));
+  check('prune keeps renamed empty section', pruned.sections.some(s => s.key === 'new_business' && s.title === 'Kept Empty'));
 }
 
 console.log(`\nagendaDocument.test: ${passed} passed, ${failed} failed`);

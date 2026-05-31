@@ -113,3 +113,87 @@ export function assembleAgendaDocument(input: AssembleAgendaInput): AgendaDocume
 export function isAgendaDocumentEmpty(doc: AgendaDocument): boolean {
   return doc.sections.every(s => s.items.length === 0);
 }
+
+// ─── Editing (pure, immutable) ────────────────────────────────────────────────
+// Each helper returns a NEW AgendaDocument (no mutation), so the editor can hold a draft
+// and persist it verbatim via agendaDocumentService.upsertAgendaDocument. Unknown
+// section/item keys are no-ops (never throw).
+
+/** Apply a transform to one section (by key), returning a new document. Pure. */
+function mapSection(
+  doc: AgendaDocument,
+  sectionKey: string,
+  fn: (sec: AgendaDocSection) => AgendaDocSection,
+): AgendaDocument {
+  return { ...doc, sections: doc.sections.map(sec => (sec.key === sectionKey ? fn(sec) : sec)) };
+}
+
+/** Set a section's display title. Pure. */
+export function setSectionTitle(doc: AgendaDocument, sectionKey: string, title: string): AgendaDocument {
+  return mapSection(doc, sectionKey, sec => ({ ...sec, title }));
+}
+
+/** Set one item's text. Pure (kept verbatim — caller trims on save if desired). */
+export function setItemText(doc: AgendaDocument, sectionKey: string, itemId: string, text: string): AgendaDocument {
+  return mapSection(doc, sectionKey, sec => ({
+    ...sec,
+    items: sec.items.map(it => (it.id === itemId ? { ...it, text } : it)),
+  }));
+}
+
+/**
+ * Append a manual 'note' item to a section. Its id is deterministic within the section
+ * (`<sectionKey>:note:<n>`, n = max existing note index + 1), so ids stay stable/unique
+ * across removals. Pure.
+ */
+export function addManualItem(doc: AgendaDocument, sectionKey: string, text: string): AgendaDocument {
+  return mapSection(doc, sectionKey, sec => {
+    let max = 0;
+    for (const it of sec.items) {
+      const m = /:note:(\d+)$/.exec(it.id);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    const item: AgendaDocItem = { id: `${sectionKey}:note:${max + 1}`, text, kind: 'note' };
+    return { ...sec, items: [...sec.items, item] };
+  });
+}
+
+/** Remove an item from a section. Pure. */
+export function removeItem(doc: AgendaDocument, sectionKey: string, itemId: string): AgendaDocument {
+  return mapSection(doc, sectionKey, sec => ({
+    ...sec,
+    items: sec.items.filter(it => it.id !== itemId),
+  }));
+}
+
+/**
+ * Ensure every canonical section is present (empty if missing), preserving existing order
+ * + content, so an editor can add notes to any section. New canonical sections are appended
+ * in AGENDA_SECTION_DEFS order. Pure.
+ */
+export function withAllCanonicalSections(doc: AgendaDocument): AgendaDocument {
+  const present = new Set(doc.sections.map(s => s.key));
+  const added: AgendaDocSection[] = AGENDA_SECTION_DEFS
+    .filter(d => !present.has(d.key))
+    .map(d => ({ key: d.key, title: d.title, items: [] }));
+  return { ...doc, sections: [...doc.sections, ...added] };
+}
+
+/**
+ * Drop sections with no items AND a still-default title (so a renamed-but-empty section the
+ * user intentionally kept survives, while untouched empties are pruned). Trims item text and
+ * removes items left blank. Pure — use on SAVE to keep the stored doc clean.
+ */
+export function pruneEmptySections(doc: AgendaDocument): AgendaDocument {
+  const defaultTitle: Record<string, string> = Object.fromEntries(AGENDA_SECTION_DEFS.map(d => [d.key, d.title]));
+  const sections: AgendaDocSection[] = [];
+  for (const sec of doc.sections) {
+    const items = sec.items
+      .map(it => ({ ...it, text: it.text.trim() }))
+      .filter(it => it.text.length > 0);
+    const titleChanged = sec.title.trim() !== (defaultTitle[sec.key] ?? '');
+    if (items.length === 0 && !titleChanged) continue;
+    sections.push({ ...sec, items });
+  }
+  return { ...doc, sections };
+}

@@ -25,7 +25,12 @@
  */
 
 import { buildAgenda } from '@/lib/buildAgenda';
-import { assembleAgendaDocument, type AgendaDocItem, type AgendaDocSection } from '@/lib/agendaDocument';
+import {
+  assembleAgendaDocument,
+  setSectionTitle, setItemText, addManualItem, removeItem,
+  withAllCanonicalSections, pruneEmptySections,
+  type AgendaDocument, type AgendaDocItem, type AgendaDocSection,
+} from '@/lib/agendaDocument';
 import {
   getAgendaDocument, upsertAgendaDocument, finalizeAgendaDocument, type AgendaReadResult,
 } from '@/lib/agendaDocumentService';
@@ -41,7 +46,7 @@ import { useDevRole } from '@/lib/devRoleStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const HTTP_RE = /^https?:\/\//i;
 
@@ -66,6 +71,9 @@ export default function AgendaScreen() {
   const [loadingDoc, setLoadingDoc] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Inline editing: a local working copy of the saved AgendaDocument. Persisted only on Save.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<AgendaDocument | null>(null);
 
   const loadDoc = useCallback(async () => {
     if (!eventId) { setLoadingDoc(false); return; }
@@ -155,6 +163,36 @@ export default function AgendaScreen() {
     else await loadDoc();
   }
 
+  // ── Inline editing (leadership; unfinalized saved doc) ──
+  function startEdit() {
+    if (!savedDoc) return;
+    setActionError(null);
+    // Show every canonical section so notes can be added anywhere; empties pruned on save.
+    setDraft(withAllCanonicalSections(savedDoc.sections));
+    setEditing(true);
+  }
+  function cancelEdit() {
+    setEditing(false);
+    setDraft(null);
+    setActionError(null);
+  }
+  async function saveEdit() {
+    if (busy || !draft) return;
+    setBusy(true); setActionError(null);
+    const cleaned = pruneEmptySections(draft);
+    const res = await upsertAgendaDocument({
+      eventId: event!.id,
+      title:   savedDoc?.title || `${event!.title} — Agenda`,
+      sections: cleaned,
+      generatedFrom: savedDoc?.generatedFrom ?? null,
+    });
+    setBusy(false);
+    if (!res.ok) { setActionError('Couldn’t save your edits. Please try again.'); return; }
+    setEditing(false);
+    setDraft(null);
+    await loadDoc();
+  }
+
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <Text style={s.title}>{event.title}</Text>
@@ -196,57 +234,109 @@ export default function AgendaScreen() {
         </Pressable>
       )}
 
-      {/* Sections (saved doc or preview) */}
-      {sections.length === 0 ? (
-        <View style={s.empty}>
-          <Text style={s.emptyIcon}>🗒️</Text>
-          <Text style={s.emptyTitle}>Nothing to put on the agenda yet</Text>
-          <Text style={s.emptyText}>This week’s events and open tasks will appear here as they’re added.</Text>
-        </View>
-      ) : (
-        sections.map((sec: AgendaDocSection) => (
-          <View key={sec.key} style={s.group}>
-            <Text style={s.groupLabel}>{sec.title.toUpperCase()}</Text>
-            {sec.items.map(it => {
-              const tappable = (it.kind === 'event' || it.kind === 'task') && !!it.refId || it.kind === 'goal';
-              return (
-                <Pressable
-                  key={it.id}
-                  style={s.item}
-                  onPress={() => openDocItem(it)}
-                  disabled={!tappable}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.itemTitle} numberOfLines={2}>{it.text}</Text>
-                    {!!it.meta && <Text style={s.itemMeta} numberOfLines={1}>{it.meta}</Text>}
-                  </View>
-                  {tappable && <Text style={s.chevron}>›</Text>}
-                </Pressable>
-              );
-            })}
-          </View>
-        ))
-      )}
+      {/* ── EDIT MODE: editable draft (leadership, unfinalized) ── */}
+      {editing && draft ? (
+        <>
+          {draft.sections.map((sec: AgendaDocSection) => (
+            <View key={sec.key} style={s.group}>
+              <TextInput
+                style={s.sectionTitleInput}
+                value={sec.title}
+                onChangeText={txt => setDraft(d => (d ? setSectionTitle(d, sec.key, txt) : d))}
+                placeholder="Section title"
+                placeholderTextColor="#475569"
+              />
+              {sec.items.map(it => (
+                <View key={it.id} style={s.editItemRow}>
+                  <TextInput
+                    style={s.editInput}
+                    value={it.text}
+                    onChangeText={txt => setDraft(d => (d ? setItemText(d, sec.key, it.id, txt) : d))}
+                    placeholder="Agenda line"
+                    placeholderTextColor="#475569"
+                    multiline
+                  />
+                  <Pressable style={s.removeBtn} onPress={() => setDraft(d => (d ? removeItem(d, sec.key, it.id) : d))}>
+                    <Text style={s.removeBtnText}>×</Text>
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable style={s.addItemBtn} onPress={() => setDraft(d => (d ? addManualItem(d, sec.key, '') : d))}>
+                <Text style={s.addItemText}>+ Add item</Text>
+              </Pressable>
+            </View>
+          ))}
 
-      {/* Leadership actions */}
-      {isLeader && !loadingDoc && !finalized && (
-        <View style={s.actions}>
-          <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={() => void generate()} disabled={busy}>
-            <Text style={s.actionBtnText}>
-              {busy ? 'Saving…' : savedDoc ? 'Regenerate from current' : 'Save agenda document'}
-            </Text>
-          </Pressable>
-          {savedDoc && (
-            <Pressable style={[s.actionBtnSecondary, busy && s.actionBtnDisabled]} onPress={() => void finalize()} disabled={busy}>
-              <Text style={s.actionBtnSecondaryText}>Finalize (lock)</Text>
+          <View style={s.actions}>
+            <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={() => void saveEdit()} disabled={busy}>
+              <Text style={s.actionBtnText}>{busy ? 'Saving…' : 'Save changes'}</Text>
             </Pressable>
+            <Pressable style={[s.actionBtnSecondary, busy && s.actionBtnDisabled]} onPress={cancelEdit} disabled={busy}>
+              <Text style={s.actionBtnSecondaryText}>Cancel</Text>
+            </Pressable>
+            {actionError && <Text style={s.actionError}>{actionError}</Text>}
+            <Text style={s.actionHint}>
+              Edit section titles and lines, add manual items, or remove lines. Empty lines/sections
+              are dropped on save. Changes are saved to the chapter’s agenda.
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          {/* Sections (saved doc or preview) — read-only */}
+          {sections.length === 0 ? (
+            <View style={s.empty}>
+              <Text style={s.emptyIcon}>🗒️</Text>
+              <Text style={s.emptyTitle}>Nothing to put on the agenda yet</Text>
+              <Text style={s.emptyText}>This week’s events and open tasks will appear here as they’re added.</Text>
+            </View>
+          ) : (
+            sections.map((sec: AgendaDocSection) => (
+              <View key={sec.key} style={s.group}>
+                <Text style={s.groupLabel}>{sec.title.toUpperCase()}</Text>
+                {sec.items.map(it => {
+                  const tappable = (it.kind === 'event' || it.kind === 'task') && !!it.refId || it.kind === 'goal';
+                  return (
+                    <Pressable key={it.id} style={s.item} onPress={() => openDocItem(it)} disabled={!tappable}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.itemTitle} numberOfLines={2}>{it.text}</Text>
+                        {!!it.meta && <Text style={s.itemMeta} numberOfLines={1}>{it.meta}</Text>}
+                      </View>
+                      {tappable && <Text style={s.chevron}>›</Text>}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))
           )}
-          {actionError && <Text style={s.actionError}>{actionError}</Text>}
-          <Text style={s.actionHint}>
-            Saving stores this agenda for the chapter. Regenerating overwrites it from the current
-            events/tasks. Finalizing locks it. (Inline text editing is coming next.)
-          </Text>
-        </View>
+
+          {/* Leadership actions */}
+          {isLeader && !loadingDoc && !finalized && (
+            <View style={s.actions}>
+              <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={() => void generate()} disabled={busy}>
+                <Text style={s.actionBtnText}>
+                  {busy ? 'Saving…' : savedDoc ? 'Regenerate from current' : 'Save agenda document'}
+                </Text>
+              </Pressable>
+              {savedDoc && (
+                <Pressable style={[s.actionBtnSecondary, busy && s.actionBtnDisabled]} onPress={startEdit} disabled={busy}>
+                  <Text style={s.actionBtnSecondaryText}>Edit agenda</Text>
+                </Pressable>
+              )}
+              {savedDoc && (
+                <Pressable style={[s.actionBtnSecondary, busy && s.actionBtnDisabled]} onPress={() => void finalize()} disabled={busy}>
+                  <Text style={s.actionBtnSecondaryText}>Finalize (lock)</Text>
+                </Pressable>
+              )}
+              {actionError && <Text style={s.actionError}>{actionError}</Text>}
+              <Text style={s.actionHint}>
+                {savedDoc
+                  ? 'Edit to hand-tune lines, Regenerate to rebuild from current events/tasks, or Finalize to lock.'
+                  : 'Save to store this agenda for the chapter.'}
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       <View style={{ height: 40 }} />
@@ -289,6 +379,14 @@ const s = StyleSheet.create({
 
   retryBtn:  { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   retryText: { fontSize: 12, color: '#e2e8f0', fontWeight: '600' },
+
+  sectionTitleInput: { fontSize: 11, fontWeight: '700', color: '#cbd5e1', letterSpacing: 0.8, marginBottom: 8, backgroundColor: '#1e293b', borderRadius: 8, borderWidth: 1, borderColor: '#334155', paddingHorizontal: 10, paddingVertical: 7 },
+  editItemRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 },
+  editInput:    { flex: 1, fontSize: 14, color: '#f1f5f9', backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingHorizontal: 12, paddingVertical: 9, minHeight: 40 },
+  removeBtn:    { width: 36, height: 40, borderRadius: 10, backgroundColor: '#1a0505', borderWidth: 1, borderColor: '#7f1d1d', alignItems: 'center', justifyContent: 'center' },
+  removeBtnText:{ fontSize: 20, color: '#fca5a5', lineHeight: 22 },
+  addItemBtn:   { paddingVertical: 8, paddingHorizontal: 4 },
+  addItemText:  { fontSize: 13, color: '#818cf8', fontWeight: '600' },
 
   empty:      { alignItems: 'center', paddingTop: 56, gap: 8 },
   emptyIcon:  { fontSize: 30 },
