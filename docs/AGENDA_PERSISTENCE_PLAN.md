@@ -13,6 +13,8 @@ update-derived Help-Needed/Announcements).** Governed by `docs/MASTER_ROADMAP.md
   tests). Edit mode persists via upsert; finalized/members read-only.
 - Goals-needing-attention folded in at generate time (leadership reads goals; members see it
   via the saved doc).
+- Finalizing emits an in-app, officer-bounded, **no-push** "Meeting agenda finalized" notice
+  (`emitAgendaFinalizedNotice`; entityType 'event'; excludes the finalizer).
 
 **Implemented (continued):**
 - **Announcements / help-needed sections** — WIRED. `list_submissions_for_org_cycle` applied

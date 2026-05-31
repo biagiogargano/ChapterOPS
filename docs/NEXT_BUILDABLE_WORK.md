@@ -73,29 +73,20 @@ Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-
   (see below). **Needs device verification** of the generate → submit → reload →
   leadership-read round-trip (a build), like the questionnaire round-trip.
 
-**Goals → updates → history → review → agenda — FOUNDATIONS BUILT (pure), apply/wire gated:**
-The next product layer now has pure, tested foundations + drafted (unapplied) SQL. Nothing
-is wired (no fake persistence); each is gated on a SQL apply and/or device-verifying the
-base goal-update round-trip first.
-- **Update history / snapshot** — `lib/goalUpdateSnapshot.ts` (26 tests): durable, versioned
-  snapshot of the form + goal context as submitted, so old updates render historically
-  instead of drifting against current goals. **DRAFT SQL:**
-  `supabase/task_report_submission_snapshot_patch_draft.sql` (adds optional
-  `definition_snapshot jsonb` + 4-arg upsert / snapshot-returning get; backward compatible).
-  Wiring waits for the apply.
-- **Leadership/Annotator review** — `lib/goalUpdateReview.ts` (22 tests): v1 model expressed
-  with the EXISTING task states (submitted=pending, approved=reviewed, rejected=changes),
-  **no schema**. Reviewer = Annotator primary + leadership. Wiring (generation sets
-  reviewerRole + requiresApproval; form submits to `submitted`; Task Detail reviewer
-  affordance for goal-update tasks) held until the base submit is device-verified.
-- **Agenda from updates/goals** — pure seams: `lib/agendaGoals.ts` (goals needing
-  attention, 21 tests) + `lib/agendaContributions.groupAgendaContributions` (announcements/
-  help-needed grouping). Read-only agenda is derivable from these once the screen fetches
-  goals + submissions (device-verify first); no new schema for the read path.
-- **Editable agenda persistence** — `lib/agendaDocument.ts` (model + assembler, 18 tests) +
-  **DRAFT SQL** `supabase/agenda_documents_patch_draft.sql` (one agenda per meeting event;
-  RLS + definer RPCs; edit=leadership/annotator, view=any member, finalize lock). Plan:
-  `docs/AGENDA_PERSISTENCE_PLAN.md`. No editor until applied + read path verified.
+**Goals → updates → history → review → agenda — MOSTLY WIRED (see detailed status below).**
+- **Update history / snapshot** — ✅ WIRED (SQL applied; submit persists a snapshot, read
+  prefers it). See the WIRED section below.
+- **Editable agenda + update-derived sections + Officer Priorities + agenda-finalized in-app
+  notice** — ✅ WIRED. See the WIRED section below.
+- **Leadership/Annotator review** — the one **NOT wired** piece. `lib/goalUpdateReview.ts`
+  (22 tests) + the read-only "submitted/awaiting review" copy are ready, but turning on a real
+  review GATE flips goal-update submit from auto-complete (→approved) to review-gated
+  (→submitted, reviewer approves). That is a **PRODUCT DECISION** (does a weekly update need
+  leadership sign-off to count as done?) + behavior change to an unverified flow — held. When
+  decided: generation sets `reviewerRole`='annotator' + `requiresApproval`; the form's
+  onSubmitted sets `submitted` (not `approved`, no push); Task Detail shows the reviewer
+  approve/reject affordance for goal-update tasks (drop the `!isReportTask` gate). No SQL,
+  no permission change, no push needed.
 
 **SQL — ✅ BOTH APPLIED + verified on alpha (2026-05-30):**
 1. `task_report_submission_snapshot_patch_draft.sql` — `definition_snapshot` column +
@@ -132,9 +123,19 @@ weeklyGoalUpdatePeriodKey(now))` → `agendaContributionsFromSubmissions` →
 failed read omits them honestly (never blocks save). (`app/agenda/[eventId].tsx`.) Known: uses
 the current weekly period (not meeting-anchored); only snapshot-backed submissions contribute.
 
+**✅ Officer Priorities section + agenda-finalized in-app notice — WIRED.** Generate also
+folds each officer's "priorities for next period" into an Officer Priorities section
+(`officerPriorityItems`). Finalizing emits an in-app, officer-bounded, **no-push**
+"Meeting agenda finalized" notice (`emitAgendaFinalizedNotice`, entityType 'event';
+store excludes the actor). (`app/agenda/[eventId].tsx`, `lib/updateNoticeStore.ts`.)
+
 **Still gated / next:**
-- **Leadership/Annotator review wiring** (`lib/goalUpdateReview.ts` ready) — held until the
-  base goal-update submit round-trip is device-verified.
+- **Leadership/Annotator review wiring** — held; it's a **product decision** (does a weekly
+  update need leadership sign-off to count as done?) + a behavior change to an unverified
+  flow. Model + read-copy are ready (`lib/goalUpdateReview.ts`); see the detailed gate above.
+- **Agenda announcements/help-needed from Weekly Officer Reports** (not just goal updates) —
+  the list RPC matches only `goalupdrole_*`; widening it is a separate SQL lane.
+- **Meeting-anchored agenda cycle** (vs current weekly) — a later product decision.
 
 ---
 

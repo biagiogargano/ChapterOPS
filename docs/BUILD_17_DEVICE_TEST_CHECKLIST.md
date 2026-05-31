@@ -242,9 +242,13 @@ real document via `agenda_documents`. No fake save.
 - [ ] **Regenerate confirm:** as leadership, tap **"Regenerate from current"** → a confirm
       dialog warns it **replaces the saved agenda including your edits**; **Cancel** keeps your
       edits; **Regenerate** rebuilds from current events/tasks/goals.
-- [ ] **Finalize (lock):** tap **"Finalize (lock)"** → green **"Finalized … read-only"**
-      banner; the Edit/Regenerate/Finalize buttons disappear; a further edit attempt is
-      refused by the server (`agenda_finalized`).
+- [ ] **Finalize (lock):** tap **"Finalize (lock)"** → green **"Finalized … official
+      baseline"** banner; the Edit/Regenerate/Finalize buttons disappear; a further edit
+      attempt is refused by the server (`agenda_finalized`).
+- [ ] **Finalize in-app notice (NEW; no push):** after finalizing, sign in as a **different
+      officer** → the **Notifications** screen shows **"Meeting agenda finalized: <meeting>"**
+      (taps to the event). The **finalizer** sees no such notice for themselves. **No push**
+      fires. A non-officer (Brother) does not get it.
 - [ ] **Member cannot edit:** on a non-leadership account, **no Edit/Regenerate/Finalize/Save**
       buttons appear — view only.
 - [ ] **Tap-through (read mode):** event/task agenda items open the event/task; goal items
@@ -296,10 +300,11 @@ real document via `agenda_documents`. No fake save.
   - [ ] **Dismiss** a notification (tap it) → it **disappears** from the list.
   - [ ] **Actor does NOT get their own notification** (e.g. the President who
         approved a task sees no "Task approved" notice for it).
-- [ ] **Goal-assigned in-app notice (in-app only, NO push):** the only non-task in-app
-      notice is "New goal assigned: <title>" (covered in §7). It must **not** fire a
-      push. No **event / RSVP / questionnaire / goal-update-generation** notifications
-      appear at all (in-app or push).
+- [ ] **In-app-only notices (NO push) — the complete set beyond the 4 task actions:**
+      **"New goal assigned: <title>"** (§7) and **"Meeting agenda finalized: <meeting>"**
+      (§7c, officer-bounded). Both are **in-app only** — they must **not** fire a push.
+      No **RSVP / questionnaire / goal-update-generation / all-member** notifications appear
+      at all (in-app or push).
 
 ---
 
