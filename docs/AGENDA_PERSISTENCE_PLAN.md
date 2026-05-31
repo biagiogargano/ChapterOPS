@@ -1,7 +1,22 @@
 # Agenda Persistence Plan (editable meeting agenda)
 
-Status: **DRAFT model + DRAFT SQL. Nothing applied, nothing wired.** Governed by
-`docs/MASTER_ROADMAP.md` (Phase E · Agendas/Meetings).
+Status: **SQL APPLIED + WIRED (generate / view / finalize).** Inline editing +
+update-derived sections deferred. Governed by `docs/MASTER_ROADMAP.md` (Phase E).
+
+**Implemented (commits `9e428f0`, `648b2e5`, `688926e`):**
+- `lib/agendaDocumentService.ts` — fallback-safe get/upsert/finalize wrappers (11 tests).
+- `app/agenda/[eventId].tsx` — load saved doc; leadership generate / regenerate / finalize;
+  members view; live preview when none saved; honest loading/error/empty; tap-through.
+- Goals-needing-attention folded in at generate time (leadership reads goals; members see it
+  via the saved doc).
+
+**Deferred (precise next steps):**
+- **Inline item/section editing** — the service stores an arbitrary `AgendaDocument`; a future
+  editor mutates sections/items and calls upsert. No new schema.
+- **Announcements / help-needed sections** — need a submissions-for-cycle read path (only a
+  per-task `get_task_report_submission` exists): a new `list_submissions_for_org_cycle` RPC
+  (cleanest, SQL gate) or per-task enumeration. Pure extraction is ready
+  (`extractAgendaContributions` + `groupAgendaContributions`).
 
 ## Problem
 The meeting agenda is read-only and derived live (`lib/buildAgenda` from events+tasks;

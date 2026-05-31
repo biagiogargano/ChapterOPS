@@ -105,11 +105,29 @@ base goal-update round-trip first.
    0 policies, no client grant). Inert until the agenda editor/read path is wired. →
    editable meeting agenda.
 
-**Now UNBLOCKED to wire (no longer SQL-gated; still respect device-verify of the base flow):**
-- **Goal-update snapshot write/read** — at submit, pass `buildGoalUpdateSnapshot(...)` to the
-  (now 4-arg) upsert; on read, prefer `definitionFromSnapshot(...)` over live reconstruction.
-- **Editable agenda** — wire `agendaDocument` ↔ the new `get/upsert/finalize_agenda_document`
-  RPCs behind a leadership editor on meeting Event Detail.
+**✅ WIRED (real persistence; needs device round-trip verification on the next build):**
+- **Goal-update snapshot write/read** — on submit, Task Detail builds
+  `buildGoalUpdateSnapshot(...)` and persists it via the 4-arg upsert; on read it prefers the
+  stored snapshot (`definitionFromSnapshot` / `pickGoalUpdateDefinition`) over live
+  reconstruction, with a "from the saved snapshot for that week" read note. Ordinary
+  questionnaires unchanged. (`reportSubmissionService.ts`, `goalUpdateGeneration.ts`,
+  `app/task/[id].tsx`.)
+- **Editable agenda document** — `lib/agendaDocumentService.ts` (get/upsert/finalize, 11
+  tests) + `app/agenda/[eventId].tsx`: leadership generate/regenerate/**finalize** a durable
+  agenda; any member views the saved doc; live preview when none saved; honest
+  loading/error/empty. **Goals-needing-attention** is folded in at generate (leadership reads
+  goals; members see it via the saved doc).
+
+**Still gated / next (no longer SQL-gated unless noted):**
+- **Agenda announcements + help-needed sections** — need a submissions-for-cycle read path
+  (only a per-task `get_task_report_submission` exists): a new `list_submissions_for_org_cycle`
+  RPC (**SQL gate**) or per-task enumeration of `goalupdrole_<role>__<period>`. Pure extraction
+  (`extractAgendaContributions` + `groupAgendaContributions`) is ready.
+- **Agenda inline editing** — the service stores an arbitrary `AgendaDocument`; a future
+  editor mutates sections/items and calls upsert (no new schema). Currently generate/
+  regenerate/finalize only.
+- **Leadership/Annotator review wiring** (`lib/goalUpdateReview.ts` ready) — held until the
+  base goal-update submit round-trip is device-verified.
 
 ---
 

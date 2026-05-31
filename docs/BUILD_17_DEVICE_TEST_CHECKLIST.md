@@ -36,9 +36,11 @@ weekly goal-update flow** — on a real device.
 5. Goals permissions + read-only assigned goals + owner selector + visibility (§7).
 6. Goal-assigned in-app notice + the 4 task-action notices + dismiss + actor-exclusion (§7, §9).
 7. "Opens <date>" card cue, idempotent re-runs, Goals error honesty + pull-to-refresh (§7, §7b).
+8. Durable goal-update **snapshot** survives goal edits (§7b); editable **agenda** generate/
+   member-view/finalize (§7c).
 
 **Priority 3 — smoke. Confirm no regressions:**
-8. Today / Tasks / Event Detail / starter-pack read surfaces look unchanged (§8).
+9. Today / Tasks / Event Detail / starter-pack read surfaces look unchanged (§8).
 
 Pass/fail criteria are at the bottom (**"Pass / fail criteria"**).
 
@@ -184,21 +186,55 @@ live goals (not stored), so it must survive reload.
       the form (so you don't submit a check-in-only form thinking you have no goals).
       Reconnect + reopen → the goals appear.
 - [ ] **Leadership read:** on a **second leadership account**, open the submitted task →
-      the same goal questions render read-only with the answers. *(Known: it reflects
-      the role's CURRENT goals — if a goal was archived after submitting, its answer
-      persists but isn't shown. History snapshot is a later lane.)*
+      the same goal questions render read-only with the answers.
+- [ ] **Durable snapshot (NEW — history survives goal edits):** submit a goal update, then
+      **edit or archive one of that role's goals** (rename it / change its target). Reopen
+      the submitted task (as the submitter or a leadership reader) → it shows a
+      **"📌 …from the saved snapshot for that week"** note and renders the goals/questions
+      **as they were when submitted** (the renamed/archived goal still appears with its
+      original title + your answer) — it does **not** drift to the current goals.
+- [ ] **Pre-snapshot fallback:** a goal-update task submitted *before* this build (no stored
+      snapshot) still opens — it falls back to reconstructing from current goals (no crash,
+      no "unavailable").
 - [ ] **No push:** generating or submitting a goal update fires **no** push.
 
 **Known limitations (expected — do NOT file as bugs):**
-- **Current goals are reconstructed, not snapshotted.** The form (and the leadership
-  read view) is rebuilt from the role's goals *as they are now*. If a goal is edited or
-  archived after the officer submitted, the submitted answers persist but the form
-  reflects the *current* goal set — there is no per-cycle historical snapshot yet
-  (that's the Phase D update-history lane).
+- **Updates submitted before this build have no snapshot** → they reconstruct from current
+  goals (so they can still drift). Only updates submitted on this build onward are
+  history-accurate. (Snapshot persistence is now wired; older rows just predate it.)
 - **The window is relative to generation time, not calendar-anchored.** availableAt =
   generation + ~4 days, dueAt = +7 days. Whoever runs it first that ISO week sets the
   window; re-runs the same week are idempotent (they don't move it). It is **not**
   pinned to a fixed weekday.
+
+## 7c. Editable meeting agenda (NEW — persisted; needs the live RPCs)
+The agenda screen (reached from a **meeting Event Detail** → "Open agenda") now persists a
+real document via `agenda_documents`. No fake save.
+- [ ] **Preview (no saved agenda):** open the agenda for a chapter/eboard meeting with no
+      saved doc → it shows a **live preview** (this week's events + open tasks) labeled
+      *"Preview — … not saved yet"* (leadership) / *"… no saved agenda yet"* (member).
+- [ ] **Generate (leadership):** as **President / Pro Consul / Annotator**, tap **"Save
+      agenda document"** → it persists and the banner flips to **"Saved agenda"**. The
+      **Goals Needing Attention** section appears if any active goal is not-started / needs
+      a target / ready-to-complete.
+- [ ] **Member view:** on a **non-leadership** account, open the same meeting's agenda →
+      the **saved** document renders read-only (no Save/Finalize buttons).
+- [ ] **Regenerate:** as leadership, change an event/task, tap **"Regenerate from current"**
+      → the saved doc updates.
+- [ ] **Finalize (lock):** tap **"Finalize (lock)"** → green **"Finalized … read-only"**
+      banner; the Save/Regenerate/Finalize buttons disappear; a further edit attempt is
+      refused by the server (`agenda_finalized`).
+- [ ] **Tap-through:** event/task agenda items open the event/task; goal items open Goals.
+- [ ] **Error honesty:** force offline + open a meeting with a saved agenda → it shows
+      *"Couldn't load the saved agenda. Showing the live preview."* + **Retry**, not a fake
+      blank.
+- [ ] **No push:** generating/finalizing an agenda fires **no** push.
+
+**Known agenda limitations (expected):**
+- **No inline text/item editing yet** — leadership can generate / regenerate / finalize, but
+  not hand-edit section lines (coming next; the store already supports it).
+- **Announcements / Help-needed sections are not populated yet** — they need a
+  submissions-for-cycle read path (only a per-task read exists today).
 
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
