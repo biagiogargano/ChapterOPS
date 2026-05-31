@@ -89,6 +89,11 @@ event/template smoke.
 ## 7. Feature roadmap (post-stabilization order)
 - **D · Goals V1:** text/nonnumeric values (schema decision), progress display for numeric+text,
   update windows, connect Goals → weekly update tasks, goal update history, leadership review.
+  - *Foundation status (no-build):* text values + windows + Goals→weekly-update generation are
+    BUILT; **update history** (`lib/goalUpdateSnapshot` + DRAFT
+    `task_report_submission_snapshot_patch_draft.sql`) and **leadership review**
+    (`lib/goalUpdateReview`, no-schema model) are pure foundations — wire after the base
+    goal-update round-trip is device-verified / the snapshot SQL is applied.
 - **Questionnaire/Weekly Updates V1:** weekly officer update becomes a goal-update/check-in
   task that methodically asks goal updates (current value / no update / what changed / needs
   help / announcements / completion request); reliable definition persistence; leadership read
@@ -99,6 +104,11 @@ event/template smoke.
   planning, agenda linkage, follow-up, repeating events later.
 - **E · Agendas/Meetings:** auto-build old business / new business / needs-help / officer updates
   / announcements / goals needing attention / absent-or-read-minutes tasks.
+  - *Foundation status (no-build):* pure seams BUILT — `lib/agendaGoals` (goals needing
+    attention), `lib/agendaContributions` (announcements/help-needed from updates),
+    `lib/agendaDocument` (editable document model + assembler). Editable persistence is DRAFT
+    `agenda_documents_patch_draft.sql` (see `docs/AGENDA_PERSISTENCE_PLAN.md`). Read-only
+    derived agenda can wire first (fetch goals+submissions, device-verify); editor after apply.
 - **Notifications:** smarter reminders (goal-update due, meeting), settings, avoid spam.
 - **F · Starter packs / multi-org:** packs define role labels/levels/permissions/event kinds/
   templates/questionnaire+goal+agenda defaults. Have: Sigma Chi pack, Club pack as data; runtime

@@ -73,11 +73,33 @@ Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-
   (see below). **Needs device verification** of the generate → submit → reload →
   leadership-read round-trip (a build), like the questionnaire round-trip.
 
-**Still gated (next):**
-- Goal-update → leadership review flow + **update history / snapshot UI** (Phase D) —
-  the one real follow-on: a per-cycle historical record so a reader sees what was
-  answered *then*, independent of later goal edits.
-- Editable agenda persistence (own SQL lane) — read-only agenda is fine for now.
+**Goals → updates → history → review → agenda — FOUNDATIONS BUILT (pure), apply/wire gated:**
+The next product layer now has pure, tested foundations + drafted (unapplied) SQL. Nothing
+is wired (no fake persistence); each is gated on a SQL apply and/or device-verifying the
+base goal-update round-trip first.
+- **Update history / snapshot** — `lib/goalUpdateSnapshot.ts` (26 tests): durable, versioned
+  snapshot of the form + goal context as submitted, so old updates render historically
+  instead of drifting against current goals. **DRAFT SQL:**
+  `supabase/task_report_submission_snapshot_patch_draft.sql` (adds optional
+  `definition_snapshot jsonb` + 4-arg upsert / snapshot-returning get; backward compatible).
+  Wiring waits for the apply.
+- **Leadership/Annotator review** — `lib/goalUpdateReview.ts` (22 tests): v1 model expressed
+  with the EXISTING task states (submitted=pending, approved=reviewed, rejected=changes),
+  **no schema**. Reviewer = Annotator primary + leadership. Wiring (generation sets
+  reviewerRole + requiresApproval; form submits to `submitted`; Task Detail reviewer
+  affordance for goal-update tasks) held until the base submit is device-verified.
+- **Agenda from updates/goals** — pure seams: `lib/agendaGoals.ts` (goals needing
+  attention, 21 tests) + `lib/agendaContributions.groupAgendaContributions` (announcements/
+  help-needed grouping). Read-only agenda is derivable from these once the screen fetches
+  goals + submissions (device-verify first); no new schema for the read path.
+- **Editable agenda persistence** — `lib/agendaDocument.ts` (model + assembler, 18 tests) +
+  **DRAFT SQL** `supabase/agenda_documents_patch_draft.sql` (one agenda per meeting event;
+  RLS + definer RPCs; edit=leadership/annotator, view=any member, finalize lock). Plan:
+  `docs/AGENDA_PERSISTENCE_PLAN.md`. No editor until applied + read path verified.
+
+**Drafted SQL awaiting approval (do NOT apply without explicit greenlight):**
+1. `task_report_submission_snapshot_patch_draft.sql` — goal-update history.
+2. `agenda_documents_patch_draft.sql` — editable meeting agenda.
 
 ---
 
