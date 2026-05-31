@@ -1,24 +1,34 @@
 /**
- * app/agenda/[eventId].tsx — dedicated, READ-ONLY meeting agenda.
+ * app/agenda/[eventId].tsx — meeting agenda: persisted document + live preview.
  *
- * A real-data artifact view for a chapter/eboard meeting: it renders the pure
- * buildAgenda() output (this week's events + open tasks) for the given meeting
- * event. No editing, no persistence, no mock data — it reads getAllEvents() /
- * getAllTasks() / stored task state live. Reached from the "Open agenda" card on
- * Event Detail (officer-gated there).
+ * Two layers:
+ *   • A PERSISTED agenda document (agenda_documents, via lib/agendaDocumentService) —
+ *     leadership/Annotator GENERATE it from the current agenda, everyone VIEWS it, and a
+ *     FINALIZE action locks it (read-only) as the meeting baseline.
+ *   • A live PREVIEW derived from this week's events + open tasks (pure buildAgenda →
+ *     assembleAgendaDocument) shown when no document has been saved yet.
  *
- * Report-derived sections (announcements / help-needed) and minutes capture are
- * intentionally NOT here — they depend on the not-yet-built reports work.
+ * Real persistence only — no fake save. Inline text/item editing of a saved document is a
+ * documented follow-up (the service stores an arbitrary AgendaDocument; a future editor
+ * mutates it and calls upsert). Goals-needing-attention / announcements / help-needed
+ * sections arrive once those reads are wired (Lane 5).
  */
 
-import { buildAgenda, isAgendaEmpty, type AgendaItem } from '@/lib/buildAgenda';
+import { buildAgenda } from '@/lib/buildAgenda';
+import { assembleAgendaDocument, type AgendaDocItem, type AgendaDocSection } from '@/lib/agendaDocument';
+import {
+  getAgendaDocument, upsertAgendaDocument, finalizeAgendaDocument, type AgendaReadResult,
+} from '@/lib/agendaDocumentService';
 import { findEventById, getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getEventDate } from '@/lib/mockEvents';
 import { getStoredProof, getStoredState, useTaskStateVersion } from '@/lib/devTaskStore';
+import { isLeadershipRole } from '@/lib/roles';
+import { useDevRole } from '@/lib/devRoleStore';
+import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const HTTP_RE = /^https?:\/\//i;
 
@@ -26,8 +36,9 @@ export default function AgendaScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const navigation  = useNavigation();
   const router      = useRouter();
+  const { role }    = useDevRole();
 
-  // Re-render when task state / proof changes so the agenda + doc link stay live.
+  // Re-render when task state / proof changes so the live preview stays current.
   useTaskStateVersion();
 
   useEffect(() => {
@@ -35,6 +46,21 @@ export default function AgendaScreen() {
   }, [navigation]);
 
   const event = eventId ? findEventById(eventId) : undefined;
+
+  // Persisted agenda document (loaded on focus).
+  const [docResult, setDocResult] = useState<AgendaReadResult | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const loadDoc = useCallback(async () => {
+    if (!eventId) { setLoadingDoc(false); return; }
+    setLoadingDoc(true);
+    const r = await getAgendaDocument(eventId);
+    setDocResult(r);
+    setLoadingDoc(false);
+  }, [eventId]);
+  useFocusEffect(useCallback(() => { void loadDoc(); }, [loadDoc]));
 
   if (!event) {
     return (
@@ -44,50 +70,99 @@ export default function AgendaScreen() {
     );
   }
 
-  const date     = getEventDate(event.dayOffset);
-  const dateStr  = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const date    = getEventDate(event.dayOffset);
+  const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  // Live-derived agenda → the preview document + the generation source.
   const agenda = buildAgenda({
     events:      getAllEvents().filter(e => e.id !== event.id),   // exclude this meeting
     tasks:       getAllTasks(),
     stateOf:     t => getStoredState(t.id, t.state),
     todayOffset: (new Date().getDay() + 6) % 7,                   // Mon=0 … Sun=6
   });
+  const previewDoc = assembleAgendaDocument({ agenda, includeEmpty: false });
 
-  // Optional, real: if a "Prepare agenda" prep task for THIS event has a saved
-  // link proof (the existing proofContent path), surface it as "Agenda document".
-  // No new field, no schema — just reads what the annotator already submitted.
+  // Optional, real: a "Prepare agenda" prep task's saved link proof → "Agenda document".
   const agendaTask = getAllTasks().find(t =>
-    t.linkedEventId === event.id &&
-    t.proofType === 'link' &&
-    /agenda/i.test(t.title),
+    t.linkedEventId === event.id && t.proofType === 'link' && /agenda/i.test(t.title),
   );
   const agendaDoc = agendaTask ? getStoredProof(agendaTask.id).trim() : '';
   const hasAgendaDoc = HTTP_RE.test(agendaDoc);
 
-  const groups: { label: string; items: AgendaItem[] }[] = [
-    { label: 'Old business', items: agenda.oldBusiness },
-    { label: 'New business', items: agenda.newBusiness },
-    { label: 'Open tasks',   items: agenda.unresolved },
-    { label: 'Everyone',     items: agenda.brotherWide },
-  ].filter(g => g.items.length > 0);
+  const isLeader  = isLeadershipRole(role) || role === 'annotator';
+  const savedDoc  = docResult?.document ?? null;
+  const finalized = !!savedDoc?.finalizedAt;
+  const readFailed = !!docResult && !docResult.ok;
 
-  function openItem(it: AgendaItem) {
-    router.push(
-      it.kind === 'event'
-        ? `/event/${it.id}` as any
-        : `/task/${it.id}?fromEventId=${event!.id}` as any,
-    );
+  // What we render: the saved document's AgendaDocument if present, else the live preview.
+  // (AgendaDocumentRow.sections IS the AgendaDocument — { v, sections: [...] }.)
+  const displayDocument = savedDoc ? savedDoc.sections : previewDoc;
+  const sections = displayDocument.sections.filter(sec => sec.items.length > 0);
+
+  function openDocItem(it: AgendaDocItem) {
+    if (it.kind === 'event' && it.refId) router.push(`/event/${it.refId}` as any);
+    else if (it.kind === 'task' && it.refId) router.push(`/task/${it.refId}?fromEventId=${event!.id}` as any);
+    else if (it.kind === 'goal') router.push('/(tabs)/goals' as any);
+    // 'contribution' / 'note' → no nav target.
+  }
+
+  async function generate() {
+    if (busy) return;
+    setBusy(true); setActionError(null);
+    const res = await upsertAgendaDocument({
+      eventId: event!.id,
+      title:   `${event!.title} — Agenda`,
+      sections: assembleAgendaDocument({ agenda, includeEmpty: false }),
+      generatedFrom: { source: 'buildAgenda', sections: previewDoc.sections.map(x => x.key) },
+    });
+    setBusy(false);
+    if (!res.ok) setActionError('Couldn’t save the agenda. Please try again.');
+    else await loadDoc();
+  }
+
+  async function finalize() {
+    if (busy) return;
+    setBusy(true); setActionError(null);
+    const res = await finalizeAgendaDocument(event!.id);
+    setBusy(false);
+    if (!res.ok) setActionError('Couldn’t finalize the agenda. Please try again.');
+    else await loadDoc();
   }
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-      {/* Meeting header */}
       <Text style={s.title}>{event.title}</Text>
       <Text style={s.subtitle}>{dateStr} · {event.time}</Text>
-      <Text style={s.hint}>Auto-built from this week’s events and open tasks. Read-only.</Text>
 
-      {/* Agenda document (only if a prep task already carries a link) */}
+      {/* Status banner: saved vs preview vs finalized */}
+      {loadingDoc ? (
+        <Text style={s.hint}>Loading the saved agenda…</Text>
+      ) : finalized ? (
+        <View style={[s.banner, s.bannerFinal]}>
+          <Text style={s.bannerText}>✓ Finalized agenda — locked for the meeting (read-only).</Text>
+        </View>
+      ) : savedDoc ? (
+        <View style={s.banner}>
+          <Text style={s.bannerText}>Saved agenda{isLeader ? ' — regenerate to refresh, or finalize to lock.' : ' (read-only).'}</Text>
+        </View>
+      ) : (
+        <Text style={s.hint}>
+          {isLeader
+            ? 'Preview — auto-built from this week’s events and open tasks. Save it to share a fixed agenda with the chapter.'
+            : 'Auto-built from this week’s events and open tasks. Read-only — no saved agenda yet.'}
+        </Text>
+      )}
+
+      {readFailed && (
+        <View style={[s.banner, s.bannerError]}>
+          <Text style={s.bannerText}>Couldn’t load the saved agenda. Showing the live preview.</Text>
+          <Pressable style={s.retryBtn} onPress={() => void loadDoc()}>
+            <Text style={s.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Agenda document link (prep task) */}
       {hasAgendaDoc && (
         <Pressable style={s.docCard} onPress={() => { void Linking.openURL(agendaDoc); }}>
           <Text style={s.docLabel}>AGENDA DOCUMENT</Text>
@@ -95,29 +170,57 @@ export default function AgendaScreen() {
         </Pressable>
       )}
 
-      {isAgendaEmpty(agenda) ? (
+      {/* Sections (saved doc or preview) */}
+      {sections.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyIcon}>🗒️</Text>
           <Text style={s.emptyTitle}>Nothing to put on the agenda yet</Text>
-          <Text style={s.emptyText}>
-            This week’s events and open tasks will appear here as they’re added.
-          </Text>
+          <Text style={s.emptyText}>This week’s events and open tasks will appear here as they’re added.</Text>
         </View>
       ) : (
-        groups.map(g => (
-          <View key={g.label} style={s.group}>
-            <Text style={s.groupLabel}>{g.label}</Text>
-            {g.items.map(it => (
-              <Pressable key={`${it.kind}_${it.id}`} style={s.item} onPress={() => openItem(it)}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.itemTitle} numberOfLines={1}>{it.title}</Text>
-                  <Text style={s.itemMeta} numberOfLines={1}>{it.meta}</Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ))}
+        sections.map((sec: AgendaDocSection) => (
+          <View key={sec.key} style={s.group}>
+            <Text style={s.groupLabel}>{sec.title.toUpperCase()}</Text>
+            {sec.items.map(it => {
+              const tappable = (it.kind === 'event' || it.kind === 'task') && !!it.refId || it.kind === 'goal';
+              return (
+                <Pressable
+                  key={it.id}
+                  style={s.item}
+                  onPress={() => openDocItem(it)}
+                  disabled={!tappable}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.itemTitle} numberOfLines={2}>{it.text}</Text>
+                    {!!it.meta && <Text style={s.itemMeta} numberOfLines={1}>{it.meta}</Text>}
+                  </View>
+                  {tappable && <Text style={s.chevron}>›</Text>}
+                </Pressable>
+              );
+            })}
           </View>
         ))
+      )}
+
+      {/* Leadership actions */}
+      {isLeader && !loadingDoc && !finalized && (
+        <View style={s.actions}>
+          <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={() => void generate()} disabled={busy}>
+            <Text style={s.actionBtnText}>
+              {busy ? 'Saving…' : savedDoc ? 'Regenerate from current' : 'Save agenda document'}
+            </Text>
+          </Pressable>
+          {savedDoc && (
+            <Pressable style={[s.actionBtnSecondary, busy && s.actionBtnDisabled]} onPress={() => void finalize()} disabled={busy}>
+              <Text style={s.actionBtnSecondaryText}>Finalize (lock)</Text>
+            </Pressable>
+          )}
+          {actionError && <Text style={s.actionError}>{actionError}</Text>}
+          <Text style={s.actionHint}>
+            Saving stores this agenda for the chapter. Regenerating overwrites it from the current
+            events/tasks. Finalizing locks it. (Inline text editing is coming next.)
+          </Text>
+        </View>
       )}
 
       <View style={{ height: 40 }} />
@@ -133,6 +236,11 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#94a3b8', marginTop: 2 },
   hint:     { fontSize: 12, color: '#64748b', marginTop: 8, marginBottom: 16, lineHeight: 17 },
 
+  banner:      { backgroundColor: '#1e293b', borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingVertical: 10, paddingHorizontal: 12, marginTop: 10, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  bannerFinal: { borderColor: '#16a34a', backgroundColor: '#052e16' },
+  bannerError: { borderColor: '#b91c1c', backgroundColor: '#1a0505' },
+  bannerText:  { fontSize: 12.5, color: '#cbd5e1', flex: 1, lineHeight: 17 },
+
   docCard:  { backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, gap: 3 },
   docLabel: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 0.6 },
   docLink:  { fontSize: 14, color: '#818cf8', textDecorationLine: 'underline' },
@@ -143,6 +251,18 @@ const s = StyleSheet.create({
   itemTitle:  { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
   itemMeta:   { fontSize: 12, color: '#64748b', marginTop: 1 },
   chevron:    { fontSize: 18, color: '#475569' },
+
+  actions:          { marginTop: 8, gap: 10 },
+  actionBtn:        { backgroundColor: '#4f46e5', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  actionBtnText:    { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+  actionBtnSecondary:     { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#475569', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  actionBtnSecondaryText: { fontSize: 14, fontWeight: '600', color: '#cbd5e1' },
+  actionBtnDisabled: { opacity: 0.5 },
+  actionError:      { fontSize: 12.5, color: '#fca5a5' },
+  actionHint:       { fontSize: 11.5, color: '#64748b', lineHeight: 16 },
+
+  retryBtn:  { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  retryText: { fontSize: 12, color: '#e2e8f0', fontWeight: '600' },
 
   empty:      { alignItems: 'center', paddingTop: 56, gap: 8 },
   emptyIcon:  { fontSize: 30 },
