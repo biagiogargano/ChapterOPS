@@ -96,6 +96,11 @@ Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-
    editable meeting agenda.
 
 **✅ WIRED (real persistence; needs device round-trip verification on the next build):**
+- **My Work hub (officer/member)** — `app/my-work.tsx` (+ broadly-available Me-tab card with
+  live count badge), aggregating real data via pure `lib/myWork.ts` (27 tests): needs-action
+  (overdue/due-soon/returned), weekly-update status (open/not-open/in-review), my active goals
+  (`goalDisplay` + needs-attention), my notices (attention-first). Tap-through; "caught up"
+  empty state. No schema, no push.
 - **Leadership Review Inbox / Command Center** — `app/review.tsx` (+ Me-tab card with live
   count badge), aggregating real data via pure `lib/reviewInbox.ts` (31 tests): updates
   pending review, returned-for-changes, goals needing attention, meeting agendas to

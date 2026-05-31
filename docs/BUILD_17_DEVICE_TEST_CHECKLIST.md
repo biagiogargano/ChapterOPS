@@ -309,6 +309,25 @@ Consul / Annotator**.
 - [ ] **All clear:** with nothing pending, the inbox shows an **"All clear"** state.
 - [ ] **No push:** the inbox sends nothing — it only reads existing data.
 
+## 7e. My Work hub (NEW — Me tab → "My Work", everyone)
+The officer/member counterpart to the Review Inbox. Available to **all** roles; focused on the
+viewer's own role. Real data only.
+- [ ] **Card + badge:** the **Me** tab shows a **"My Work"** card (above Review Inbox) for
+      **any** role, with a live **count badge** of things to do.
+- [ ] **Summary counts:** To do / Update / Goals / Notices match the sections below.
+- [ ] **Needs action now:** as an officer with an **overdue** or **due-soon** task (or a
+      **returned** weekly update), it appears here; tap → the task.
+- [ ] **Weekly update status:** the section reflects your weekly goal-update task —
+      **"Submit your weekly goal update"** when open, **"Opens <date>"** when not open yet,
+      **"In review — waiting for leadership"** after you submit. Tap → the task.
+- [ ] **My goals:** your **active goals** for your role show with their value line (numeric
+      "cur/tgt · NN%" or text "current → target") and a **"needs attention"** highlight where
+      applicable; tap → Goals tab. A failed read shows a retry row (not a fake empty).
+- [ ] **My notices:** your notices show (attention first); tap opens + dismisses.
+- [ ] **Caught up:** with nothing pending, shows **"You're caught up."**
+- [ ] **Member view:** a non-officer (Brother) sees the card and their own (likely empty)
+      work + any chapter-wide tasks/notices — no error, no leadership data.
+
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
       when overdue exists.
