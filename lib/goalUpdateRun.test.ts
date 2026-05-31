@@ -78,6 +78,10 @@ export async function runAsync(): Promise<{ passed: number; failed: number }> {
     const t = findTaskById(goalUpdateTaskId('social_chair', period));
     check('persisted task has availableAt', !!t && t.availableAt === weeklyGoalUpdateWindow(now).availableAt);
     check('persisted task has goal-update def id', !!t && (t.reportDefinitionId ?? '').startsWith('goalupddef_'));
+    // Full run path produces REVIEW-REQUIRED tasks (not just the unit builder).
+    check('persisted task is review-required', !!t && t.requiresApproval === true);
+    check('persisted task reviewer = annotator', !!t && t.reviewerRole === 'annotator');
+    check('persisted task has no proof requirement', !!t && t.requiresProof === false);
 
     // ── re-run same week → everything skipped (idempotent) ──
     const r2 = await runWeeklyGoalUpdateGeneration({ orgId: 'org-run', now, goals });
