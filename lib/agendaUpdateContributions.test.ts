@@ -6,6 +6,8 @@
 import { agendaContributionsFromSubmissions, type UpdateSubmissionLike } from './agendaUpdateContributions';
 import { buildGoalUpdateDefinition } from './goalUpdateDefinition';
 import { buildGoalUpdateSnapshot } from './goalUpdateSnapshot';
+import { assembleAgendaDocument } from './agendaDocument';
+import type { Agenda } from './buildAgenda';
 import { withAnswerValue, withAnswerNoUpdate, type StructuredAnswerMap } from './structuredResponses';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
@@ -83,6 +85,33 @@ function answers(over: (a: StructuredAnswerMap) => StructuredAnswerMap): Structu
 {
   check('empty list → empty groups', (() => { const g = agendaContributionsFromSubmissions([]); return g.announcements.length === 0 && g.helpNeeded.length === 0; })());
   check('nullish list → empty groups (no throw)', (() => { const g = agendaContributionsFromSubmissions(undefined as any); return g.announcements.length === 0 && g.helpNeeded.length === 0; })());
+}
+
+// ── integration: submissions → contributions → assembled agenda (as the screen does) ──
+const emptyAgenda: Agenda = { oldBusiness: [], newBusiness: [], unresolved: [], brotherWide: [] };
+{
+  const a = answers(m => {
+    m = withAnswerValue(m, 'announcements', 'Formal Saturday');
+    m = withAnswerValue(m, 'blockers', 'Need a van');
+    return m;
+  });
+  const contributions = agendaContributionsFromSubmissions([{ definitionSnapshot: snapshot, answers: a, submittedRole: 'social_chair' }]);
+  const doc = assembleAgendaDocument({ agenda: emptyAgenda, contributions, includeEmpty: false });
+  const keys = doc.sections.map(s => s.key);
+  check('assembled doc includes announcements section', keys.includes('announcements'));
+  check('assembled doc includes help_needed section', keys.includes('help_needed'));
+  check('announcement text + source land in the doc',
+    doc.sections.find(s => s.key === 'announcements')!.items[0].text === 'Formal Saturday' &&
+    doc.sections.find(s => s.key === 'announcements')!.items[0].meta === 'Social Chair');
+}
+
+// ── no submissions → optional sections omitted (honest, not empty placeholders) ──
+{
+  const contributions = agendaContributionsFromSubmissions([]);
+  const doc = assembleAgendaDocument({ agenda: emptyAgenda, contributions, includeEmpty: false });
+  check('empty submissions → no help_needed/announcements sections',
+    !doc.sections.some(s => s.key === 'help_needed' || s.key === 'announcements'));
+  check('empty submissions → empty document (nothing else either)', doc.sections.length === 0);
 }
 
 console.log(`\nagendaUpdateContributions.test: ${passed} passed, ${failed} failed`);

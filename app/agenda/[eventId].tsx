@@ -35,7 +35,10 @@ import {
   getAgendaDocument, upsertAgendaDocument, finalizeAgendaDocument, type AgendaReadResult,
 } from '@/lib/agendaDocumentService';
 import { goalsNeedingAttention } from '@/lib/agendaGoals';
+import { agendaContributionsFromSubmissions } from '@/lib/agendaUpdateContributions';
 import { listGoalsForOrgResult } from '@/lib/goalService';
+import { listSubmissionsForOrgCycle } from '@/lib/reportSubmissionService';
+import { weeklyGoalUpdatePeriodKey } from '@/lib/goalUpdateRun';
 import { findEventById, getAllEvents } from '@/lib/eventStore';
 import { getAllTasks } from '@/lib/mockTasks';
 import { getEventDate } from '@/lib/mockEvents';
@@ -150,17 +153,29 @@ export default function AgendaScreen() {
     // reading the saved doc — no member-side goals read is required. A failed/empty goals
     // read just omits the section (honest; never blocks the save).
     let goalsAttn: ReturnType<typeof goalsNeedingAttention> = [];
+    let contributions;
     if (orgId) {
       const gr = await listGoalsForOrgResult(orgId);
       if (gr.ok) goalsAttn = goalsNeedingAttention(gr.goals);
+
+      // Fold Help-Needed / Announcements from this cycle's weekly goal-update submissions.
+      // The list reader is leadership/Annotator-gated (the generate button already is), and
+      // each submission carries its own snapshot so contributions need no per-role goals.
+      // Fail-safe: the wrapper returns [] on error/empty → those sections are simply omitted
+      // (assemble drops empty sections); never blocks the save, never fakes data.
+      // PERIOD: uses the CURRENT weekly period (when leadership generates). Weekly update
+      // tasks key on the same now-relative period. TODO: when meetings get a calendar-anchored
+      // cycle, derive the period from the meeting's week instead of "now".
+      const period = weeklyGoalUpdatePeriodKey(new Date());
+      contributions = agendaContributionsFromSubmissions(await listSubmissionsForOrgCycle(orgId, period));
     }
 
-    const sections = assembleAgendaDocument({ agenda, goalsNeedingAttention: goalsAttn, includeEmpty: false });
+    const sections = assembleAgendaDocument({ agenda, goalsNeedingAttention: goalsAttn, contributions, includeEmpty: false });
     const res = await upsertAgendaDocument({
       eventId: event!.id,
       title:   `${event!.title} — Agenda`,
       sections,
-      generatedFrom: { source: 'buildAgenda+goals', sections: sections.sections.map(x => x.key) },
+      generatedFrom: { source: 'buildAgenda+goals+updates', sections: sections.sections.map(x => x.key) },
     });
     setBusy(false);
     if (!res.ok) setActionError('Couldn’t save the agenda. Please try again.');
