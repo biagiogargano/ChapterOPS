@@ -255,6 +255,20 @@ export function emitAgendaFinalizedNotice(
   if (notice) emitUpdateNotice(notice);
 }
 
+/**
+ * Split notices into two priority tiers for display: `attention` (critical + moderate) and
+ * `fyi` (low). Order within each tier is preserved (callers pass newest-first). Pure.
+ */
+export function partitionNoticesByPriority(notices: UpdateNotice[]): { attention: UpdateNotice[]; fyi: UpdateNotice[] } {
+  const attention: UpdateNotice[] = [];
+  const fyi: UpdateNotice[] = [];
+  for (const n of notices ?? []) {
+    if (n.severity === 'low') fyi.push(n);
+    else attention.push(n);
+  }
+  return { attention, fyi };
+}
+
 // ─── Acknowledge ────────────────────────────────────────────────────────────
 
 /** Mark a notice acknowledged for one role (hides it for that role). */

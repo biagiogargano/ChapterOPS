@@ -4,6 +4,7 @@ import { findTaskById } from '@/lib/mockTasks';
 import {
   acknowledgeNotice,
   getNoticesForRole,
+  partitionNoticesByPriority,
   useUpdateNoticesVersion,
   type UpdateNotice,
   type UpdateSeverity,
@@ -64,16 +65,37 @@ export default function NotificationsScreen() {
     }
   }
 
+  const { attention, fyi } = partitionNoticesByPriority(notices);
+
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       {notices.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyIcon}>✓</Text>
           <Text style={s.emptyTitle}>No notifications</Text>
-          <Text style={s.emptyText}>You're all caught up.</Text>
+          <Text style={s.emptyText}>You're all caught up. Tap any notice to open it and dismiss it.</Text>
         </View>
       ) : (
-        notices.map(n => <NoticeCard key={n.id} notice={n} onPress={() => handlePress(n)} />)
+        <>
+          <Text style={s.countHeader}>
+            {notices.length} {notices.length === 1 ? 'notification' : 'notifications'}
+            {attention.length > 0 ? ` · ${attention.length} need${attention.length === 1 ? 's' : ''} attention` : ''}
+          </Text>
+
+          {attention.length > 0 && (
+            <>
+              {fyi.length > 0 && <Text style={s.tierLabel}>NEEDS ATTENTION</Text>}
+              {attention.map(n => <NoticeCard key={n.id} notice={n} onPress={() => handlePress(n)} />)}
+            </>
+          )}
+
+          {fyi.length > 0 && (
+            <>
+              {attention.length > 0 && <Text style={[s.tierLabel, { marginTop: 8 }]}>FYI</Text>}
+              {fyi.map(n => <NoticeCard key={n.id} notice={n} onPress={() => handlePress(n)} />)}
+            </>
+          )}
+        </>
       )}
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -85,6 +107,9 @@ export default function NotificationsScreen() {
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: '#0f172a' },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+
+  countHeader: { fontSize: 13, color: '#94a3b8', fontWeight: '600', marginBottom: 12 },
+  tierLabel:   { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.8, marginBottom: 8 },
 
   card:    { flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
   stripe:  { width: 4 },

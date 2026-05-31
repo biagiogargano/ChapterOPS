@@ -9,8 +9,8 @@
 import {
   buildTaskActionNotice, emitTaskActionNotice, buildGoalAssignedNotice, emitGoalAssignedNotice,
   buildAgendaFinalizedNotice, emitAgendaFinalizedNotice, emitUpdateNotice,
-  getNoticesForRole, acknowledgeNotice,
-  type TaskActionKind,
+  getNoticesForRole, acknowledgeNotice, partitionNoticesByPriority,
+  type TaskActionKind, type UpdateNotice,
 } from './updateNoticeStore';
 
 const proc: { exit(code: number): never } = (globalThis as any).process;
@@ -183,6 +183,23 @@ check('agenda-finalized → default title when blank',
   const live = 'expiry_entity_live';
   emitUpdateNotice({ entityType: 'task', entityId: live, summary: 'live', severity: 'low', audienceRoles: ['tribune'], changedByRole: 'president', expiresInDays: 7 });
   check('a live notice IS returned', getNoticesForRole('tribune').some(n => n.entityId === live));
+}
+
+// ── partitionNoticesByPriority: attention (critical+moderate) vs fyi (low) ────
+{
+  const mk = (id: string, severity: 'critical' | 'moderate' | 'low'): UpdateNotice => ({
+    id, entityType: 'task', entityId: id, summary: id, severity,
+    audienceRoles: ['president'], changedByRole: 'x', acknowledgedBy: [],
+    createdAt: '', expiresAt: '',
+  });
+  const list = [mk('c', 'critical'), mk('l1', 'low'), mk('m', 'moderate'), mk('l2', 'low')];
+  const { attention, fyi } = partitionNoticesByPriority(list);
+  check('attention = critical + moderate', attention.map(n => n.id).join(',') === 'c,m');
+  check('fyi = low only', fyi.map(n => n.id).join(',') === 'l1,l2');
+  check('order preserved within tiers', attention[0].id === 'c' && fyi[0].id === 'l1');
+  const empty = partitionNoticesByPriority([]);
+  check('empty input → empty tiers', empty.attention.length === 0 && empty.fyi.length === 0);
+  check('nullish input → empty tiers (no throw)', (() => { const r = partitionNoticesByPriority(undefined as any); return r.attention.length === 0 && r.fyi.length === 0; })());
 }
 
 console.log(`\nupdateNoticeStore.test: ${passed} passed, ${failed} failed`);
