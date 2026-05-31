@@ -3,6 +3,7 @@ import { DEMO_CHAPTER, DEMO_USER } from '@/lib/demoUser';
 import { useDevRole } from '@/lib/devRoleStore';
 import { useIdentity } from '@/lib/identityStore';
 import { ROLES, ROLE_LABELS, ROLE_SWITCHER_OPTIONS, isOfficer, type Role } from '@/lib/roles';
+import { canAccessReviewInbox } from '@/lib/reviewInbox';
 import { AUTH_ENABLED } from '@/lib/flags';
 import { generateQuestionnaireTasks } from '@/lib/reportGeneration';
 import { getQuestionnaireDefinition } from '@/lib/reportDefinitions';
@@ -335,6 +336,17 @@ export default function MeScreen() {
             ))}
           </View>
         </View>
+      )}
+
+      {/* ── Leadership Review Inbox (Consul / Pro Consul / Annotator) ── */}
+      {canAccessReviewInbox(role) && (
+        <Pressable style={s.linkCard} onPress={() => router.push('/review' as any)}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.linkTitle}>Review Inbox</Text>
+            <Text style={s.linkSub}>Updates to review, goals needing attention, agendas to prepare</Text>
+          </View>
+          <Text style={s.linkChevron}>›</Text>
+        </Pressable>
       )}
 
       {/* ── Manage templates (officers) ── */}
