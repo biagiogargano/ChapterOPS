@@ -48,6 +48,7 @@ import {
   definitionFromSnapshot,
   type GoalUpdateSnapshot,
 } from '@/lib/goalUpdateSnapshot';
+import { goalUpdateReviewStage, reviewStageHint } from '@/lib/goalUpdateReview';
 import { listGoalsForOrgResult, listMyGoalsResult, type GoalListResult } from '@/lib/goalService';
 import { taskWindowView } from '@/lib/taskWindow';
 import {
@@ -798,6 +799,7 @@ function ReportFormSection({
   done,
   onSubmitted,
   snapshot,
+  taskState,
 }: {
   definition:  StructuredResponseDefinition;
   taskId:      string;
@@ -807,6 +809,8 @@ function ReportFormSection({
   /** Durable definition snapshot to persist on submit (goal-update tasks). Undefined for
    *  ordinary questionnaires → upsert behaves exactly as before. */
   snapshot?:   unknown;
+  /** The task's current state — drives the read-only "submitted/awaiting review" copy. */
+  taskState?:  TaskState;
 }) {
   const [answers, setAnswers]       = useState<StructuredAnswerMap>({});
   const [submitting, setSubmitting] = useState(false);
@@ -858,7 +862,7 @@ function ReportFormSection({
                   <View key={q.key}>
                     <Text style={s.reportPrompt}>{q.prompt}</Text>
                     {a?.noUpdate ? (
-                      <Text style={s.reportNoUpdateTag}>No update</Text>
+                      <Text style={s.reportNoUpdateTag}>No update this cycle</Text>
                     ) : hasValue ? (
                       <Text style={s.proofDisplayContent}>{a!.value}</Text>
                     ) : (
@@ -870,10 +874,15 @@ function ReportFormSection({
             </View>
           </>
         ) : (
-          // Reader viewing before the assignee has submitted. Answers only persist
-          // on full submit (which flips the task to done), so a not-done read-only
-          // view is always "nothing submitted yet" — say so instead of empty dashes.
-          <Text style={s.reportHint}>Not submitted yet.</Text>
+          // Not done. Today a report/goal-update task goes submit → approved (done), so a
+          // not-done read-only view means nothing was submitted yet. If/when review is wired
+          // (submit → 'submitted' → reviewer approves), reflect that review stage instead of a
+          // misleading "Not submitted yet." (drives goalUpdateReview copy; harmless today).
+          <Text style={s.reportHint}>
+            {taskState === 'submitted' || taskState === 'rejected'
+              ? reviewStageHint(goalUpdateReviewStage(taskState))
+              : 'Not submitted yet.'}
+          </Text>
         )}
       </View>
     );
@@ -1541,6 +1550,7 @@ export default function TaskDetailScreen() {
               editable={isAssignee && !windowLocked}
               done={taskState === 'approved'}
               snapshot={goalUpdateSnapshot ?? undefined}
+              taskState={taskState}
               onSubmitted={() => {
                 // Report submitted → mark the task complete (approved = done per
                 // isTaskCompleted; reports have no review gate), then return. The
