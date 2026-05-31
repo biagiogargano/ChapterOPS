@@ -96,6 +96,14 @@ Decision: MANUAL weekly generation, no scheduler/push/AI/background job. End-to-
    editable meeting agenda.
 
 **✅ WIRED (real persistence; needs device round-trip verification on the next build):**
+- **Leadership Review Inbox / Command Center** — `app/review.tsx` (+ Me-tab card with live
+  count badge), aggregating real data via pure `lib/reviewInbox.ts` (31 tests): updates
+  pending review, returned-for-changes, goals needing attention, meeting agendas to
+  generate/finalize, recent notices — with tap-through. Access = Consul/Pro Consul/Annotator
+  (`canAccessReviewInbox`). No new schema, no push, no permission change.
+- **Meeting-relative agenda period** — `agendaReportingPeriodKey(eventDate, fallback)` (6
+  tests); agenda generate pulls the meeting's own week's updates.
+- **Notifications priority grouping** — `partitionNoticesByPriority` (NEEDS ATTENTION / FYI).
 - **Goal-update snapshot write/read** — on submit, Task Detail builds
   `buildGoalUpdateSnapshot(...)` and persists it via the 4-arg upsert; on read it prefers the
   stored snapshot (`definitionFromSnapshot` / `pickGoalUpdateDefinition`) over live

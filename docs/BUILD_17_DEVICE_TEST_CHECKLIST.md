@@ -279,13 +279,35 @@ real document via `agenda_documents`. No fake save.
 - [ ] **No push:** generating / editing / finalizing an agenda fires **no** push.
 
 **Known agenda limitations (expected):**
-- **Update-derived sections use the CURRENT weekly period** (when leadership generates), not
-  a meeting-anchored week. If the meeting is for a different week than "now", the
-  Announcements/Help-Needed reflect this week's submissions. (Calendar-anchored per-meeting
-  cycles are a later decision.)
+- **Update-derived sections use the MEETING's week** (`agendaReportingPeriodKey` from the event
+  date, fallback current week). With the current event model (dayOffset within the current
+  week) this equals the current week; a fully org-configurable reporting calendar is future work.
 - **Help-Needed / Announcements come only from snapshot-backed submissions** — updates
   submitted before snapshot persistence shipped contribute nothing (they have no stored
   definition to attribute questions). New submissions are fine.
+
+## 7d. Leadership Review Inbox (NEW — Me tab → "Review Inbox")
+A leadership-only command center aggregating real actionable items. Access = **Consul / Pro
+Consul / Annotator**.
+- [ ] **Card + access:** as leadership, the **Me** tab shows a **"Review Inbox"** card (with a
+      live **count badge** when there are pending items). A **non-leadership** officer does
+      **not** see the card; opening `/review` directly shows a harmless **"No leadership
+      actions"** state.
+- [ ] **Summary counts:** the top row shows To review / Goals / Agendas / Returned counts that
+      match the sections below.
+- [ ] **Updates pending review:** submit a weekly goal update (as an officer) → as the
+      **Annotator** (or leadership), the inbox lists it under **Updates pending review**; tap →
+      opens the task to approve / request changes. After approving, it leaves the list.
+- [ ] **Returned for changes:** request changes on an update → it appears under **Returned for
+      changes** until the officer resubmits.
+- [ ] **Goals needing attention:** with an active goal that's not-started / needs a target /
+      ready-to-complete, it appears under **Goals needing attention**; tap → Goals tab.
+- [ ] **Meeting agendas:** a chapter/eboard meeting with no saved agenda (or saved-unfinalized)
+      appears under **Meeting agendas** ("generate one" / "review & finalize"); tap → the agenda
+      screen. A finalized agenda drops off the list.
+- [ ] **Recent notices:** important notices show; tap opens + dismisses.
+- [ ] **All clear:** with nothing pending, the inbox shows an **"All clear"** state.
+- [ ] **No push:** the inbox sends nothing — it only reads existing data.
 
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only
@@ -309,6 +331,9 @@ real document via `agenda_documents`. No fake save.
 - [ ] **No new push** is expected from questionnaire generation/submission or Goals —
       those flows send nothing. Push **scope is unchanged** (still the 4 task
       responsibility pushes).
+- [ ] **Notifications grouping (NEW):** the Notifications screen shows a count header and, when
+      there's a mix, **NEEDS ATTENTION** (critical/moderate) above **FYI** (low). Tap-through +
+      dismiss unchanged.
 - [ ] **In-app mirroring (NEW):** each of the **four task pushes** now also creates an
       in-app **Notifications** item. Test each:
   - [ ] **Task assigned** → as the assignee, the **Notifications** screen shows
