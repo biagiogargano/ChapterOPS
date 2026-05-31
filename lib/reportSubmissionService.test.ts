@@ -16,6 +16,7 @@
 import {
   upsertTaskReportSubmission,
   getTaskReportSubmission,
+  listSubmissionsForOrgCycle,
 } from './reportSubmissionService';
 import type { StructuredAnswerMap } from './structuredResponses';
 
@@ -52,11 +53,20 @@ export async function runAsync(): Promise<{ passed: number; failed: number }> {
   check('get null on empty taskId',
     (await getTaskReportSubmission('')) === null);
 
+  // ── List-for-cycle (draft RPC): [] when unconfigured / bad input ──────────────
+  check('listSubmissionsForOrgCycle → [] when unconfigured',
+    (await listSubmissionsForOrgCycle('org-1', '2026-W23')).length === 0);
+  check('listSubmissionsForOrgCycle → [] on empty orgId',
+    (await listSubmissionsForOrgCycle('', '2026-W23')).length === 0);
+  check('listSubmissionsForOrgCycle → [] on empty period',
+    (await listSubmissionsForOrgCycle('org-1', '')).length === 0);
+
   // ── Never throws ────────────────────────────────────────────────────────────
   let threw = false;
   try {
     await upsertTaskReportSubmission('t', 'd', {});
     await getTaskReportSubmission('t');
+    await listSubmissionsForOrgCycle('o', 'p');
   } catch { threw = true; }
   check('service never throws', threw === false);
 

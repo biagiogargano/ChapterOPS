@@ -122,3 +122,35 @@ export async function getTaskReportSubmission(taskId: string): Promise<ReportSub
     return null;
   }
 }
+
+/**
+ * List every goal-update submission for an org + cycle period via the
+ * list_submissions_for_org_cycle RPC (agenda contributions read path). Returns [] when
+ * unconfigured, on error/empty, or when the caller isn't a leadership/agenda reader (the
+ * RPC returns an empty set). Never throws.
+ *
+ * ⚠️ The RPC is a DRAFT (supabase/list_submissions_for_org_cycle_patch_draft.sql) — UNAPPLIED.
+ *    Until it's applied this returns [] (the call errors and is swallowed), so a caller
+ *    degrades to "no contributions" honestly rather than faking data.
+ */
+export async function listSubmissionsForOrgCycle(orgId: string, period: string): Promise<ReportSubmission[]> {
+  if (!isSupabaseConfigured()) return [];
+  if (!orgId || !period) return [];
+  try {
+    const { data, error } = await supabase.rpc('list_submissions_for_org_cycle', { p_org_id: orgId, p_period: period });
+    if (error) { console.warn('[reportSubmissionService] list error:', error.message); return []; }
+    const rows = Array.isArray(data) ? data : [];
+    return rows.map((row: any) => ({
+      taskId:             row.task_id ?? '',
+      definitionId:       row.definition_id ?? '',
+      answers:            (row.answers && typeof row.answers === 'object' ? (row.answers as StructuredAnswerMap) : {}),
+      definitionSnapshot: row.definition_snapshot ?? null,
+      submittedRole:      row.submitted_role ?? '',
+      submittedAt:        row.submitted_at ?? '',
+      updatedAt:          row.updated_at ?? '',
+    }));
+  } catch (err) {
+    console.warn('[reportSubmissionService] list threw:', err);
+    return [];
+  }
+}
