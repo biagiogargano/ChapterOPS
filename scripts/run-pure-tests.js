@@ -33,7 +33,7 @@ const EXPECTED = [
   'questionnaireGenerationFlow', 'questionnaireGenerationPlan', 'questionnaireTemplates',
   'reportDefinitions', 'rolePackRuntime', 'starterPacks', 'starterPackValidation',
   'templatePackView',
-  'reportGeneration', 'reportSubmissionService', 'reportTasks', 'roles',
+  'reportGeneration', 'reportSubmissionService', 'reportTasks', 'reviewInbox', 'roles',
   'routeTarget', 'structuredResponses', 'taskAssignment', 'taskCompletion',
   'taskListView', 'taskServiceMapping', 'taskWindow', 'todayFeed', 'updateNoticeStore',
 ];
