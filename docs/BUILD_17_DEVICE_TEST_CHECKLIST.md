@@ -223,9 +223,12 @@ real document via `agenda_documents`. No fake save.
       doc shows a **HELP NEEDED** and/or **ANNOUNCEMENTS** section with those lines, each
       attributed to the officer's role (e.g. "— Social Chair"). "No update"/blank answers
       contribute nothing.
+- [ ] **Officer Priorities section (NEW):** if officers' weekly updates have a **"Priorities
+      for next period"** answer, generating the agenda adds an **OFFICER PRIORITIES** section,
+      one attributed line per officer. ("No update"/blank priorities contribute nothing.)
 - [ ] **Saves with no submissions:** with **no** weekly-update submissions for the week,
       generate → the agenda still **saves** and simply has **no** Help Needed / Announcements
-      sections (honest omission, no empty placeholders, no error).
+      / Officer Priorities sections (honest omission, no empty placeholders, no error).
 - [ ] **Regenerate updates sections:** submit/another update with a new announcement →
       **Regenerate from current** → the agenda's Announcements/Help-Needed reflect the latest
       submissions.

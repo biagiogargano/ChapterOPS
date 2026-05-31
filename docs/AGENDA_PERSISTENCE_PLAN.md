@@ -20,6 +20,9 @@ update-derived Help-Needed/Announcements).** Governed by `docs/MASTER_ROADMAP.md
   weeklyGoalUpdatePeriodKey(now))` → `agendaContributionsFromSubmissions(...)` →
   `assembleAgendaDocument`. Fail-safe: empty/failed list omits the sections; only
   snapshot-backed submissions contribute; role-attributed.
+- **Officer Priorities section** — WIRED. `officerPriorityItems(subs)` pulls each officer's
+  "priorities for next period" answer from the same fetch → `officer_updates` section
+  (`assembleAgendaDocument`). Same fail-safe / snapshot-backed / attributed rules.
 
 **Deferred:**
 - **Meeting-anchored cycle** — update-derived sections currently use the current weekly period
