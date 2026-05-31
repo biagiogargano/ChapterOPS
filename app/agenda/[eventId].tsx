@@ -242,11 +242,11 @@ export default function AgendaScreen() {
         </View>
       ) : finalized ? (
         <View style={[s.banner, s.bannerFinal]}>
-          <Text style={s.bannerText}>✓ Finalized agenda — locked for the meeting (read-only).</Text>
+          <Text style={s.bannerText}>✓ Finalized — this agenda is locked as the meeting’s official baseline. It can’t be edited or regenerated.</Text>
         </View>
       ) : savedDoc ? (
         <View style={s.banner}>
-          <Text style={s.bannerText}>Saved agenda{isLeader ? ' — regenerate to refresh, or finalize to lock.' : ' (read-only).'}</Text>
+          <Text style={s.bannerText}>Saved agenda{isLeader ? ' — regenerate to refresh, edit to hand-tune, or finalize to lock.' : ' — members view only; leadership can edit, regenerate, or finalize.'}</Text>
         </View>
       ) : (
         <Text style={s.hint}>
@@ -326,8 +326,12 @@ export default function AgendaScreen() {
           {sections.length === 0 ? (
             <View style={s.empty}>
               <Text style={s.emptyIcon}>🗒️</Text>
-              <Text style={s.emptyTitle}>Nothing to put on the agenda yet</Text>
-              <Text style={s.emptyText}>This week’s events and open tasks will appear here as they’re added.</Text>
+              <Text style={s.emptyTitle}>{finalized ? 'Finalized — nothing on the agenda' : 'Nothing to put on the agenda yet'}</Text>
+              <Text style={s.emptyText}>
+                {finalized
+                  ? 'This agenda was finalized with no items.'
+                  : 'This week’s events and open tasks will appear here as they’re added.'}
+              </Text>
             </View>
           ) : (
             sections.map((sec: AgendaDocSection) => (
@@ -370,8 +374,8 @@ export default function AgendaScreen() {
               {actionError && <Text style={s.actionError}>{actionError}</Text>}
               <Text style={s.actionHint}>
                 {savedDoc
-                  ? 'Edit to hand-tune lines, Regenerate to rebuild from current events/tasks, or Finalize to lock.'
-                  : 'Save to store this agenda for the chapter.'}
+                  ? 'Edit to hand-tune lines, Regenerate to rebuild from current events/tasks (this discards manual edits), or Finalize to lock.'
+                  : 'Save to store this agenda for the chapter. It pulls in this week’s events, open tasks, goals needing attention, and submitted weekly updates.'}
               </Text>
             </View>
           )}
