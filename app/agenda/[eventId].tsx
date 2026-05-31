@@ -46,7 +46,7 @@ import { useDevRole } from '@/lib/devRoleStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const HTTP_RE = /^https?:\/\//i;
 
@@ -128,6 +128,19 @@ export default function AgendaScreen() {
     // 'contribution' / 'note' → no nav target.
   }
 
+  // Regenerating overwrites the saved doc (incl. hand-edits) → confirm first when one exists.
+  function confirmRegenerate() {
+    if (!savedDoc) { void generate(); return; }
+    Alert.alert(
+      'Regenerate agenda?',
+      'This replaces the saved agenda — including any edits you made — with a fresh one built from the current events, tasks, and goals.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Regenerate', style: 'destructive', onPress: () => { void generate(); } },
+      ],
+    );
+  }
+
   async function generate() {
     if (busy) return;
     setBusy(true); setActionError(null);
@@ -198,9 +211,13 @@ export default function AgendaScreen() {
       <Text style={s.title}>{event.title}</Text>
       <Text style={s.subtitle}>{dateStr} · {event.time}</Text>
 
-      {/* Status banner: saved vs preview vs finalized */}
+      {/* Status banner: editing vs saved vs preview vs finalized */}
       {loadingDoc ? (
         <Text style={s.hint}>Loading the saved agenda…</Text>
+      ) : editing ? (
+        <View style={s.banner}>
+          <Text style={s.bannerText}>Editing agenda — make changes below, then Save changes or Cancel.</Text>
+        </View>
       ) : finalized ? (
         <View style={[s.banner, s.bannerFinal]}>
           <Text style={s.bannerText}>✓ Finalized agenda — locked for the meeting (read-only).</Text>
@@ -313,7 +330,7 @@ export default function AgendaScreen() {
           {/* Leadership actions */}
           {isLeader && !loadingDoc && !finalized && (
             <View style={s.actions}>
-              <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={() => void generate()} disabled={busy}>
+              <Pressable style={[s.actionBtn, busy && s.actionBtnDisabled]} onPress={confirmRegenerate} disabled={busy}>
                 <Text style={s.actionBtnText}>
                   {busy ? 'Saving…' : savedDoc ? 'Regenerate from current' : 'Save agenda document'}
                 </Text>
