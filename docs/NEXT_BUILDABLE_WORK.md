@@ -118,16 +118,25 @@ base goal-update round-trip first.
   loading/error/empty. **Goals-needing-attention** is folded in at generate (leadership reads
   goals; members see it via the saved doc).
 
-**Still gated / next (no longer SQL-gated unless noted):**
-- **Agenda announcements + help-needed sections** — need a submissions-for-cycle read path
-  (only a per-task `get_task_report_submission` exists): a new `list_submissions_for_org_cycle`
-  RPC (**SQL gate**) or per-task enumeration of `goalupdrole_<role>__<period>`. Pure extraction
-  (`extractAgendaContributions` + `groupAgendaContributions`) is ready.
-- **Agenda inline editing** — the service stores an arbitrary `AgendaDocument`; a future
-  editor mutates sections/items and calls upsert (no new schema). Currently generate/
-  regenerate/finalize only.
+**✅ Agenda inline editing — WIRED.** Leadership/Annotator edit a saved, unfinalized doc
+(section titles + item text, add manual item, remove line), persisted via
+`upsertAgendaDocument`; regenerate confirms before overwriting edits; members + finalized
+docs read-only. Pure immutable helpers in `lib/agendaDocument.ts` (set/add/remove/prune, 36
+tests). (`app/agenda/[eventId].tsx`.)
+
+**Still gated / next:**
+- **Agenda announcements + help-needed sections** — read path DRAFTED:
+  `supabase/list_submissions_for_org_cycle_patch_draft.sql` (**SQL gate — unapplied**) + the
+  ready wrapper `reportSubmissionService.listSubmissionsForOrgCycle` (returns [] until applied).
+  On apply: at generate, `listSubmissionsForOrgCycle(org, period)` → per-submission
+  `pickGoalUpdateDefinition` → `extractAgendaContributions` → `groupAgendaContributions` →
+  pass to `assembleAgendaDocument`. All the pure pieces are tested.
 - **Leadership/Annotator review wiring** (`lib/goalUpdateReview.ts` ready) — held until the
   base goal-update submit round-trip is device-verified.
+
+**Drafted SQL awaiting approval (do NOT apply without explicit greenlight):**
+- `list_submissions_for_org_cycle_patch_draft.sql` — agenda contributions read path (definer
+  reader; leadership/annotator read-set; deny-by-default unchanged).
 
 ---
 

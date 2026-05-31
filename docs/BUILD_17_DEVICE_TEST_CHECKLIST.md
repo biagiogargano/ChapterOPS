@@ -219,22 +219,31 @@ real document via `agenda_documents`. No fake save.
       a target / ready-to-complete.
 - [ ] **Member view:** on a **non-leadership** account, open the same meeting's agenda →
       the **saved** document renders read-only (no Save/Finalize buttons).
-- [ ] **Regenerate:** as leadership, change an event/task, tap **"Regenerate from current"**
-      → the saved doc updates.
+- [ ] **Edit (NEW):** as leadership, tap **"Edit agenda"** → an **"Editing agenda"** banner
+      shows and each line becomes editable. **Edit an item's text**, **edit a section title**,
+      **+ Add item** (type a manual line), and **×** to remove a line. Tap **Save changes** →
+      reopen → the edits **persisted**. **Cancel** discards edits (nothing saved). Empty
+      lines / untouched empty sections are dropped on save.
+- [ ] **Regenerate confirm:** as leadership, tap **"Regenerate from current"** → a confirm
+      dialog warns it **replaces the saved agenda including your edits**; **Cancel** keeps your
+      edits; **Regenerate** rebuilds from current events/tasks/goals.
 - [ ] **Finalize (lock):** tap **"Finalize (lock)"** → green **"Finalized … read-only"**
-      banner; the Save/Regenerate/Finalize buttons disappear; a further edit attempt is
+      banner; the Edit/Regenerate/Finalize buttons disappear; a further edit attempt is
       refused by the server (`agenda_finalized`).
-- [ ] **Tap-through:** event/task agenda items open the event/task; goal items open Goals.
+- [ ] **Member cannot edit:** on a non-leadership account, **no Edit/Regenerate/Finalize/Save**
+      buttons appear — view only.
+- [ ] **Tap-through (read mode):** event/task agenda items open the event/task; goal items
+      open Goals.
 - [ ] **Error honesty:** force offline + open a meeting with a saved agenda → it shows
       *"Couldn't load the saved agenda. Showing the live preview."* + **Retry**, not a fake
       blank.
-- [ ] **No push:** generating/finalizing an agenda fires **no** push.
+- [ ] **No push:** generating / editing / finalizing an agenda fires **no** push.
 
 **Known agenda limitations (expected):**
-- **No inline text/item editing yet** — leadership can generate / regenerate / finalize, but
-  not hand-edit section lines (coming next; the store already supports it).
-- **Announcements / Help-needed sections are not populated yet** — they need a
-  submissions-for-cycle read path (only a per-task read exists today).
+- **Announcements / Help-needed sections are not populated yet** — they need the
+  list-submissions-for-cycle RPC (**DRAFT, unapplied** —
+  `supabase/list_submissions_for_org_cycle_patch_draft.sql`). The client wrapper + pure
+  extraction are ready; until applied, those sections are honestly omitted (never faked).
 
 ## 8. Quick smoke check (no regressions)
 - [ ] **Today** tab: overdue items first, accurate summary line, red header only

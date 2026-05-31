@@ -1,22 +1,28 @@
 # Agenda Persistence Plan (editable meeting agenda)
 
-Status: **SQL APPLIED + WIRED (generate / view / finalize).** Inline editing +
-update-derived sections deferred. Governed by `docs/MASTER_ROADMAP.md` (Phase E).
+Status: **SQL APPLIED + WIRED (generate / view / inline edit / finalize).**
+Update-derived sections (announcements/help-needed) drafted but unapplied. Governed by
+`docs/MASTER_ROADMAP.md` (Phase E).
 
-**Implemented (commits `9e428f0`, `648b2e5`, `688926e`):**
+**Implemented:**
 - `lib/agendaDocumentService.ts` — fallback-safe get/upsert/finalize wrappers (11 tests).
-- `app/agenda/[eventId].tsx` — load saved doc; leadership generate / regenerate / finalize;
-  members view; live preview when none saved; honest loading/error/empty; tap-through.
+- `app/agenda/[eventId].tsx` — load saved doc; leadership generate / regenerate (with confirm)
+  / **inline edit** / finalize; members view; live preview when none saved; honest
+  loading/error/empty; tap-through.
+- **Inline editing** — pure immutable helpers in `lib/agendaDocument.ts` (setSectionTitle,
+  setItemText, addManualItem, removeItem, withAllCanonicalSections, pruneEmptySections; 36
+  tests). Edit mode persists via upsert; finalized/members read-only.
 - Goals-needing-attention folded in at generate time (leadership reads goals; members see it
   via the saved doc).
 
-**Deferred (precise next steps):**
-- **Inline item/section editing** — the service stores an arbitrary `AgendaDocument`; a future
-  editor mutates sections/items and calls upsert. No new schema.
-- **Announcements / help-needed sections** — need a submissions-for-cycle read path (only a
-  per-task `get_task_report_submission` exists): a new `list_submissions_for_org_cycle` RPC
-  (cleanest, SQL gate) or per-task enumeration. Pure extraction is ready
-  (`extractAgendaContributions` + `groupAgendaContributions`).
+**Deferred (read path DRAFTED, unapplied):**
+- **Announcements / help-needed sections** — DRAFT
+  `supabase/list_submissions_for_org_cycle_patch_draft.sql` (definer LIST reader for an org +
+  cycle; leadership/annotator read-set). Client wrapper
+  `reportSubmissionService.listSubmissionsForOrgCycle` is ready (returns [] until applied).
+  On apply, wire at generate: list → `pickGoalUpdateDefinition` per submission →
+  `extractAgendaContributions` → `groupAgendaContributions` → `assembleAgendaDocument`.
+- **Minutes / versioning** — still out of scope; `finalized_at` is the baseline hook.
 
 ## Problem
 The meeting agenda is read-only and derived live (`lib/buildAgenda` from events+tasks;
