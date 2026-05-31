@@ -32,9 +32,12 @@
 --   • Org isolation: RPCs resolve roles via public.auth_user_roles_for_org(org) and gate
 --     edit vs view on those roles. tasks/events are untouched.
 --
--- DEPENDENCY: reuses public.auth_user_roles_for_org(uuid) (already live). Assumes an
---   events table public.events(id uuid, chapter_id uuid) — adjust the FK/column names at
---   apply time to match the live events schema (the events table predates these drafts).
+-- DEPENDENCY: reuses public.auth_user_roles_for_org(uuid) (already live). Reads
+--   public.events(id uuid, chapter_id uuid) inside the RPCs (late-bound; resolved at call
+--   time). NOTE: event_id is a SOFT reference — NO foreign key is declared on it by design,
+--   so apply never fails on the events schema. Just confirm the live events table is named
+--   `events` and has a `chapter_id` column (it does in the repo schema, both events_schema.sql
+--   and schema.sql) before relying on the agenda RPCs at runtime.
 -- ════════════════════════════════════════════════════════════════════════════
 
 begin;
